@@ -294,7 +294,7 @@ export function PasswordManager() {
                 </div>
 
                 <div className="info-box">
-                  <h3>What's Next?</h3>
+                  <h3>What&apos;s Next?</h3>
                   <ul>
                     <li>✅ v2 Rust program code complete</li>
                     <li>✅ Frontend dashboard complete</li>
@@ -306,12 +306,12 @@ export function PasswordManager() {
                 </div>
 
                 <div className="info-box">
-                  <h3>For Now:</h3>
+                  <h3>Development Status:</h3>
                   <p>
-                    You can still use the <a href="/" style={{color: '#667eea', textDecoration: 'underline'}}>v1 lockbox</a> for encrypted storage.
+                    The password manager frontend is complete and ready for use once the v2 program is deployed to devnet.
                   </p>
                   <p>
-                    The v2 password manager will be available once the program is deployed.
+                    All security enhancements are in place (AEAD validation, rate limiting, input sanitization, etc.).
                   </p>
                 </div>
               </>
