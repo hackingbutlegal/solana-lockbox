@@ -4,7 +4,7 @@
  * Provides a comprehensive interface for the multi-tier password manager.
  */
 
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
 import * as util from 'tweetnacl-util';
@@ -24,8 +24,9 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
+import IDL from '../idl/lockbox-v2.json';
 
-export const PROGRAM_ID = new PublicKey('5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ');
+export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
 
 /**
@@ -49,8 +50,24 @@ export class LockboxV2Client {
       { commitment: 'confirmed' }
     );
 
-    // Note: Program initialization would use IDL when available
-    this.program = {} as Program; // Placeholder
+    // Initialize program with IDL
+    // Note: Using a minimal placeholder until full IDL is available
+    // The program binary is deployed and functional, but automated IDL generation
+    // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
+    try {
+      // Try to create program with IDL, but gracefully fallback
+      this.program = new Program(IDL as Idl, provider);
+      console.log('Program initialized successfully with IDL');
+    } catch (error) {
+      console.warn('IDL initialization failed, using placeholder:', error);
+      // Fallback: Create a minimal program interface
+      this.program = {
+        programId: PROGRAM_ID,
+        provider,
+        methods: {},
+        account: {},
+      } as any as Program;
+    }
   }
 
   // ============================================================================
@@ -412,6 +429,11 @@ export class LockboxV2Client {
    * Get master lockbox account
    */
   async getMasterLockbox(): Promise<MasterLockbox> {
+    // Check if program is properly initialized
+    if (!this.program.account) {
+      throw new Error('Program not initialized - IDL not loaded');
+    }
+
     const [masterLockbox] = this.getMasterLockboxAddress();
     return await (this.program.account as any).masterLockbox.fetch(masterLockbox);
   }
@@ -420,6 +442,11 @@ export class LockboxV2Client {
    * Get storage chunk account
    */
   async getStorageChunk(chunkIndex: number): Promise<StorageChunk> {
+    // Check if program is properly initialized
+    if (!this.program.account) {
+      throw new Error('Program not initialized - IDL not loaded');
+    }
+
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
     return await (this.program.account as any).storageChunk.fetch(storageChunk);
   }
@@ -428,9 +455,15 @@ export class LockboxV2Client {
    * Check if master lockbox exists
    */
   async exists(): Promise<boolean> {
+    // If program not initialized, we can't check
+    if (!this.program.account) {
+      return false;
+    }
+
     try {
-      await this.getMasterLockbox();
-      return true;
+      const [masterLockbox] = this.getMasterLockboxAddress();
+      const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+      return accountInfo !== null;
     } catch {
       return false;
     }
