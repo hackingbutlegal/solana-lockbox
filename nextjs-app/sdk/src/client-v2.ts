@@ -4,7 +4,7 @@
  * Provides a comprehensive interface for the multi-tier password manager.
  */
 
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
 import * as util from 'tweetnacl-util';
@@ -24,6 +24,7 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
+import IDL from '../idl/lockbox.json';
 
 export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
@@ -49,8 +50,13 @@ export class LockboxV2Client {
       { commitment: 'confirmed' }
     );
 
-    // Note: Program initialization would use IDL when available
-    this.program = {} as Program; // Placeholder
+    // Initialize program with IDL
+    try {
+      this.program = new Program(IDL as Idl, provider);
+    } catch (error) {
+      console.error('Failed to initialize program with IDL:', error);
+      this.program = {} as Program; // Fallback
+    }
   }
 
   // ============================================================================

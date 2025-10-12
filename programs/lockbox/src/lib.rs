@@ -33,11 +33,11 @@
 //! - Can be migrated to v2 system
 //!
 //! ## Program ID
-//! `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ` (Devnet)
+//! `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB` (Devnet)
 
 use anchor_lang::prelude::*;
 
-declare_id!("5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ");
+declare_id!("7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB");
 
 // Import v2 modules
 pub mod state;
