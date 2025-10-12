@@ -189,68 +189,6 @@
   background: #8e44ad;
 }
 
-.storage-retrievals {
-  border-top: 1px solid #e0e0e0;
-  padding-top: 10px;
-  margin-top: 10px;
-}
-
-.retrievals-header {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #34495e;
-  margin-bottom: 8px;
-}
-
-.retrievals-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.retrieval-record {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: white;
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-
-.retrieval-record.success {
-  border-left: 3px solid #27ae60;
-}
-
-.retrieval-record.failed {
-  border-left: 3px solid #e74c3c;
-}
-
-.retrieval-icon {
-  font-weight: bold;
-}
-
-.retrieval-record.success .retrieval-icon {
-  color: #27ae60;
-}
-
-.retrieval-record.failed .retrieval-icon {
-  color: #e74c3c;
-}
-
-.retrieval-time {
-  color: #7f8c8d;
-  font-size: 0.8rem;
-}
-
-.retrievals-more {
-  text-align: center;
-  padding: 6px;
-  color: #95a5a6;
-  font-size: 0.8rem;
-  font-style: italic;
-}
-
 /* Scrollbar styling */
 .storage-history-content::-webkit-scrollbar {
   width: 8px;

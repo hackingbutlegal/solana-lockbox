@@ -11,25 +11,22 @@ import {
   Transaction,
   LAMPORTS_PER_SOL
 } from '@solana/web3.js';
-import { AnchorProvider, Program, Idl, web3, BN } from '@coral-xyz/anchor';
+import { web3 } from '@coral-xyz/anchor';
 import { printSimulate } from '@raydium-io/raydium-sdk-v2';
 import {
   encryptAEAD,
-  decryptAEAD,
   generateChallenge,
   createSessionKeyFromSignature,
   wipeSensitiveData,
   validateEncryptedSize,
   MAX_ENCRYPTED_SIZE,
 } from './crypto';
-import lockboxIdl from './idl/lockbox.json';
 import { ActivityLog, LogEntry, LogLevel } from './components/ActivityLog';
 import { StorageHistory, StoredItem } from './components/StorageHistory';
+import { FAQ } from './components/FAQ';
 import {
   retrieveUserItems,
   addStoredItem,
-  recordRetrieval,
-  secureClearAll,
 } from './utils/secureStorage';
 import './App.css';
 
@@ -52,7 +49,6 @@ function LockboxApp() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [storedItems, setStoredItems] = useState<StoredItem[]>([]);
-  const [activeRetrievalId, setActiveRetrievalId] = useState<string | null>(null);
 
   // Refs for security
   const sessionKeyRef = useRef<Uint8Array | null>(null);
@@ -97,6 +93,12 @@ function LockboxApp() {
     }
     throw new Error('Max retries exceeded');
   };
+
+  // Ensure no decrypted data is shown on page load/refresh
+  useEffect(() => {
+    setRetrievedData('');
+    setShowRetrieved(false);
+  }, []);
 
   // Load stored items when wallet connects
   useEffect(() => {
@@ -396,7 +398,6 @@ function LockboxApp() {
     }
 
     setLoading(true);
-    setActiveRetrievalId(item.id);
 
     try {
       addLog('progress', `Retrieving data from transaction ${item.txHash.slice(0, 8)}...`);
@@ -416,16 +417,9 @@ function LockboxApp() {
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Record successful retrieval
-      recordRetrieval(publicKey.toBase58(), item.id, true);
-
+      // Show decrypted data (never stored, only in memory)
       setRetrievedData(`[Demo] Original data:\n${item.dataPreview}\n\nTransaction: ${item.txHash}\nStored: ${item.timestamp.toLocaleString()}`);
       setShowRetrieved(true);
-      setActiveRetrievalId(null);
-
-      // Refresh items to show new retrieval record
-      const items = retrieveUserItems(publicKey.toBase58());
-      setStoredItems(items);
 
       addLog('success', 'Data retrieved and decrypted successfully');
       addLog('warning', 'Data will auto-hide in 30 seconds for security');
@@ -439,15 +433,8 @@ function LockboxApp() {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', `Retrieval failed: ${errorMsg}`);
-
-      // Record failed retrieval
-      recordRetrieval(publicKey.toBase58(), item.id, false);
-
-      const items = retrieveUserItems(publicKey.toBase58());
-      setStoredItems(items);
     } finally {
       setLoading(false);
-      setActiveRetrievalId(null);
     }
   };
 
@@ -510,6 +497,8 @@ function LockboxApp() {
               onRetrieve={handleRetrieveItem}
               onCopyTxHash={handleCopyTxHash}
             />
+
+            <FAQ />
           </div>
 
           <div className="secondary-section">
@@ -519,16 +508,24 @@ function LockboxApp() {
       )}
 
       {!publicKey && (
-        <div className="connect-prompt">
-          <p>Connect your Solana wallet to get started</p>
-          <p className="connect-hint">Supports Phantom, Solflare, and other Solana wallets</p>
-        </div>
+        <>
+          <div className="connect-prompt">
+            <p>Connect your Solana wallet to get started</p>
+            <p className="connect-hint">Supports Phantom, Solflare, and other Solana wallets</p>
+          </div>
+          <div className="faq-wrapper">
+            <FAQ />
+          </div>
+        </>
       )}
 
       <footer>
         <p>Zero persistent storage • Keys derived from wallet • XChaCha20-Poly1305 AEAD</p>
         <p className="network-badge">🌐 Devnet</p>
         <p className="security-note">🔒 Session auto-expires after 15 minutes of inactivity</p>
+        <p className="credits">
+          created with &lt;3 by <a href="https://x.com/0xgraffito" target="_blank" rel="noopener noreferrer">GRAFFITO</a>
+        </p>
       </footer>
     </div>
   );

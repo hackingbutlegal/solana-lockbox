@@ -179,17 +179,19 @@ solana program show 5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ
 The frontend includes built-in transaction simulation using Raydium SDK:
 
 1. Open http://localhost:5173
-2. Connect your wallet (Phantom or Solflare)
-3. Enter test data
-4. Click "Store Encrypted Data"
-5. Check browser console for simulation logs:
-   ```
-   Transaction Simulation
-   #1: Compute Budget Program Instruction > Program returned success
-   #2: Compute Budget Program Instruction > Program returned success
-   #3: Instruction > Program logged: "Instruction: StoreEncrypted"
-                  > Program logged: "Encrypted data stored successfully"
-   ```
+2. View the interactive FAQ to understand how Lockbox works
+3. Connect your wallet (Phantom or Solflare)
+4. Enter test data (e.g., "Hello, Lockbox!")
+5. Click "Encrypt & Store (0.001 SOL)"
+6. Check Activity Log for real-time transaction status:
+   - "Checking wallet balance..."
+   - "Encrypting data with XChaCha20-Poly1305..."
+   - "Simulating transaction..."
+   - "Transaction confirmed!"
+7. Check Storage History to see your stored data
+8. Click "Decrypt & View" to temporarily decrypt
+9. Watch as data auto-hides after 30 seconds
+10. Refresh page and notice decrypted data is cleared
 
 ### View On-Chain Data
 
@@ -233,10 +235,12 @@ solana account <YOUR_PDA_ADDRESS>
 ### Issue: Transaction Fails with "Unexpected error"
 
 **Steps to debug**:
-1. Check browser console for detailed error
-2. Look at simulation output (shows exactly which instruction failed)
-3. Verify all accounts are correct
-4. Check wallet has sufficient balance
+1. Check Activity Log in the app for detailed error messages
+2. Check browser console for simulation output
+3. Look at simulation output (shows exactly which instruction failed)
+4. Verify all accounts are correct
+5. Check wallet has sufficient balance
+6. Check the FAQ section for common issues
 
 ### Issue: IDL Build Fails
 
@@ -382,6 +386,20 @@ solana program set-upgrade-authority \
 
 ---
 
-- **Last Updated**: October 11, 2025
-- **Deployed Version**: v1.0.0
-- **Status**: ✅ Live on Devnet
+## Recent Updates
+
+**v1.1.0** (October 2025):
+- Added comprehensive FAQ section for new users
+- Implemented ephemeral decryption model
+- Removed persistent retrieval tracking
+- Enhanced Activity Log messaging
+- Added creator attribution footer
+- Updated all documentation
+
+---
+
+**Last Updated**: October 12, 2025
+**Deployed Version**: v1.1.0
+**Status**: ✅ Live on Devnet
+
+Created with <3 by [GRAFFITO](https://x.com/0xgraffito)

@@ -9,13 +9,16 @@ Wallet-tied encrypted storage on Solana with zero persistent client secrets.
 
 ## Features
 
-- **Wallet-Derived Encryption**: All keys derived from your Solana wallet (Ed25519→Curve25519 conversion)
+- **Wallet-Derived Encryption**: All keys derived from your Solana wallet signature using HKDF
 - **AEAD Encryption**: XChaCha20-Poly1305 authenticated encryption with nonce uniqueness
-- **Zero Client Storage**: No persistent secrets in localStorage, IndexedDB, or caches
+- **Zero Persistent Secrets**: No decrypted data or keys stored - everything cleared on refresh
+- **Ephemeral Decryption**: Decrypted data exists only in memory, auto-hides after 30s
 - **On-Chain Storage**: Encrypted ciphertext, salt, and nonce stored in Solana PDAs
-- **Mobile-First PWA**: Minimal, fast UI with timed reveal and memory scrubbing
-- **Rate Limiting**: Cooldown-based protection against brute force attempts
-- **Custom Errors**: Precise error handling (DataTooLarge, InvalidCiphertext, Unauthorized, etc.)
+- **Interactive FAQ**: Comprehensive user-friendly FAQ section answering common questions
+- **Mobile-First UI**: Responsive design with touch-friendly controls
+- **Activity Logging**: Real-time transaction monitoring with color-coded status messages
+- **Rate Limiting**: 10-slot cooldown protection against brute force attempts
+- **Session Security**: 15-minute inactivity timeout with automatic wallet disconnect
 
 ## Architecture
 
@@ -96,15 +99,21 @@ cd app && npm run dev
 ```
 lockbox/
 ├── programs/lockbox/src/
-│   └── lib.rs              # Anchor program with PDA storage
+│   └── lib.rs                      # Anchor program with PDA storage
 ├── app/
 │   ├── src/
-│   │   ├── App.tsx         # Main React component
-│   │   ├── crypto.ts       # Cryptography utilities
-│   │   └── main.tsx        # Entry point
+│   │   ├── components/
+│   │   │   ├── ActivityLog.tsx     # Real-time transaction log
+│   │   │   ├── StorageHistory.tsx  # Transaction history display
+│   │   │   └── FAQ.tsx             # Interactive FAQ component
+│   │   ├── utils/
+│   │   │   └── secureStorage.ts    # Session storage utilities
+│   │   ├── App.tsx                 # Main React component
+│   │   ├── crypto.ts               # Cryptography utilities
+│   │   └── main.tsx                # Entry point
 │   ├── public/
-│   │   └── manifest.json   # PWA manifest
-│   └── vite.config.ts      # Vite configuration
+│   │   └── manifest.json           # PWA manifest
+│   └── vite.config.ts              # Vite configuration
 ├── Anchor.toml
 └── package.json
 ```
@@ -138,10 +147,13 @@ plaintext = XChaCha20-Poly1305.decrypt(ciphertext, session_key, nonce)
 
 ## Security Features
 
-- **No Key Storage**: Session keys exist only in memory
+- **No Key Storage**: Session keys exist only in memory, never persisted
+- **No Data Persistence**: Decrypted data cleared on page refresh
+- **Ephemeral Viewing**: Decrypted data auto-hides after 30 seconds
 - **Nonce Uniqueness**: Random 24-byte nonces for XChaCha20
 - **Memory Scrubbing**: Wipe sensitive data after use
 - **Cooldown Rate Limiting**: 10 slots (~4s) between operations
+- **Inactivity Timeout**: Auto-disconnect after 15 minutes
 - **Size Validation**: Enforce 1 KiB limit before encryption
 - **Domain Separation**: Unique context in key derivation
 
@@ -155,13 +167,17 @@ The program returns precise custom errors:
 - `CooldownNotElapsed`: Rate limit active
 - `FeeTooLow`: Insufficient fee payment
 
-## Mobile UX
+## User Experience
 
-- **Timed Reveal**: Decrypted data auto-hides after 30s
-- **No Copy on Mobile**: Prevent clipboard leakage
-- **Minimal UI**: Single-screen flow for speed
+- **Interactive FAQ**: 18 comprehensive questions covering security, costs, and usage
+- **Activity Log**: Color-coded real-time transaction monitoring
+- **Storage History**: Track all your storage transactions with Explorer links
+- **Timed Reveal**: Decrypted data auto-hides after 30s for security
+- **Ephemeral Decryption**: Data cleared on every page refresh
 - **Size Counter**: Live feedback on remaining bytes
-- **Toast Notifications**: Fast, clear status updates
+- **Responsive Design**: Optimized for mobile and desktop
+- **One-Click Actions**: Copy transaction hashes, view on Explorer
+- **Visual Feedback**: Clear loading states and status messages
 
 ## Viewing On-Chain Data
 
@@ -268,4 +284,17 @@ PRs welcome! Please ensure:
 
 ---
 
+## Recent Updates
+
+**v1.1.0** (October 2025):
+- Added interactive FAQ with 18 comprehensive questions
+- Implemented ephemeral decryption (cleared on page refresh)
+- Removed persistent retrieval tracking for improved privacy
+- Added attribution footer with creator link
+- Enhanced security documentation
+
+---
+
 Built with [Anchor](https://www.anchor-lang.com/) • [Solana](https://solana.com/) • [React](https://react.dev/)
+
+Created with <3 by [GRAFFITO](https://x.com/0xgraffito)

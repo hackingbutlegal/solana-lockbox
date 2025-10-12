@@ -50,14 +50,18 @@ npm run dev
 - ✅ On-chain storage in Program Derived Addresses
 - ✅ Transaction simulation with detailed logging
 - ✅ Real-time activity log with color-coded messages
-- ✅ Storage history with retrieval tracking
-- ✅ Wallet adapter integration (Phantom, Solflare)
+- ✅ Storage history with transaction Explorer links
+- ✅ Interactive FAQ with 18 comprehensive questions
+- ✅ Ephemeral decryption (cleared on refresh)
+- ✅ Auto-hide decrypted data after 30 seconds
+- ✅ Wallet adapter integration (Phantom, Solflare, etc.)
 - ✅ Mobile-first responsive design
 - ✅ Session timeout (15 minutes inactivity)
 - ✅ Memory scrubbing for sensitive data
 - ✅ 1 KiB size limit enforcement
 - ✅ 0.001 SOL fee per storage operation
 - ✅ 10-slot cooldown rate limiting
+- ✅ Attribution footer with creator link
 
 ### Activity Log
 
@@ -79,9 +83,21 @@ Each transaction entry includes:
 Tracks all your storage operations:
 - Timestamp of each storage
 - Data preview (first 50 characters)
-- Transaction hash with Explorer link
+- Transaction hash with copy and Explorer link
 - Size in bytes
-- Retrieval history per item
+- "Decrypt & View" button for each item
+
+**Note**: Decrypted data is never stored. Each time you click "Decrypt & View", the data is freshly decrypted from the blockchain, displayed for 30 seconds, then cleared from memory. Page refresh clears all decrypted data.
+
+### FAQ Section
+
+Comprehensive interactive FAQ covering:
+- **What is Lockbox**: Purpose and functionality
+- **Security Model**: How encryption works, where keys are stored
+- **Costs**: Transaction fees and account creation
+- **Usage**: Data limits, supported wallets, mobile support
+- **Privacy**: What's visible on-chain, wallet compromise scenarios
+- **Technical**: Session timeouts, page refresh behavior, blockchain benefits
 
 ---
 
@@ -295,16 +311,18 @@ cd app && npm run build
 
 ### Implemented Security Features
 
-- ✅ **Client-Side Encryption**: All encryption happens off-chain
-- ✅ **Wallet-Derived Keys**: Keys derived from wallet signatures
-- ✅ **No Persistent Secrets**: Keys exist only in session memory
-- ✅ **Memory Scrubbing**: Sensitive data wiped after use
-- ✅ **Session Timeouts**: 15-minute inactivity auto-disconnect
-- ✅ **Rate Limiting**: 10-slot cooldown between operations
-- ✅ **Size Limits**: 1 KiB maximum to prevent abuse
-- ✅ **Fee Requirement**: 0.001 SOL prevents spam
-- ✅ **Owner-Only Access**: PDA ensures isolation
-- ✅ **AEAD Encryption**: XChaCha20-Poly1305 with authentication
+✅ **Client-Side Encryption**: All encryption happens off-chain
+✅ **Wallet-Derived Keys**: Keys derived from wallet signatures using HKDF
+✅ **No Persistent Secrets**: Keys and decrypted data never persisted to storage
+✅ **Ephemeral Decryption**: Decrypted data cleared on page refresh
+✅ **Auto-Hide Protection**: Decrypted data auto-hides after 30 seconds
+✅ **Memory Scrubbing**: Sensitive data wiped after use
+✅ **Session Timeouts**: 15-minute inactivity auto-disconnect
+✅ **Rate Limiting**: 10-slot cooldown between operations
+✅ **Size Limits**: 1 KiB maximum to prevent abuse
+✅ **Fee Requirement**: 0.001 SOL prevents spam
+✅ **Owner-Only Access**: PDA ensures isolation
+✅ **AEAD Encryption**: XChaCha20-Poly1305 with authentication
 
 ### Known Limitations
 
@@ -410,6 +428,21 @@ For issues, questions, or contributions:
 
 ---
 
-- **Last Updated**: October 11, 2025
-- **Version**: v1.0.0
-- **Status**: ✅ Live on Devnet
+## Recent Updates
+
+**v1.1.0** (October 2025):
+- ✅ Added interactive FAQ component with 18 questions
+- ✅ Implemented ephemeral decryption (cleared on refresh)
+- ✅ Removed persistent retrieval history tracking
+- ✅ Changed "Retrieve" to "Decrypt & View" for clarity
+- ✅ Added attribution footer linking to @0xgraffito
+- ✅ Enhanced security model documentation
+- ✅ Improved user experience with clearer messaging
+
+---
+
+**Last Updated**: October 12, 2025
+**Version**: v1.1.0
+**Status**: ✅ Live on Devnet
+
+Created with <3 by [GRAFFITO](https://x.com/0xgraffito)

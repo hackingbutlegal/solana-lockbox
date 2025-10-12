@@ -242,6 +242,18 @@ button:disabled {
   opacity: 0.7;
 }
 
+.faq-wrapper {
+  padding: 0 20px 30px 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .faq-wrapper {
+    padding: 0 40px 40px 40px;
+  }
+}
+
 footer {
   background: #f8f9fa;
   padding: 20px;
@@ -270,6 +282,24 @@ footer p {
   font-size: 0.75rem !important;
   opacity: 0.8;
   font-style: italic;
+}
+
+.credits {
+  font-size: 0.8rem !important;
+  margin-top: 10px;
+  color: #95a5a6;
+}
+
+.credits a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.credits a:hover {
+  color: #764ba2;
+  text-decoration: underline;
 }
 
 /* Wallet adapter button styling override */

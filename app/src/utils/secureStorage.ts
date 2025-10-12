@@ -1,8 +1,10 @@
 /**
  * Secure storage utilities with additional security hardening
- * - Encrypted metadata storage
+ * - Stores only transaction metadata (hashes, timestamps, sizes)
+ * - NEVER stores decrypted plaintext data
  * - Session-only storage with auto-cleanup
- * - CSP-compliant implementation
+ * - All decrypted data exists only in memory during active decryption
+ * - Clears automatically on page refresh/reload
  */
 
 import { StoredItem } from '../components/StorageHistory';
@@ -129,10 +131,6 @@ export function retrieveUserItems(publicKey: string): StoredItem[] {
   return items.map(item => ({
     ...item,
     timestamp: new Date(item.timestamp),
-    retrievals: item.retrievals.map(r => ({
-      ...r,
-      timestamp: new Date(r.timestamp),
-    })),
   }));
 }
 
@@ -153,35 +151,10 @@ export function addStoredItem(
     txHash,
     dataPreview,
     sizeBytes,
-    retrievals: [],
   };
 
   items.unshift(newItem); // Add to beginning
   storeUserItems(publicKey, items.slice(0, 50)); // Keep last 50 items
-}
-
-/**
- * Record a retrieval attempt
- */
-export function recordRetrieval(
-  publicKey: string,
-  itemId: string,
-  success: boolean
-): void {
-  const items = retrieveUserItems(publicKey);
-  const item = items.find(i => i.id === itemId);
-
-  if (item) {
-    item.retrievals.unshift({
-      timestamp: new Date(),
-      success,
-    });
-
-    // Keep only last 10 retrievals per item
-    item.retrievals = item.retrievals.slice(0, 10);
-
-    storeUserItems(publicKey, items);
-  }
 }
 
 /**

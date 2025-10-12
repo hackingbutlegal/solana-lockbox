@@ -7,12 +7,6 @@ export interface StoredItem {
   txHash: string;
   dataPreview: string; // First 50 chars of encrypted data
   sizeBytes: number;
-  retrievals: RetrievalRecord[];
-}
-
-export interface RetrievalRecord {
-  timestamp: Date;
-  success: boolean;
 }
 
 interface StorageHistoryProps {
@@ -71,9 +65,9 @@ export function StorageHistory({ items, onRetrieve, onCopyTxHash }: StorageHisto
                   <button
                     className="retrieve-btn"
                     onClick={() => onRetrieve(item)}
-                    title="Retrieve and decrypt this data"
+                    title="Temporarily decrypt and display this data (auto-hides in 30s)"
                   >
-                    🔓 Retrieve
+                    🔓 Decrypt & View
                   </button>
                 </div>
 
@@ -102,34 +96,6 @@ export function StorageHistory({ items, onRetrieve, onCopyTxHash }: StorageHisto
                     Explorer
                   </a>
                 </div>
-
-                {item.retrievals.length > 0 && (
-                  <div className="storage-retrievals">
-                    <div className="retrievals-header">
-                      📊 Retrieval History ({item.retrievals.length})
-                    </div>
-                    <div className="retrievals-list">
-                      {item.retrievals.slice(0, 3).map((retrieval, idx) => (
-                        <div
-                          key={idx}
-                          className={`retrieval-record ${retrieval.success ? 'success' : 'failed'}`}
-                        >
-                          <span className="retrieval-icon">
-                            {retrieval.success ? '✓' : '✗'}
-                          </span>
-                          <span className="retrieval-time">
-                            {formatTimestamp(retrieval.timestamp)}
-                          </span>
-                        </div>
-                      ))}
-                      {item.retrievals.length > 3 && (
-                        <div className="retrievals-more">
-                          +{item.retrievals.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
