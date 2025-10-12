@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd app && npm run build",
+  "buildCommand": "bash build.sh",
   "outputDirectory": "app/dist",
-  "installCommand": "cd app && npm install",
+  "installCommand": "echo 'Dependencies installed via build script'",
   "framework": null,
   "rewrites": [
     {
