@@ -14,6 +14,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <title>Lockbox - Wallet-Tied Encrypted Storage</title>
+
+    <!-- Buffer polyfill loaded before app bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script>
+      window.Buffer = buffer.Buffer;
+      globalThis.Buffer = buffer.Buffer;
+    </script>
   </head>
   <body>
     <div id="root"></div>
