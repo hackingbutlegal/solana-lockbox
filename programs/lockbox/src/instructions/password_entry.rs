@@ -42,6 +42,17 @@ pub fn store_password_entry_handler(
     let storage_chunk = &mut ctx.accounts.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
 
+    // SECURITY: Validate AEAD ciphertext format
+    // XChaCha20-Poly1305 (NaCl secretbox) format:
+    // - First 24 bytes: nonce
+    // - Remaining bytes: ciphertext + 16-byte Poly1305 tag
+    // Minimum valid size: 24 (nonce) + 16 (tag) = 40 bytes
+    const MIN_AEAD_SIZE: usize = 40;
+    require!(
+        encrypted_data.len() >= MIN_AEAD_SIZE,
+        crate::errors::LockboxError::InvalidDataSize
+    );
+
     // Check subscription is active
     require!(
         master_lockbox.is_subscription_active(current_timestamp),
@@ -187,6 +198,13 @@ pub fn update_password_entry_handler(
     let master_lockbox = &mut ctx.accounts.master_lockbox;
     let storage_chunk = &mut ctx.accounts.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
+
+    // SECURITY: Validate AEAD ciphertext format
+    const MIN_AEAD_SIZE: usize = 40;
+    require!(
+        new_encrypted_data.len() >= MIN_AEAD_SIZE,
+        crate::errors::LockboxError::InvalidDataSize
+    );
 
     // Check subscription is active
     require!(

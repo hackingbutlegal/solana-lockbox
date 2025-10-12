@@ -13,10 +13,21 @@ export const NONCE_SIZE = 24;
 
 /**
  * Convert Ed25519 public key to Curve25519 for X25519 operations
+ *
+ * SECURITY NOTE: TweetNaCl does not provide Ed25519→Curve25519 conversion.
+ * For now, we avoid this conversion entirely by using the signature-based
+ * key derivation approach instead. This function is kept for API compatibility
+ * but should not be used in production code paths.
+ *
+ * TODO: If X25519 key agreement is needed in the future, use:
+ * - @stablelib/ed25519 for proper conversion
+ * - OR use native crypto.subtle.deriveKey with ECDH
+ *
+ * @deprecated Avoid using this function. Use signature-based key derivation instead.
  */
 export function ed25519ToCurve25519PublicKey(ed25519PublicKey: Uint8Array): Uint8Array {
-  // Using TweetNaCl's internal conversion
-  // Note: This is a simplified approach; in production, use @stablelib/ed25519 for proper conversion
+  console.warn('ed25519ToCurve25519PublicKey: This conversion is not cryptographically secure. Use signature-based key derivation.');
+  // Return as-is to avoid breaking existing code, but this should not be used
   return ed25519PublicKey;
 }
 
@@ -173,13 +184,36 @@ export async function createSessionKeyFromSignature(
 }
 
 /**
- * Wipe sensitive data from memory
+ * Wipe sensitive data from memory (multiple passes with random data)
+ *
+ * SECURITY: JavaScript garbage collection may leave copies in memory.
+ * This function performs multiple overwrites with random data to increase
+ * the difficulty of memory scraping attacks.
+ *
+ * Note: This is not a guarantee against sophisticated memory analysis,
+ * but it's significantly better than a single zero pass.
  */
 export function wipeSensitiveData(data: Uint8Array): void {
-  // Overwrite with zeros
+  if (data.length === 0) return;
+
+  // Pass 1: Random data
+  crypto.getRandomValues(data);
+
+  // Pass 2: All 0xFF
+  for (let i = 0; i < data.length; i++) {
+    data[i] = 0xFF;
+  }
+
+  // Pass 3: Random data again
+  crypto.getRandomValues(data);
+
+  // Pass 4: All zeros (final pass)
   for (let i = 0; i < data.length; i++) {
     data[i] = 0;
   }
+
+  // Note: JavaScript GC may still leave copies. For maximum security,
+  // minimize the lifetime of sensitive data in memory.
 }
 
 /**
@@ -187,4 +221,65 @@ export function wipeSensitiveData(data: Uint8Array): void {
  */
 export function validateEncryptedSize(ciphertext: Uint8Array): boolean {
   return ciphertext.length > 0 && ciphertext.length <= MAX_ENCRYPTED_SIZE;
+}
+
+/**
+ * Validate AEAD ciphertext format
+ *
+ * XChaCha20-Poly1305 (NaCl secretbox) produces:
+ * - 16-byte authentication tag (Poly1305 MAC)
+ * - Encrypted plaintext
+ *
+ * Minimum valid ciphertext: 16 bytes (tag only, for empty plaintext)
+ * Maximum: MAX_ENCRYPTED_SIZE
+ *
+ * @param ciphertext - The encrypted data to validate
+ * @param nonce - The 24-byte nonce
+ * @returns true if format appears valid
+ */
+export function validateAEADFormat(
+  ciphertext: Uint8Array,
+  nonce: Uint8Array
+): boolean {
+  // Check ciphertext has at least the Poly1305 tag (16 bytes)
+  if (ciphertext.length < 16) {
+    return false;
+  }
+
+  // Check ciphertext doesn't exceed maximum
+  if (ciphertext.length > MAX_ENCRYPTED_SIZE) {
+    return false;
+  }
+
+  // Check nonce is exactly 24 bytes (XChaCha20 requirement)
+  if (nonce.length !== NONCE_SIZE) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Safely decrypt with validation
+ *
+ * This wrapper adds input validation before attempting decryption,
+ * which helps prevent processing of malformed data.
+ */
+export function safeDecryptAEAD(
+  ciphertext: Uint8Array,
+  nonce: Uint8Array,
+  sessionKey: Uint8Array
+): Uint8Array {
+  // Validate format before attempting decryption
+  if (!validateAEADFormat(ciphertext, nonce)) {
+    throw new Error('Invalid AEAD format: ciphertext or nonce has invalid length');
+  }
+
+  // Validate session key length
+  if (sessionKey.length !== 32) {
+    throw new Error('Invalid session key: must be 32 bytes');
+  }
+
+  // Attempt decryption
+  return decryptAEAD(ciphertext, nonce, sessionKey);
 }

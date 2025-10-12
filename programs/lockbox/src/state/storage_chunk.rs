@@ -107,7 +107,12 @@ impl StorageChunk {
             crate::errors::LockboxError::MaxEntriesPerChunk
         );
 
-        let new_size = self.current_size + encrypted_data.len() as u32;
+        // SECURITY: Use checked_add to prevent integer overflow
+        let data_len = encrypted_data.len() as u32;
+        let new_size = self.current_size
+            .checked_add(data_len)
+            .ok_or(crate::errors::LockboxError::InvalidDataSize)?;
+
         require!(
             new_size <= self.max_capacity,
             crate::errors::LockboxError::InsufficientChunkCapacity
