@@ -6,21 +6,9 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import {
   clusterApiUrl,
   Connection,
-  PublicKey,
-  SystemProgram,
-  Transaction,
   LAMPORTS_PER_SOL
 } from '@solana/web3.js';
-import { web3 } from '@coral-xyz/anchor';
-import { printSimulate } from '@raydium-io/raydium-sdk-v2';
-import {
-  encryptAEAD,
-  generateChallenge,
-  createSessionKeyFromSignature,
-  wipeSensitiveData,
-  validateEncryptedSize,
-  MAX_ENCRYPTED_SIZE,
-} from './crypto';
+import { LockboxClient } from 'lockbox-solana-sdk';
 import { ActivityLog, LogEntry, LogLevel } from './components/ActivityLog';
 import { StorageHistory, StoredItem } from './components/StorageHistory';
 import { FAQ } from './components/FAQ';
@@ -33,25 +21,20 @@ import './App.css';
 // Import styles for wallet adapter
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-const PROGRAM_ID = new PublicKey('5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ');
-const FEE_RECEIVER = new PublicKey('3H8e4VnGjxKGFKxk2QMmjuu1B7dnDLysGN8hvcDCKxZh'); // Your wallet as fee receiver
-
 // Security: Disable right-click on sensitive areas (configurable)
 const DISABLE_CONTEXT_MENU = false;
 
 function LockboxApp() {
   const wallet = useWallet();
-  const { publicKey, signMessage, sendTransaction, disconnect } = wallet;
+  const { publicKey, disconnect } = wallet;
   const [data, setData] = useState('');
   const [retrievedData, setRetrievedData] = useState('');
-  const [sessionKey, setSessionKey] = useState<Uint8Array | null>(null);
   const [showRetrieved, setShowRetrieved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [storedItems, setStoredItems] = useState<StoredItem[]>([]);
 
   // Refs for security
-  const sessionKeyRef = useRef<Uint8Array | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connection = useMemo(() => new Connection(
@@ -61,6 +44,12 @@ function LockboxApp() {
       confirmTransactionInitialTimeout: 60000,
     }
   ), []);
+
+  // Initialize SDK client
+  const client = useMemo(() => {
+    if (!wallet.publicKey) return null;
+    return new LockboxClient({ connection, wallet });
+  }, [connection, wallet]);
 
   // Add log entry
   const addLog = useCallback((level: LogLevel, message: string, txHash?: string) => {
@@ -118,19 +107,16 @@ function LockboxApp() {
     }
 
     inactivityTimerRef.current = setTimeout(() => {
-      if (sessionKey) {
-        wipeSensitiveData(sessionKey);
-        setSessionKey(null);
-        sessionKeyRef.current = null;
+      if (publicKey) {
         addLog('warning', 'Session expired due to inactivity. Please reconnect.');
         disconnect();
       }
     }, 15 * 60 * 1000); // 15 minutes
-  }, [sessionKey, addLog, disconnect]);
+  }, [publicKey, addLog, disconnect]);
 
   // Reset inactivity on user activity
   useEffect(() => {
-    if (!sessionKey) return;
+    if (!publicKey) return;
 
     const activities = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     activities.forEach(event => {
@@ -147,68 +133,34 @@ function LockboxApp() {
         clearTimeout(inactivityTimerRef.current);
       }
     };
-  }, [sessionKey, resetInactivityTimer]);
+  }, [publicKey, resetInactivityTimer]);
 
-  // Calculate remaining bytes
+  // Calculate remaining bytes (using SDK's constant)
+  const MAX_ENCRYPTED_SIZE = 1024;
   const remainingBytes = MAX_ENCRYPTED_SIZE - new TextEncoder().encode(data).length;
   const isOverLimit = remainingBytes < 0;
 
-  // Derive session key from wallet signature
-  const deriveSessionKey = useCallback(async () => {
-    if (!publicKey || !signMessage) {
-      addLog('error', 'Wallet not connected');
-      return null;
-    }
-
-    try {
-      addLog('progress', 'Requesting wallet signature for session key derivation...');
-      const challenge = generateChallenge(publicKey);
-      const signature = await signMessage(challenge);
-
-      addLog('progress', 'Deriving session key using HKDF...');
-      const { sessionKey: derivedKey } = await createSessionKeyFromSignature(
-        publicKey,
-        signature
-      );
-
-      setSessionKey(derivedKey);
-      sessionKeyRef.current = derivedKey;
-      addLog('success', 'Session key derived successfully. Ready to encrypt data.');
-      return derivedKey;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog('error', `Failed to derive session key: ${errorMsg}`);
-      return null;
-    }
-  }, [publicKey, signMessage, addLog]);
-
-  // Auto-derive session key when wallet connects
+  // Log wallet connection
   useEffect(() => {
-    if (publicKey && !sessionKey) {
+    if (publicKey) {
       addLog('info', `Wallet connected: ${publicKey.toBase58().slice(0, 8)}...${publicKey.toBase58().slice(-8)}`);
-      deriveSessionKey();
+      addLog('success', 'SDK client initialized. Ready to encrypt data.');
     }
-  }, [publicKey, sessionKey, deriveSessionKey, addLog]);
+  }, [publicKey, addLog]);
 
   // Cleanup on disconnect
   useEffect(() => {
-    if (!publicKey && sessionKey) {
-      wipeSensitiveData(sessionKey);
-      setSessionKey(null);
-      sessionKeyRef.current = null;
+    if (!publicKey) {
       setData('');
       setRetrievedData('');
       setShowRetrieved(false);
-      addLog('info', 'Wallet disconnected. Session key wiped from memory.');
+      addLog('info', 'Wallet disconnected. Session cleared.');
     }
-  }, [publicKey, sessionKey, addLog]);
+  }, [publicKey, addLog]);
 
   // Security: Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (sessionKeyRef.current) {
-        wipeSensitiveData(sessionKeyRef.current);
-      }
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
       }
@@ -223,7 +175,7 @@ function LockboxApp() {
 
   // Store encrypted data
   const handleStore = async () => {
-    if (!publicKey || !sessionKey || !sendTransaction) {
+    if (!publicKey || !client) {
       addLog('error', 'Please connect wallet first');
       return;
     }
@@ -254,126 +206,32 @@ function LockboxApp() {
       addLog('info', `Balance: ${(balance / LAMPORTS_PER_SOL).toFixed(3)} SOL`);
       addLog('progress', 'Encrypting data with XChaCha20-Poly1305...');
 
-      // Encrypt client-side
-      const plaintext = new TextEncoder().encode(data);
-      const { ciphertext, nonce, salt } = encryptAEAD(plaintext, sessionKey);
+      const plaintextLength = new TextEncoder().encode(data).length;
 
-      // Validate size
-      if (!validateEncryptedSize(ciphertext)) {
-        throw new Error('Encrypted data size validation failed');
-      }
-
-      addLog('info', `Encrypted ${plaintext.length} bytes → ${ciphertext.length} bytes (including auth tag)`);
-      addLog('progress', 'Building transaction to store encrypted data on Solana...');
-
-      // Create PDA for user's lockbox
-      const [lockboxPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('lockbox'), publicKey.toBuffer()],
-        PROGRAM_ID
-      );
-
+      // Get PDA for logging
+      const [lockboxPda] = client.getLockboxAddress();
       addLog('info', `Target PDA: ${lockboxPda.toBase58().slice(0, 8)}...${lockboxPda.toBase58().slice(-8)}`);
 
-      // Calculate proper Anchor discriminator using crypto
-      addLog('progress', 'Building program instruction...');
+      addLog('progress', 'Sending transaction to Solana devnet (SDK handles encryption & signing)...');
 
-      // Calculate Anchor sighash for "global:store_encrypted"
-      const instructionName = "global:store_encrypted";
-      const instructionBytes = new TextEncoder().encode(instructionName);
-      // @ts-expect-error - TextEncoder.encode() returns Uint8Array but TS infers broader type
-      const hashBuffer = await crypto.subtle.digest('SHA-256', instructionBytes);
-      const discriminator = new Uint8Array(hashBuffer).slice(0, 8);
-
-      addLog('info', `Discriminator: ${Array.from(discriminator).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-
-      // Serialize instruction data using Borsh format
-      // Format: [discriminator (8 bytes), vec_len (4 bytes), ciphertext, nonce (24 bytes), salt (32 bytes)]
-      const ciphertextLen = Buffer.alloc(4);
-      ciphertextLen.writeUInt32LE(ciphertext.length, 0);
-
-      const instructionData = Buffer.concat([
-        Buffer.from(discriminator),
-        ciphertextLen,
-        Buffer.from(ciphertext),
-        Buffer.from(nonce),
-        Buffer.from(salt),
-      ]);
-
-      // Build account metas
-      const keys = [
-        { pubkey: lockboxPda, isSigner: false, isWritable: true },
-        { pubkey: publicKey, isSigner: true, isWritable: true },
-        { pubkey: FEE_RECEIVER, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ];
-
-      const instruction = new web3.TransactionInstruction({
-        keys,
-        programId: PROGRAM_ID,
-        data: instructionData,
-      });
-
-      // Get recent blockhash
-      addLog('progress', 'Fetching recent blockhash...');
-      const { blockhash, lastValidBlockHeight } = await retryWithBackoff(() =>
-        connection.getLatestBlockhash('finalized')
-      );
-
-      // Build and send transaction
-      const transaction = new Transaction({
-        feePayer: publicKey,
-        blockhash,
-        lastValidBlockHeight,
-      }).add(instruction);
-
-      // Simulate transaction for debugging
-      addLog('progress', 'Simulating transaction...');
-      try {
-        // @ts-expect-error - printSimulate signature mismatch but works at runtime
-        const simulateResult = await printSimulate(connection, [transaction]);
-        console.log('Simulation result:', simulateResult);
-        addLog('info', `Simulation complete - check console for details`);
-      } catch (simError) {
-        addLog('warning', `Simulation warning: ${simError instanceof Error ? simError.message : 'Unknown'}`);
-        console.error('Simulation error:', simError);
-      }
-
-      addLog('progress', 'Sending transaction to Solana devnet...');
-      const signature = await sendTransaction(transaction, connection);
+      // Use SDK to handle everything
+      const signature = await client.store(data);
 
       addLog('progress', `Transaction sent. Confirming... (Signature: ${signature.slice(0, 8)}...)`);
-
-      // Wait for confirmation
-      const confirmation = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash,
-          lastValidBlockHeight,
-        },
-        'confirmed'
-      );
-
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
-
       addLog('success', `Transaction confirmed! (Signature: ${signature.slice(0, 8)}...)`, signature);
 
       // Store metadata
       const dataPreview = data.length > 50 ? `${data.slice(0, 47)}...` : data;
-      addStoredItem(publicKey.toBase58(), signature, dataPreview, plaintext.length);
+      addStoredItem(publicKey.toBase58(), signature, dataPreview, plaintextLength);
 
       // Refresh stored items
       const items = retrieveUserItems(publicKey.toBase58());
       setStoredItems(items);
 
       addLog('success', `Data stored successfully! Fee: 0.001 SOL`, signature);
-      addLog('info', 'Clearing input and wiping plaintext from memory...');
+      addLog('info', 'Clearing input from memory...');
 
       setData('');
-
-      // Wipe plaintext from memory
-      wipeSensitiveData(plaintext);
     } catch (error) {
       let errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
@@ -394,8 +252,8 @@ function LockboxApp() {
   };
 
   // Retrieve and decrypt specific item
-  const handleRetrieveItem = async (item: StoredItem) => {
-    if (!publicKey || !sessionKey) {
+  const handleRetrieveItem = async (_item: StoredItem) => {
+    if (!publicKey || !client) {
       addLog('error', 'Please connect wallet first');
       return;
     }
@@ -403,25 +261,21 @@ function LockboxApp() {
     setLoading(true);
 
     try {
-      addLog('progress', `Retrieving data from transaction ${item.txHash.slice(0, 8)}...`);
+      addLog('progress', `Retrieving data from blockchain...`);
 
-      // Create PDA for user's lockbox
-      const [lockboxPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('lockbox'), publicKey.toBuffer()],
-        PROGRAM_ID
-      );
-
+      // Get PDA for logging
+      const [lockboxPda] = client.getLockboxAddress();
       addLog('info', `Querying PDA: ${lockboxPda.toBase58().slice(0, 8)}...${lockboxPda.toBase58().slice(-8)}`);
 
-      // Simulate retrieval (TODO: fetch from chain)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      addLog('progress', 'Fetching encrypted data from chain...');
+
+      // Use SDK to retrieve and decrypt
+      const decryptedData = await client.retrieve();
 
       addLog('progress', 'Decrypting with session key...');
 
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       // Show decrypted data (never stored, only in memory)
-      setRetrievedData(`[Demo] Original data:\n${item.dataPreview}\n\nTransaction: ${item.txHash}\nStored: ${item.timestamp.toLocaleString()}`);
+      setRetrievedData(decryptedData);
       setShowRetrieved(true);
 
       addLog('success', 'Data retrieved and decrypted successfully');
