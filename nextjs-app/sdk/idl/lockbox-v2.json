@@ -610,7 +610,128 @@
       }
     }
   ],
-  "errors": [],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "MaxChunksReached",
+      "msg": "Maximum number of storage chunks reached"
+    },
+    {
+      "code": 6001,
+      "name": "ChunkNotFound",
+      "msg": "Storage chunk not found"
+    },
+    {
+      "code": 6002,
+      "name": "MaxEntriesPerChunk",
+      "msg": "Maximum entries per chunk reached"
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientChunkCapacity",
+      "msg": "Insufficient chunk capacity"
+    },
+    {
+      "code": 6004,
+      "name": "EntryNotFound",
+      "msg": "Entry not found"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidEntryOffset",
+      "msg": "Invalid entry offset"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidTierUpgrade",
+      "msg": "Invalid tier upgrade"
+    },
+    {
+      "code": 6007,
+      "name": "SubscriptionExpired",
+      "msg": "Subscription expired"
+    },
+    {
+      "code": 6008,
+      "name": "InsufficientStorageCapacity",
+      "msg": "Insufficient storage capacity"
+    },
+    {
+      "code": 6009,
+      "name": "IncorrectPaymentAmount",
+      "msg": "Payment amount incorrect"
+    },
+    {
+      "code": 6010,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidDataSize",
+      "msg": "Invalid data size"
+    },
+    {
+      "code": 6012,
+      "name": "CooldownNotElapsed",
+      "msg": "Cooldown period not elapsed"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidChunkIndex",
+      "msg": "Invalid chunk index"
+    },
+    {
+      "code": 6014,
+      "name": "CannotDowngrade",
+      "msg": "Cannot downgrade subscription tier"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidEntryType",
+      "msg": "Invalid entry type"
+    },
+    {
+      "code": 6016,
+      "name": "SearchIndexFull",
+      "msg": "Search index full"
+    },
+    {
+      "code": 6017,
+      "name": "CategoryLimitReached",
+      "msg": "Category limit reached"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidCategory",
+      "msg": "Invalid category"
+    },
+    {
+      "code": 6019,
+      "name": "ChunkAlreadyExists",
+      "msg": "Chunk already exists"
+    },
+    {
+      "code": 6020,
+      "name": "DuplicateChunk",
+      "msg": "Duplicate chunk index"
+    },
+    {
+      "code": 6021,
+      "name": "NotInitialized",
+      "msg": "Master lockbox not initialized"
+    },
+    {
+      "code": 6022,
+      "name": "DataCorruption",
+      "msg": "Data corruption detected"
+    },
+    {
+      "code": 6023,
+      "name": "RateLimitExceeded",
+      "msg": "Rate limit exceeded: please wait before retrying"
+    }
+  ],
   "metadata": {
     "name": "lockbox",
     "version": "2.0.0",
