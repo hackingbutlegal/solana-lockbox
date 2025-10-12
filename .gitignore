@@ -60,3 +60,4 @@ coverage/
 
 # Vercel
 .vercel
+nextjs-app/

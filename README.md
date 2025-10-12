@@ -114,6 +114,18 @@ lockbox/
 │   ├── public/
 │   │   └── manifest.json           # PWA manifest
 │   └── vite.config.ts              # Vite configuration
+├── sdk/
+│   ├── src/
+│   │   ├── index.ts                # TypeScript SDK
+│   │   ├── types.ts                # Type definitions
+│   │   └── idl/
+│   │       └── lockbox.json        # Program IDL
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── README.md                   # SDK documentation
+├── target/
+│   └── idl/
+│       └── lockbox.json            # Generated IDL
 ├── Anchor.toml
 └── package.json
 ```
@@ -284,7 +296,35 @@ PRs welcome! Please ensure:
 
 ---
 
+## TypeScript SDK
+
+A complete TypeScript SDK is now available for developers:
+
+```bash
+npm install @lockbox/sdk
+```
+
+```typescript
+import { LockboxClient } from '@lockbox/sdk';
+
+const client = new LockboxClient({ connection, wallet });
+
+// Store encrypted data
+await client.store('My secret data');
+
+// Retrieve and decrypt
+const data = await client.retrieve();
+```
+
+See [SDK Documentation](./sdk/README.md) for complete API reference.
+
 ## Recent Updates
+
+**v1.2.0** (October 2025):
+- Added TypeScript SDK for easy integration
+- Generated IDL for program interactions
+- Enhanced developer documentation
+- Improved API reference and examples
 
 **v1.1.0** (October 2025):
 - Added interactive FAQ with 18 comprehensive questions

@@ -1,0 +1,33 @@
+{
+  "name": "@lockbox/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Lockbox Solana program",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "solana",
+    "blockchain",
+    "encryption",
+    "lockbox",
+    "sdk"
+  ],
+  "author": "",
+  "license": "ISC",
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/web3.js": "^1.98.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

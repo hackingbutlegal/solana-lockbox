@@ -1,0 +1,345 @@
+/**
+ * Type definitions for the Lockbox program
+ */
+
+import { PublicKey } from '@solana/web3.js';
+
+export type Lockbox = {
+  version: '0.1.0';
+  name: 'lockbox';
+  instructions: [
+    {
+      name: 'storeEncrypted';
+      accounts: [
+        {
+          name: 'lockbox';
+          isMut: true;
+          isSigner: false;
+        },
+        {
+          name: 'user';
+          isMut: true;
+          isSigner: true;
+        },
+        {
+          name: 'feeReceiver';
+          isMut: true;
+          isSigner: false;
+        },
+        {
+          name: 'systemProgram';
+          isMut: false;
+          isSigner: false;
+        }
+      ];
+      args: [
+        {
+          name: 'ciphertext';
+          type: 'bytes';
+        },
+        {
+          name: 'nonce';
+          type: {
+            array: ['u8', 24];
+          };
+        },
+        {
+          name: 'salt';
+          type: {
+            array: ['u8', 32];
+          };
+        }
+      ];
+    },
+    {
+      name: 'retrieveEncrypted';
+      accounts: [
+        {
+          name: 'lockbox';
+          isMut: false;
+          isSigner: false;
+        },
+        {
+          name: 'user';
+          isMut: false;
+          isSigner: true;
+        }
+      ];
+      args: [];
+      returns: {
+        defined: 'EncryptedData';
+      };
+    }
+  ];
+  accounts: [
+    {
+      name: 'lockbox';
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'owner';
+            type: 'publicKey';
+          },
+          {
+            name: 'ciphertext';
+            type: 'bytes';
+          },
+          {
+            name: 'nonce';
+            type: {
+              array: ['u8', 24];
+            };
+          },
+          {
+            name: 'salt';
+            type: {
+              array: ['u8', 32];
+            };
+          },
+          {
+            name: 'lastActionSlot';
+            type: 'u64';
+          },
+          {
+            name: 'bump';
+            type: 'u8';
+          }
+        ];
+      };
+    }
+  ];
+  types: [
+    {
+      name: 'EncryptedData';
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'ciphertext';
+            type: 'bytes';
+          },
+          {
+            name: 'nonce';
+            type: {
+              array: ['u8', 24];
+            };
+          },
+          {
+            name: 'salt';
+            type: {
+              array: ['u8', 32];
+            };
+          }
+        ];
+      };
+    }
+  ];
+  errors: [
+    {
+      code: 6000;
+      name: 'DataTooLarge';
+      msg: 'Encrypted data exceeds maximum size of 1024 bytes';
+    },
+    {
+      code: 6001;
+      name: 'InvalidCiphertext';
+      msg: 'Invalid ciphertext: data cannot be empty';
+    },
+    {
+      code: 6002;
+      name: 'NonceReuseDetected';
+      msg: 'Nonce reuse detected: operation rejected';
+    },
+    {
+      code: 6003;
+      name: 'FeeTooLow';
+      msg: 'Fee too low: minimum 0.001 SOL required';
+    },
+    {
+      code: 6004;
+      name: 'Unauthorized';
+      msg: 'Unauthorized: you are not the owner of this lockbox';
+    },
+    {
+      code: 6005;
+      name: 'CooldownNotElapsed';
+      msg: 'Cooldown not elapsed: wait 10 slots before retry';
+    },
+    {
+      code: 6006;
+      name: 'AccountSpaceExceeded';
+      msg: 'Account space exceeded: cannot store more data';
+    }
+  ];
+};
+
+export const IDL: Lockbox = {
+  version: '0.1.0',
+  name: 'lockbox',
+  instructions: [
+    {
+      name: 'storeEncrypted',
+      accounts: [
+        {
+          name: 'lockbox',
+          isMut: true,
+          isSigner: false,
+        },
+        {
+          name: 'user',
+          isMut: true,
+          isSigner: true,
+        },
+        {
+          name: 'feeReceiver',
+          isMut: true,
+          isSigner: false,
+        },
+        {
+          name: 'systemProgram',
+          isMut: false,
+          isSigner: false,
+        },
+      ],
+      args: [
+        {
+          name: 'ciphertext',
+          type: 'bytes',
+        },
+        {
+          name: 'nonce',
+          type: {
+            array: ['u8', 24],
+          },
+        },
+        {
+          name: 'salt',
+          type: {
+            array: ['u8', 32],
+          },
+        },
+      ],
+    },
+    {
+      name: 'retrieveEncrypted',
+      accounts: [
+        {
+          name: 'lockbox',
+          isMut: false,
+          isSigner: false,
+        },
+        {
+          name: 'user',
+          isMut: false,
+          isSigner: true,
+        },
+      ],
+      args: [],
+      returns: {
+        defined: 'EncryptedData',
+      },
+    },
+  ],
+  accounts: [
+    {
+      name: 'lockbox',
+      type: {
+        kind: 'struct',
+        fields: [
+          {
+            name: 'owner',
+            type: 'publicKey',
+          },
+          {
+            name: 'ciphertext',
+            type: 'bytes',
+          },
+          {
+            name: 'nonce',
+            type: {
+              array: ['u8', 24],
+            },
+          },
+          {
+            name: 'salt',
+            type: {
+              array: ['u8', 32],
+            },
+          },
+          {
+            name: 'lastActionSlot',
+            type: 'u64',
+          },
+          {
+            name: 'bump',
+            type: 'u8',
+          },
+        ],
+      },
+    },
+  ],
+  types: [
+    {
+      name: 'EncryptedData',
+      type: {
+        kind: 'struct',
+        fields: [
+          {
+            name: 'ciphertext',
+            type: 'bytes',
+          },
+          {
+            name: 'nonce',
+            type: {
+              array: ['u8', 24],
+            },
+          },
+          {
+            name: 'salt',
+            type: {
+              array: ['u8', 32],
+            },
+          },
+        ],
+      },
+    },
+  ],
+  errors: [
+    {
+      code: 6000,
+      name: 'DataTooLarge',
+      msg: 'Encrypted data exceeds maximum size of 1024 bytes',
+    },
+    {
+      code: 6001,
+      name: 'InvalidCiphertext',
+      msg: 'Invalid ciphertext: data cannot be empty',
+    },
+    {
+      code: 6002,
+      name: 'NonceReuseDetected',
+      msg: 'Nonce reuse detected: operation rejected',
+    },
+    {
+      code: 6003,
+      name: 'FeeTooLow',
+      msg: 'Fee too low: minimum 0.001 SOL required',
+    },
+    {
+      code: 6004,
+      name: 'Unauthorized',
+      msg: 'Unauthorized: you are not the owner of this lockbox',
+    },
+    {
+      code: 6005,
+      name: 'CooldownNotElapsed',
+      msg: 'Cooldown not elapsed: wait 10 slots before retry',
+    },
+    {
+      code: 6006,
+      name: 'AccountSpaceExceeded',
+      msg: 'Account space exceeded: cannot store more data',
+    },
+  ],
+};
