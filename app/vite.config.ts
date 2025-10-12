@@ -9,7 +9,6 @@ export default defineConfig({
     },
   },
   define: {
-    'process.env': {},
     global: 'globalThis',
   },
   optimizeDeps: {
@@ -24,6 +23,13 @@ export default defineConfig({
     target: 'esnext',
     commonjsOptions: {
       transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'polyfills': ['buffer'],
+        },
+      },
     },
   },
 });

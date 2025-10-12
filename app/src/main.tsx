@@ -2,8 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-
-// Buffer is loaded via CDN in index.html
+import './polyfills';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
