@@ -14,12 +14,10 @@
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "master_lockbox"
+                "value": [109,97,115,116,101,114,95,108,111,99,107,98,111,120]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "owner"
               }
             ]
@@ -54,17 +52,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "storage_chunk"
+                "value": [115,116,111,114,97,103,101,95,99,104,117,110,107]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "master_lockbox"
               },
               {
                 "kind": "arg",
-                "type": "u16",
                 "path": "chunk_index"
               }
             ]
