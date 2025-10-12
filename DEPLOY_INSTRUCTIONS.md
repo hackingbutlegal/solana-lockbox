@@ -2,10 +2,10 @@
 
 ## ✅ Current Status
 
-**Program**: Successfully deployed to Solana Devnet
-**Program ID**: `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ`
-**Network**: Solana Devnet
-**Frontend**: Fully functional at http://localhost:5173
+- **Program**: Successfully deployed to Solana Devnet
+- **Program ID**: `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ`
+- **Network**: Solana Devnet
+- **Frontend**: Fully functional at http://localhost:5173
 
 [View on Solana Explorer](https://explorer.solana.com/address/5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ?cluster=devnet)
 
@@ -382,6 +382,6 @@ solana program set-upgrade-authority \
 
 ---
 
-**Last Updated**: October 11, 2025
-**Deployed Version**: v1.0.0
-**Status**: ✅ Live on Devnet
+- **Last Updated**: October 11, 2025
+- **Deployed Version**: v1.0.0
+- **Status**: ✅ Live on Devnet
