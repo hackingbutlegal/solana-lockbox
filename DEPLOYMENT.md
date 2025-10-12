@@ -410,6 +410,6 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: October 11, 2025
-**Version**: v1.0.0
-**Status**: ✅ Live on Devnet
+- **Last Updated**: October 11, 2025
+- **Version**: v1.0.0
+- **Status**: ✅ Live on Devnet
