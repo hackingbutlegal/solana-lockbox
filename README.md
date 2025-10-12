@@ -322,6 +322,13 @@ See [SDK Documentation](./sdk/README.md) for complete API reference.
 
 ## Recent Updates
 
+**v2.2.0** (October 2025):
+- Migrated frontend from Vite to Next.js 15 with Turbopack
+- Improved build performance and developer experience
+- Enhanced mobile responsiveness
+- Updated project structure and documentation
+- Cleaned up repository for production release
+
 **v1.2.0** (October 2025):
 - Added TypeScript SDK for easy integration
 - Generated IDL for program interactions

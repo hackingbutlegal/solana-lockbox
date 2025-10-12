@@ -5,6 +5,31 @@ All notable changes to the Lockbox project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-10-12
+
+### Changed
+- **Frontend Migration**: Migrated from Vite to Next.js 15 with Turbopack
+  - Improved build performance and developer experience
+  - Better production optimizations
+  - Enhanced SEO capabilities with server-side rendering
+  - Improved mobile responsiveness
+- **Project Structure**: Updated to use `nextjs-app/` directory
+  - Removed old `app/` directory
+  - Updated all documentation references
+  - Updated build scripts to use Next.js
+- **Documentation**: Cleaned up and finalized for production release
+  - Updated README with Next.js instructions
+  - Updated deployment guides
+  - Clarified project structure
+
+### Removed
+- Old Vite-based frontend (replaced with Next.js)
+- Unused dependencies and configurations
+
+### Fixed
+- Build script paths updated for Next.js app
+- Vercel deployment configuration corrected
+
 ## [1.2.0] - 2025-10-12
 
 ### Added
