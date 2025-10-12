@@ -287,9 +287,10 @@ export function PasswordManager() {
             {error && error.includes('IDL not loaded') ? (
               <>
                 <div className="info-message">
-                  <p><strong>Status:</strong> v2 Program Not Deployed Yet</p>
+                  <p><strong>Status:</strong> ✅ Program Deployed to Devnet</p>
+                  <p><strong>Program ID:</strong> 7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB</p>
                   <p>
-                    The password manager v2.0 program needs to be deployed to devnet before the frontend can interact with it.
+                    The program is deployed with all security fixes, but the IDL (Interface Description Language) needs to be generated for the frontend to interact with it.
                   </p>
                 </div>
 
@@ -297,22 +298,29 @@ export function PasswordManager() {
                   <h3>What&apos;s Next?</h3>
                   <ul>
                     <li>✅ v2 Rust program code complete</li>
+                    <li>✅ All critical security fixes applied</li>
                     <li>✅ Frontend dashboard complete</li>
                     <li>✅ SDK complete (client, types, utils)</li>
-                    <li>⏳ Deploy v2 program to devnet</li>
-                    <li>⏳ Generate program IDL</li>
+                    <li>✅ Deployed to devnet</li>
+                    <li>⏳ Generate program IDL (blocked by anchor-syn version issue)</li>
                     <li>⏳ Full integration testing</li>
                   </ul>
                 </div>
 
                 <div className="info-box">
-                  <h3>Development Status:</h3>
+                  <h3>Technical Details:</h3>
                   <p>
-                    The password manager frontend is complete and ready for use once the v2 program is deployed to devnet.
+                    The program binary was successfully built and deployed using cargo-build-sbf.
+                    IDL generation failed due to a proc-macro2 incompatibility in anchor-syn 0.30.1.
                   </p>
                   <p>
-                    All security enhancements are in place (AEAD validation, rate limiting, input sanitization, etc.).
+                    <strong>Security Fixes Deployed:</strong>
                   </p>
+                  <ul>
+                    <li>✅ Fixed FEE_RECEIVER .unwrap() panic risk</li>
+                    <li>✅ Added checked arithmetic for overflow prevention</li>
+                    <li>✅ Added chunk validation and duplicate detection</li>
+                  </ul>
                 </div>
               </>
             ) : (
