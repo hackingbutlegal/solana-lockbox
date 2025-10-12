@@ -412,6 +412,11 @@ export class LockboxV2Client {
    * Get master lockbox account
    */
   async getMasterLockbox(): Promise<MasterLockbox> {
+    // Check if program is properly initialized
+    if (!this.program.account) {
+      throw new Error('Program not initialized - IDL not loaded');
+    }
+
     const [masterLockbox] = this.getMasterLockboxAddress();
     return await (this.program.account as any).masterLockbox.fetch(masterLockbox);
   }
@@ -420,6 +425,11 @@ export class LockboxV2Client {
    * Get storage chunk account
    */
   async getStorageChunk(chunkIndex: number): Promise<StorageChunk> {
+    // Check if program is properly initialized
+    if (!this.program.account) {
+      throw new Error('Program not initialized - IDL not loaded');
+    }
+
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
     return await (this.program.account as any).storageChunk.fetch(storageChunk);
   }
@@ -428,9 +438,15 @@ export class LockboxV2Client {
    * Check if master lockbox exists
    */
   async exists(): Promise<boolean> {
+    // If program not initialized, we can't check
+    if (!this.program.account) {
+      return false;
+    }
+
     try {
-      await this.getMasterLockbox();
-      return true;
+      const [masterLockbox] = this.getMasterLockboxAddress();
+      const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+      return accountInfo !== null;
     } catch {
       return false;
     }
