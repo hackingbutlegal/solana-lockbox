@@ -17,6 +17,11 @@ import IDL from './idl/lockbox.json';
 export type { Lockbox } from './types';
 export { IDL };
 
+// V2 exports
+export * from './types-v2';
+export { LockboxV2Client } from './client-v2';
+export * from './utils';
+
 /**
  * Constants
  */
