@@ -1,4 +1,3 @@
-import React from 'react';
 import './ActivityLog.css';
 
 export type LogLevel = 'info' | 'success' | 'warning' | 'error' | 'progress';

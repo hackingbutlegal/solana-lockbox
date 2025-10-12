@@ -57,3 +57,4 @@ coverage/
 # Misc
 .yarn/
 .pnp.*
+.vercel

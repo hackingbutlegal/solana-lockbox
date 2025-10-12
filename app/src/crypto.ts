@@ -69,12 +69,14 @@ export async function deriveSessionKey(
     ['deriveBits']
   );
 
+  const infoBytes = new TextEncoder().encode('lockbox-session-key');
+  // @ts-expect-error - TextEncoder.encode() returns Uint8Array but TS infers broader type
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: 'HKDF',
       hash: 'SHA-256',
       salt: salt,
-      info: new TextEncoder().encode('lockbox-session-key'),
+      info: infoBytes,
     },
     key,
     256 // 32 bytes

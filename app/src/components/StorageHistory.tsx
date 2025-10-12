@@ -1,4 +1,3 @@
-import React from 'react';
 import './StorageHistory.css';
 
 export interface StoredItem {
