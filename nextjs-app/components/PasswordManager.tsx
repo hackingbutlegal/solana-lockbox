@@ -282,43 +282,80 @@ export function PasswordManager() {
 
         <div className="pm-setup-prompt">
           <div className="setup-card">
-            <h2>Initialize Your Password Vault</h2>
-            <p>Create your master lockbox to start storing passwords securely</p>
+            <h2>Password Manager v2.0</h2>
 
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
+            {error && error.includes('IDL not loaded') ? (
+              <>
+                <div className="info-message">
+                  <p><strong>Status:</strong> v2 Program Not Deployed Yet</p>
+                  <p>
+                    The password manager v2.0 program needs to be deployed to devnet before the frontend can interact with it.
+                  </p>
+                </div>
+
+                <div className="info-box">
+                  <h3>What's Next?</h3>
+                  <ul>
+                    <li>✅ v2 Rust program code complete</li>
+                    <li>✅ Frontend dashboard complete</li>
+                    <li>✅ SDK complete (client, types, utils)</li>
+                    <li>⏳ Deploy v2 program to devnet</li>
+                    <li>⏳ Generate program IDL</li>
+                    <li>⏳ Full integration testing</li>
+                  </ul>
+                </div>
+
+                <div className="info-box">
+                  <h3>For Now:</h3>
+                  <p>
+                    You can still use the <a href="/" style={{color: '#667eea', textDecoration: 'underline'}}>v1 lockbox</a> for encrypted storage.
+                  </p>
+                  <p>
+                    The v2 password manager will be available once the program is deployed.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>Initialize Your Password Vault</h2>
+                <p>Create your master lockbox to start storing passwords securely</p>
+
+                {error && (
+                  <div className="error-message">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={async () => {
+                    if (client) {
+                      try {
+                        await client.initializeMasterLockbox();
+                        // Refresh to show new lockbox
+                        window.location.reload();
+                      } catch (err) {
+                        console.error('Failed to initialize:', err);
+                      }
+                    }
+                  }}
+                  disabled={loading}
+                  className="btn-primary"
+                >
+                  {loading ? 'Initializing...' : 'Create Password Vault'}
+                </button>
+
+                <div className="info-box">
+                  <h3>What is a Master Lockbox?</h3>
+                  <p>
+                    Your master lockbox is your personal password vault stored on the Solana blockchain.
+                    All passwords are encrypted client-side before storage.
+                  </p>
+                  <p>
+                    <strong>Free Tier:</strong> 1KB storage (~10 passwords)
+                  </p>
+                </div>
+              </>
             )}
-
-            <button
-              onClick={async () => {
-                if (client) {
-                  try {
-                    await client.initializeMasterLockbox();
-                    // Refresh to show new lockbox
-                    window.location.reload();
-                  } catch (err) {
-                    console.error('Failed to initialize:', err);
-                  }
-                }
-              }}
-              disabled={loading}
-              className="btn-primary"
-            >
-              {loading ? 'Initializing...' : 'Create Password Vault'}
-            </button>
-
-            <div className="info-box">
-              <h3>What is a Master Lockbox?</h3>
-              <p>
-                Your master lockbox is your personal password vault stored on the Solana blockchain.
-                All passwords are encrypted client-side before storage.
-              </p>
-              <p>
-                <strong>Free Tier:</strong> 1KB storage (~10 passwords)
-              </p>
-            </div>
           </div>
         </div>
 
@@ -404,6 +441,7 @@ export function PasswordManager() {
             border-radius: 8px;
             padding: 1.5rem;
             text-align: left;
+            margin-bottom: 1rem;
           }
 
           .info-box h3 {
@@ -416,6 +454,31 @@ export function PasswordManager() {
             margin: 0.5rem 0;
             color: #7f8c8d;
             font-size: 0.95rem;
+          }
+
+          .info-box ul {
+            list-style: none;
+            padding: 0;
+            margin: 0.5rem 0;
+          }
+
+          .info-box li {
+            padding: 0.5rem 0;
+            color: #2c3e50;
+          }
+
+          .info-message {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+          }
+
+          .info-message p {
+            margin: 0.5rem 0;
+            color: #1976d2;
           }
 
           .error-message {

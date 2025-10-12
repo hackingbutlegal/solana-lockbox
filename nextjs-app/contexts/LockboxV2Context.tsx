@@ -155,14 +155,27 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       setLoading(true);
       setError(null);
 
+      // Check if lockbox exists first
+      const exists = await client.exists();
+
+      if (!exists) {
+        setMasterLockbox(null);
+        setLoading(false);
+        return;
+      }
+
       const lockbox = await client.getMasterLockbox();
       setMasterLockbox(lockbox);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch master lockbox';
-      setError(errorMsg);
+      console.error('Failed to refresh master lockbox:', errorMsg);
 
-      // If not found, lockbox may not be initialized yet
-      if (errorMsg.includes('not found') || errorMsg.includes('Account does not exist')) {
+      // Program not properly initialized - this is expected for v2
+      if (errorMsg.includes('program') || errorMsg.includes('masterLockbox') || errorMsg.includes('undefined')) {
+        setError('v2 Program IDL not loaded. Using v1 lockbox for now.');
+        setMasterLockbox(null);
+      } else {
+        setError(errorMsg);
         setMasterLockbox(null);
       }
     } finally {
