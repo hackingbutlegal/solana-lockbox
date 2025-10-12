@@ -9,7 +9,19 @@
         {
           "name": "masterLockbox",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [109,97,115,116,101,114,95,108,111,99,107,98,111,120]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner",
@@ -35,7 +47,23 @@
         {
           "name": "storageChunk",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115,116,111,114,97,103,101,95,99,104,117,110,107]
+              },
+              {
+                "kind": "account",
+                "path": "master_lockbox"
+              },
+              {
+                "kind": "arg",
+                "path": "chunk_index"
+              }
+            ]
+          }
         },
         {
           "name": "owner",
@@ -106,10 +134,7 @@
         {
           "name": "titleHash",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         }
       ]
@@ -557,10 +582,7 @@
           {
             "name": "titleHash",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {

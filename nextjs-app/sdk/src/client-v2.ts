@@ -29,16 +29,26 @@ import IDLData from '../idl/lockbox-v2.json';
 
 // Safely extract the IDL, handling various module formats
 function getIDL() {
+  let idl: any;
+
   // If it's already a plain object with 'address' field, use it directly
   if (IDLData && typeof IDLData === 'object' && 'address' in IDLData) {
-    return IDLData;
+    idl = IDLData;
   }
   // If it's wrapped in a default export
-  if ((IDLData as any)?.default && typeof (IDLData as any).default === 'object') {
-    return (IDLData as any).default;
+  else if ((IDLData as any)?.default && typeof (IDLData as any).default === 'object') {
+    idl = (IDLData as any).default;
   }
   // Last resort: return as-is and hope for the best
-  return IDLData;
+  else {
+    idl = IDLData;
+  }
+
+  // CRITICAL FIX: Don't modify the IDL at all
+  // The issue is that Anchor 0.30.1 expects the IDL in JSON format exactly as stored
+  // The manually-created IDL should work without modifications
+
+  return idl;
 }
 
 const IDL = getIDL();
@@ -67,42 +77,22 @@ export class LockboxV2Client {
       { commitment: 'confirmed' }
     );
 
-    // Initialize program with IDL
-    // Note: The program binary is deployed and functional
-    // Using manually-created IDL due to toolchain issues (proc-macro2/anchor-syn incompatibility)
-    try {
-      // Debug: Log IDL structure
-      if (typeof window !== 'undefined') {
-        console.log('IDL type:', typeof IDL);
-        console.log('IDL has address:', !!(IDL as any)?.address);
-        console.log('IDL address:', (IDL as any)?.address);
-      }
+    // IMPORTANT: Due to IDL format incompatibilities with Anchor 0.30.1 in browser environments,
+    // we're using a minimal Program interface without IDL-based method generation.
+    // All instructions will be manually constructed using raw transaction building.
 
-      // Try to create program with IDL, but gracefully fallback
-      // Note: Cast to unknown first to bypass TypeScript's type checking
-      // The IDL is manually created and structurally correct for the program
-      this.program = new Program(IDL as unknown as Idl, provider);
+    console.log('✓ Initializing Lockbox v2 Client');
+    console.log('  Program ID:', PROGRAM_ID.toBase58());
+    console.log('  Using manual transaction construction (no IDL)');
 
-      if (typeof window !== 'undefined') {
-        console.log('✓ Program initialized successfully with IDL');
-        console.log('  Program ID:', this.program.programId.toBase58());
-        console.log('  Methods:', Object.keys((this.program as any).methods || {}).length);
-      }
-    } catch (error) {
-      console.error('❌ IDL initialization failed:', error);
-      console.error('Error details:', error instanceof Error ? error.message : String(error));
-      console.error('IDL structure:', JSON.stringify(IDL).substring(0, 200));
-
-      // Fallback: Create a minimal program interface
-      this.program = {
-        programId: PROGRAM_ID,
-        provider,
-        methods: {},
-        account: {},
-      } as any as Program;
-
-      console.warn('⚠️  Using fallback program interface (limited functionality)');
-    }
+    // Create a minimal program interface for PDA derivation and provider access
+    // We'll manually construct all transactions instead of relying on IDL-generated methods
+    this.program = {
+      programId: PROGRAM_ID,
+      provider,
+      methods: {}, // Empty - we'll use manual transaction construction
+      account: {}, // Empty - we'll use manual deserialization
+    } as any as Program;
   }
 
   // ============================================================================
