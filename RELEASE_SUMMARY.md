@@ -190,7 +190,11 @@ All criteria met ✅:
 
 ## 💡 Usage Example
 
-After publishing to npm, developers can use:
+Published to npm! Developers can now use:
+
+```bash
+npm install lockbox-solana-sdk
+```
 
 ```typescript
 import { LockboxClient } from 'lockbox-solana-sdk';

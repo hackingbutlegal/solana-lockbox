@@ -11,11 +11,11 @@ We're excited to announce the official TypeScript SDK for Lockbox! This makes it
 #### Quick Start
 
 ```bash
-npm install @lockbox/sdk
+npm install lockbox-solana-sdk
 ```
 
 ```typescript
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 
 const client = new LockboxClient({ connection, wallet });
 
@@ -139,7 +139,7 @@ const tx = await program.methods
 
 **After (v1.2.0):**
 ```typescript
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 
 const client = new LockboxClient({ connection, wallet });
 const signature = await client.store('My secret data');

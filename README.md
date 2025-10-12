@@ -301,11 +301,11 @@ PRs welcome! Please ensure:
 A complete TypeScript SDK is now available for developers:
 
 ```bash
-npm install @lockbox/sdk
+npm install lockbox-solana-sdk
 ```
 
 ```typescript
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 
 const client = new LockboxClient({ connection, wallet });
 

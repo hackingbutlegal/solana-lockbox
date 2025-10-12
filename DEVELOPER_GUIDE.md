@@ -19,7 +19,7 @@ Complete guide for integrating the Lockbox SDK into your Solana application.
 ### Using the SDK
 
 ```bash
-npm install @lockbox/sdk
+npm install lockbox-solana-sdk
 ```
 
 ### Peer Dependencies
@@ -35,7 +35,7 @@ npm install @coral-xyz/anchor @solana/web3.js tweetnacl tweetnacl-util
 ### Basic Usage
 
 ```typescript
-import { LockboxClient, PROGRAM_ID } from '@lockbox/sdk';
+import { LockboxClient, PROGRAM_ID } from 'lockbox-solana-sdk';
 import { Connection, clusterApiUrl } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 
@@ -75,7 +75,7 @@ try {
 Each user has a unique PDA where their encrypted data is stored:
 
 ```typescript
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 
 // Get your lockbox PDA
 const [pda, bump] = LockboxClient.getLockboxAddress(wallet.publicKey);
@@ -213,7 +213,7 @@ import {
   FEE_LAMPORTS,
   MAX_ENCRYPTED_SIZE,
   COOLDOWN_SLOTS
-} from '@lockbox/sdk';
+} from 'lockbox-solana-sdk';
 
 console.log('Program ID:', PROGRAM_ID.toBase58());
 // 5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ
@@ -231,7 +231,7 @@ console.log('Cooldown:', COOLDOWN_SLOTS, 'slots (~4 seconds)');
 ### Utilities
 
 ```typescript
-import { utils } from '@lockbox/sdk';
+import { utils } from 'lockbox-solana-sdk';
 
 // Validate plaintext size before encrypting
 const plaintext = 'My data';
@@ -253,7 +253,7 @@ const [pda, bump] = utils.getLockboxAddress(userPubkey);
 ```typescript
 import { useMemo, useState, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 
 export function useLockbox() {
   const { connection } = useConnection();
@@ -471,7 +471,7 @@ secretData = '';
 ### 3. Validate Input Size
 
 ```typescript
-import { utils } from '@lockbox/sdk';
+import { utils } from 'lockbox-solana-sdk';
 
 function validateAndStore(input: string) {
   if (!utils.validateSize(input)) {
@@ -503,7 +503,7 @@ See the [full example app](./app/src/App.tsx) for a production-ready implementat
 
 ```typescript
 // pages/lockbox.tsx
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
@@ -525,7 +525,7 @@ export default function LockboxPage() {
 
 ```typescript
 // lockbox-cli.ts
-import { LockboxClient } from '@lockbox/sdk';
+import { LockboxClient } from 'lockbox-solana-sdk';
 import { Connection, Keypair } from '@solana/web3.js';
 import * as fs from 'fs';
 
