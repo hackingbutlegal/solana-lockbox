@@ -56,11 +56,14 @@ export class LockboxV2Client {
     // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
     try {
       // Try to create program with IDL, but gracefully fallback
-      // Note: Cast to any first due to discriminator field differences between IDL versions
-      this.program = new Program(IDL as any as Idl, provider);
+      // Note: Cast to unknown first to bypass TypeScript's type checking
+      // The IDL is manually created and structurally correct for the program
+      this.program = new Program(IDL as unknown as Idl, provider);
       console.log('Program initialized successfully with IDL');
+      console.log('Program methods available:', Object.keys((this.program as any).methods || {}));
     } catch (error) {
-      console.warn('IDL initialization failed, using placeholder:', error);
+      console.error('IDL initialization failed:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
       // Fallback: Create a minimal program interface
       this.program = {
         programId: PROGRAM_ID,

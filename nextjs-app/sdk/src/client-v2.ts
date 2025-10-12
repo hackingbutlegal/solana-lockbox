@@ -24,7 +24,7 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
-import IDL from '../idl/lockbox.json';
+import IDL from '../idl/lockbox-v2.json';
 
 export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
@@ -56,10 +56,14 @@ export class LockboxV2Client {
     // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
     try {
       // Try to create program with IDL, but gracefully fallback
-      this.program = new Program(IDL as Idl, provider);
+      // Note: Cast to unknown first to bypass TypeScript's type checking
+      // The IDL is manually created and structurally correct for the program
+      this.program = new Program(IDL as unknown as Idl, provider);
       console.log('Program initialized successfully with IDL');
+      console.log('Program methods available:', Object.keys((this.program as any).methods || {}));
     } catch (error) {
-      console.warn('IDL initialization failed, using placeholder:', error);
+      console.error('IDL initialization failed:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
       // Fallback: Create a minimal program interface
       this.program = {
         programId: PROGRAM_ID,
