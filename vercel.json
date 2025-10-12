@@ -1,7 +1,8 @@
 {
-  "buildCommand": "cd app && npm run build",
-  "outputDirectory": "app/dist",
-  "installCommand": "npm install --prefix app",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rootDirectory": "app",
   "framework": null,
   "rewrites": [
     {
