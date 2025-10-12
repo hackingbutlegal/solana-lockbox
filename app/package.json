@@ -1,0 +1,38 @@
+{
+  "name": "lockbox-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@raydium-io/raydium-sdk-v2": "^0.2.30-alpha",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
+    "@solana/web3.js": "^1.98.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
+  },
+  "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "typescript": "^5.6.3",
+    "util": "^0.12.5",
+    "vite": "^7.1.9"
+  }
+}

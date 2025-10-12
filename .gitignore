@@ -1,0 +1,59 @@
+# Anchor
+.anchor
+target/
+test-ledger/
+**/*.rs.bk
+
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+.cache/
+.parcel-cache/
+
+# Vite
+.vite/
+app/.vite/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.yarn/
+.pnp.*

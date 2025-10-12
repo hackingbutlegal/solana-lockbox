@@ -1,0 +1,336 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Mobile: Center alignment */
+@media (max-width: 1023px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Desktop: Top-aligned, horizontally centered */
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+}
+
+.lockbox-container {
+  max-width: 600px;
+  width: 100%;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+/* Desktop layout - wider container, centered */
+@media (min-width: 1024px) {
+  .lockbox-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px 20px;
+  text-align: center;
+}
+
+header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin-bottom: 20px;
+}
+
+/* Main content layout */
+.main-content {
+  padding: 30px 20px;
+}
+
+/* Desktop: Side-by-side layout */
+@media (min-width: 1024px) {
+  .main-content {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 30px;
+    padding: 30px;
+  }
+
+  .primary-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .secondary-section {
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+}
+
+section {
+  margin-bottom: 30px;
+}
+
+@media (min-width: 1024px) {
+  section {
+    margin-bottom: 0;
+  }
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  transition: border-color 0.3s;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.size-counter {
+  font-size: 0.85rem;
+  margin: 8px 0;
+  text-align: right;
+  font-weight: 500;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.retrieved-data {
+  margin-top: 15px;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-header {
+  background: #f8f9fa;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.reveal-header button {
+  width: auto;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  background: #e74c3c;
+}
+
+.retrieved-data pre {
+  padding: 15px;
+  background: #2c3e50;
+  color: #ecf0f1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  overflow-x: auto;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.status-message {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-left: 4px solid #667eea;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.connect-prompt {
+  padding: 60px 20px;
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.connect-prompt p {
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+}
+
+.connect-hint {
+  font-size: 0.9rem !important;
+  opacity: 0.7;
+}
+
+footer {
+  background: #f8f9fa;
+  padding: 20px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  border-top: 1px solid #e0e0e0;
+}
+
+footer p {
+  margin: 5px 0;
+}
+
+.network-badge {
+  display: inline-block;
+  background: #3498db;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.security-note {
+  font-size: 0.75rem !important;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+/* Wallet adapter button styling override */
+.wallet-adapter-button {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 2px solid rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s !important;
+}
+
+.wallet-adapter-button:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: white !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  header h1 {
+    font-size: 2rem;
+  }
+
+  .main-content {
+    padding: 20px 15px;
+  }
+
+  textarea {
+    font-size: 0.95rem;
+  }
+
+  button {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+}
+
+/* Prevent text selection on mobile for security */
+@media (max-width: 768px) {
+  .retrieved-data pre {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+  }
+}
+
+/* Scrollbar styling for desktop */
+@media (min-width: 1024px) {
+  .secondary-section::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .secondary-section::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .secondary-section::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  .secondary-section::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}

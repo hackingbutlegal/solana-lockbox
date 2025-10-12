@@ -1,0 +1,17 @@
+{
+  "name": "Lockbox - Wallet-Tied Encrypted Storage",
+  "short_name": "Lockbox",
+  "description": "Secure encrypted storage on Solana using wallet-derived keys",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
