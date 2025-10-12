@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { Buffer } from 'buffer';
 
 export default defineConfig({
   plugins: [react()],
@@ -12,9 +11,9 @@ export default defineConfig({
   define: {
     'process.env': {},
     global: 'globalThis',
-    Buffer: ['buffer', 'Buffer'],
   },
   optimizeDeps: {
+    include: ['buffer'],
     esbuildOptions: {
       define: {
         global: 'globalThis',
@@ -23,18 +22,8 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    rollupOptions: {
-      plugins: [
-        {
-          name: 'inject-buffer',
-          renderChunk(code) {
-            if (code.includes('Buffer')) {
-              return `import { Buffer } from 'buffer';\nglobalThis.Buffer = Buffer;\n${code}`;
-            }
-            return code;
-          },
-        },
-      ],
+    commonjsOptions: {
+      transformMixedEsModules: true,
     },
   },
 });
