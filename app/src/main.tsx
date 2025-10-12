@@ -5,10 +5,8 @@ import App from './App';
 import './index.css';
 
 // Polyfill Buffer for Solana Web3.js
-// @ts-expect-error - Adding Buffer to global scope for Solana Web3.js compatibility
-window.Buffer = Buffer;
-// @ts-expect-error - Adding Buffer to globalThis for Solana Web3.js compatibility
-globalThis.Buffer = Buffer;
+(window as any).Buffer = Buffer;
+(globalThis as any).Buffer = Buffer;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
