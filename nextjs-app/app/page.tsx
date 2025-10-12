@@ -34,7 +34,7 @@ const PasswordManager = dynamic(
   }
 );
 
-const PROGRAM_ID = '5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ';
+const PROGRAM_ID = '7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB';
 
 export default function Home() {
   const network = WalletAdapterNetwork.Devnet;

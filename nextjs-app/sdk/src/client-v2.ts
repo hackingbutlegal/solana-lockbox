@@ -25,7 +25,7 @@ import {
   DataEntryHeader,
 } from './types-v2';
 
-export const PROGRAM_ID = new PublicKey('5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ');
+export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
 
 /**
