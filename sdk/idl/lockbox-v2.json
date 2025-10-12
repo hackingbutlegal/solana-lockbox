@@ -1,4 +1,5 @@
 {
+  "address": "7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB",
   "version": "2.0.0",
   "name": "lockbox",
   "instructions": [
@@ -611,9 +612,8 @@
   ],
   "errors": [],
   "metadata": {
-    "address": "7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB",
-    "origin": "manual",
-    "description": "Lockbox v2.0 - Decentralized Password Manager",
-    "note": "Manually created due to toolchain incompatibilities preventing automated IDL generation"
+    "name": "lockbox",
+    "version": "2.0.0",
+    "spec": "0.1.0"
   }
 }
