@@ -6,7 +6,8 @@
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "dev": "cd app && npm run dev",
-    "build": "anchor build && cd app && npm run build",
+    "build": "cd app && npm install && npm run build",
+    "build:anchor": "anchor build && cd app && npm run build",
     "test": "anchor test",
     "deploy": "anchor deploy"
   },
