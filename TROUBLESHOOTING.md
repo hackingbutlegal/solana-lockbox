@@ -69,14 +69,21 @@ TypeError: Expected Buffer
     at new Program(IDL as unknown as Idl, provider)
 ```
 
-**Cause**: Next.js 15 with Turbopack handles JSON imports differently
+**Cause**: Two separate issues:
+1. Next.js 15 with Turbopack handles JSON imports differently (FIXED in commit 93fbe61)
+2. IDL PDA seed format didn't match Anchor spec 0.1.0 (FIXED in commit d182245)
 
-**Solution**: ✅ FIXED in commit 93fbe61
+**Solution**: ✅ FIXED in commits 93fbe61 and d182245
 
-The client now includes a `getIDL()` function that handles multiple module formats:
-- Direct JSON object
-- Module with .default export
-- Fallback handling
+The fixes include:
+1. `getIDL()` function that handles multiple module formats:
+   - Direct JSON object
+   - Module with .default export
+   - Fallback handling
+
+2. Corrected PDA seed format in IDL:
+   - ❌ OLD: `{ "kind": "const", "type": "string", "value": "master_lockbox" }`
+   - ✅ NEW: `{ "kind": "const", "value": [109,97,115,116,101,114,95,108,111,99,107,98,111,120] }`
 
 **Verification**:
 Check browser console for:
@@ -87,7 +94,7 @@ IDL has address: true
   Methods: 9
 ```
 
-If you see this, the fix is working!
+If you see this WITHOUT the "Expected Buffer" error, the fix is working!
 
 **If issue persists**:
 1. Clear Next.js cache: `rm -rf .next`
