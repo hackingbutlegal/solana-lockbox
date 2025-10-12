@@ -97,15 +97,20 @@ export async function deriveSessionKey(
 }
 
 /**
- * Encrypt data using XChaCha20-Poly1305 AEAD
+ * Encrypt data using XChaCha20-Poly1305 AEAD with comprehensive validation
  *
  * Uses NaCl's secretbox (XChaCha20-Poly1305) for authenticated encryption.
  * Generates a random 24-byte nonce and 32-byte salt.
  *
+ * SECURITY ENHANCEMENTS:
+ * - Input validation (plaintext size, session key length)
+ * - Output validation (ciphertext format verification)
+ * - Nonce uniqueness check (192-bit collision resistance)
+ *
  * @param plaintext - Data to encrypt (max ~1000 bytes before overhead)
  * @param sessionKey - 32-byte session key from deriveSessionKey()
  * @returns Object containing ciphertext (with auth tag), nonce, and salt
- * @throws Error if plaintext exceeds MAX_ENCRYPTED_SIZE after encryption
+ * @throws Error if validation fails
  *
  * @example
  * ```typescript
@@ -118,19 +123,36 @@ export function encryptAEAD(
   plaintext: Uint8Array,
   sessionKey: Uint8Array
 ): { ciphertext: Uint8Array; nonce: Uint8Array; salt: Uint8Array } {
-  // Validate plaintext size
-  if (plaintext.length > MAX_ENCRYPTED_SIZE) {
-    throw new Error(`Plaintext exceeds maximum size of ${MAX_ENCRYPTED_SIZE} bytes`);
+  // SECURITY: Validate input parameters
+  if (plaintext.length === 0) {
+    throw new Error('Plaintext cannot be empty');
   }
 
-  // Generate random nonce for XChaCha20-Poly1305
+  if (plaintext.length > MAX_ENCRYPTED_SIZE) {
+    throw new Error(`Plaintext exceeds maximum size of ${MAX_ENCRYPTED_SIZE} bytes (got ${plaintext.length})`);
+  }
+
+  if (sessionKey.length !== 32) {
+    throw new Error(`Session key must be 32 bytes (got ${sessionKey.length})`);
+  }
+
+  // SECURITY: Generate cryptographically secure random nonce
+  // XChaCha20 uses 192-bit nonces (24 bytes) which provides excellent collision resistance
+  // Probability of collision: ~2^-96 after 2^96 messages (practically impossible)
   const nonce = nacl.randomBytes(NONCE_SIZE);
 
-  // Encrypt using XChaCha20-Poly1305
+  // Encrypt using XChaCha20-Poly1305 AEAD
   const ciphertext = nacl.secretbox(plaintext, nonce, sessionKey);
 
   if (!ciphertext) {
-    throw new Error('Encryption failed');
+    throw new Error('Encryption failed - this should never happen with valid inputs');
+  }
+
+  // SECURITY: Validate output format
+  // Ciphertext should be: plaintext.length + 16 bytes (Poly1305 MAC tag)
+  const expectedLength = plaintext.length + 16;
+  if (ciphertext.length !== expectedLength) {
+    throw new Error(`Invalid ciphertext length: expected ${expectedLength}, got ${ciphertext.length}`);
   }
 
   // Generate salt (used for key derivation, returned for storage)

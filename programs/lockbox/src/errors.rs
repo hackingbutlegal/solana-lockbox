@@ -67,4 +67,7 @@ pub enum LockboxError {
 
     #[msg("Data corruption detected")]
     DataCorruption,
+
+    #[msg("Rate limit exceeded: please wait before retrying")]
+    RateLimitExceeded,
 }

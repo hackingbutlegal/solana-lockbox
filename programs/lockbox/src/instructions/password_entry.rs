@@ -42,6 +42,13 @@ pub fn store_password_entry_handler(
     let storage_chunk = &mut ctx.accounts.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
 
+    // SECURITY: Rate limiting (prevent DoS attacks)
+    // Minimum 1 second between write operations
+    require!(
+        master_lockbox.check_rate_limit(current_timestamp, 1),
+        crate::errors::LockboxError::RateLimitExceeded
+    );
+
     // SECURITY: Validate AEAD ciphertext format
     // XChaCha20-Poly1305 (NaCl secretbox) format:
     // - First 24 bytes: nonce
@@ -199,6 +206,12 @@ pub fn update_password_entry_handler(
     let storage_chunk = &mut ctx.accounts.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
 
+    // SECURITY: Rate limiting
+    require!(
+        master_lockbox.check_rate_limit(current_timestamp, 1),
+        crate::errors::LockboxError::RateLimitExceeded
+    );
+
     // SECURITY: Validate AEAD ciphertext format
     const MIN_AEAD_SIZE: usize = 40;
     require!(
@@ -261,6 +274,12 @@ pub fn delete_password_entry_handler(
     let master_lockbox = &mut ctx.accounts.master_lockbox;
     let storage_chunk = &mut ctx.accounts.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
+
+    // SECURITY: Rate limiting
+    require!(
+        master_lockbox.check_rate_limit(current_timestamp, 1),
+        crate::errors::LockboxError::RateLimitExceeded
+    );
 
     // Check subscription is active
     require!(

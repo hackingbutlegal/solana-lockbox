@@ -186,4 +186,19 @@ impl MasterLockbox {
     pub fn touch(&mut self, timestamp: i64) {
         self.last_accessed = timestamp;
     }
+
+    /// Check rate limiting (prevent DoS attacks)
+    ///
+    /// SECURITY: Enforces minimum time between operations to prevent spam
+    /// - Minimum 1 second between write operations
+    /// - Read operations are not rate-limited
+    ///
+    /// Returns true if enough time has passed since last operation
+    pub fn check_rate_limit(&self, current_timestamp: i64, min_interval_seconds: i64) -> bool {
+        if self.last_accessed == 0 {
+            return true; // First operation
+        }
+
+        current_timestamp >= self.last_accessed + min_interval_seconds
+    }
 }
