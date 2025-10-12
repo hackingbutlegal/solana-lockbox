@@ -1,4 +1,5 @@
 [toolchain]
+anchor_version = "0.30.1"
 
 [features]
 resolution = true
@@ -6,6 +7,9 @@ skip-lint = false
 
 [programs.localnet]
 lockbox = "5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ"
+
+[programs.devnet]
+lockbox = "7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB"
 
 [registry]
 url = "https://api.apr.dev"
