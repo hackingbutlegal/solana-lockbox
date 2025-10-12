@@ -1,5 +1,5 @@
 {
-  "name": "@lockbox/sdk",
+  "name": "lockbox-solana-sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for the Lockbox Solana program",
   "main": "dist/index.js",

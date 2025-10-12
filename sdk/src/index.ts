@@ -10,7 +10,7 @@
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
-import { decode as decodeUTF8, encode as encodeUTF8 } from 'tweetnacl-util';
+import * as util from 'tweetnacl-util';
 import IDL from './idl/lockbox.json';
 
 // Re-export types
@@ -66,7 +66,6 @@ export class LockboxClient {
 
     this.program = new Program(
       IDL as any,
-      options.programId || PROGRAM_ID,
       provider
     );
   }
@@ -105,7 +104,7 @@ export class LockboxClient {
    */
   private encrypt(plaintext: string, key: Uint8Array): { ciphertext: Uint8Array; nonce: Uint8Array } {
     const nonce = nacl.randomBytes(24);
-    const messageUint8 = encodeUTF8(plaintext);
+    const messageUint8 = util.decodeUTF8(plaintext);
     const ciphertext = nacl.secretbox(messageUint8, nonce, key);
 
     return { ciphertext, nonce };
@@ -119,14 +118,14 @@ export class LockboxClient {
     if (!decrypted) {
       return null;
     }
-    return decodeUTF8(decrypted);
+    return util.encodeUTF8(decrypted);
   }
 
   /**
    * Request a signature from the wallet for key derivation
    */
   private async requestSignature(): Promise<Uint8Array> {
-    const message = encodeUTF8('Sign this message to derive your Lockbox encryption key');
+    const message = util.decodeUTF8('Sign this message to derive your Lockbox encryption key');
     const signature = await this.wallet.signMessage(message);
     return signature;
   }
@@ -139,7 +138,7 @@ export class LockboxClient {
    */
   async store(plaintext: string): Promise<string> {
     // Validate plaintext size
-    const plaintextBytes = encodeUTF8(plaintext);
+    const plaintextBytes = util.decodeUTF8(plaintext);
     if (plaintextBytes.length > MAX_ENCRYPTED_SIZE - 16) { // Account for Poly1305 tag
       throw new Error(`Plaintext too large. Max size: ${MAX_ENCRYPTED_SIZE - 16} bytes`);
     }
@@ -187,7 +186,7 @@ export class LockboxClient {
     const [lockboxPda] = this.getLockboxAddress();
 
     // Fetch lockbox account
-    const lockboxAccount = await this.program.account.lockbox.fetch(lockboxPda);
+    const lockboxAccount: any = await (this.program.account as any).lockbox.fetch(lockboxPda);
 
     // Get wallet signature for key derivation
     const signature = await this.requestSignature();
@@ -215,7 +214,7 @@ export class LockboxClient {
   async exists(): Promise<boolean> {
     try {
       const [lockboxPda] = this.getLockboxAddress();
-      await this.program.account.lockbox.fetch(lockboxPda);
+      await (this.program.account as any).lockbox.fetch(lockboxPda);
       return true;
     } catch {
       return false;
@@ -227,7 +226,7 @@ export class LockboxClient {
    */
   async getAccount(): Promise<any> {
     const [lockboxPda] = this.getLockboxAddress();
-    return await this.program.account.lockbox.fetch(lockboxPda);
+    return await (this.program.account as any).lockbox.fetch(lockboxPda);
   }
 
   /**
@@ -271,7 +270,7 @@ export const utils = {
    * Validate plaintext size
    */
   validateSize: (plaintext: string): boolean => {
-    return encodeUTF8(plaintext).length <= MAX_ENCRYPTED_SIZE - 16;
+    return util.decodeUTF8(plaintext).length <= MAX_ENCRYPTED_SIZE - 16;
   },
 };
 
