@@ -61,6 +61,3 @@ coverage/
 # Vercel
 .vercel
 
-# Future expansion plans (separate repo)
-PASSWORD_MANAGER_EXPANSION.md
-MIGRATION_GUIDE_V2.md
