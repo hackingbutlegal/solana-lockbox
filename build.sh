@@ -5,20 +5,20 @@ echo "Current directory: $(pwd)"
 echo "Listing contents:"
 ls -la
 
-# Navigate to app directory
-if [ -d "app" ]; then
-  cd app
-elif [ -d "../app" ]; then
-  cd ../app
+# Navigate to nextjs-app directory
+if [ -d "nextjs-app" ]; then
+  cd nextjs-app
+elif [ -d "../nextjs-app" ]; then
+  cd ../nextjs-app
 else
-  echo "Error: Cannot find app directory"
+  echo "Error: Cannot find nextjs-app directory"
   exit 1
 fi
 
 echo "Installing dependencies..."
 npm install
 
-echo "Building application..."
+echo "Building Next.js application..."
 npm run build
 
 echo "Build complete!"

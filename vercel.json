@@ -1,12 +1,6 @@
 {
-  "buildCommand": "bash build.sh",
-  "outputDirectory": "app/dist",
-  "installCommand": "echo 'Dependencies installed via build script'",
-  "framework": null,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "buildCommand": "cd nextjs-app && npm install && npm run build",
+  "outputDirectory": "nextjs-app/.next",
+  "installCommand": "echo 'Dependencies installed in build command'",
+  "framework": "nextjs"
 }

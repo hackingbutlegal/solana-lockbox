@@ -63,8 +63,8 @@ git clone https://github.com/hackingbutlegal/lockbox.git
 cd lockbox
 
 # Install frontend dependencies
-cd app
-npm install --legacy-peer-deps
+cd nextjs-app
+npm install
 cd ..
 
 # Build Solana program
@@ -75,11 +75,11 @@ solana config set --url devnet
 solana program deploy --program-id target/deploy/lockbox-keypair.json target/deploy/lockbox.so
 
 # Start frontend dev server
-cd app
+cd nextjs-app
 npm run dev
 ```
 
-Visit http://localhost:5173 and connect your Phantom or Solflare wallet.
+Visit http://localhost:3000 and connect your Phantom or Solflare wallet.
 
 ### Development
 
@@ -91,7 +91,7 @@ solana-test-validator
 anchor build && anchor deploy
 
 # Terminal 3: Start frontend
-cd app && npm run dev
+cd nextjs-app && npm run dev
 ```
 
 ## Project Structure
@@ -100,20 +100,22 @@ cd app && npm run dev
 lockbox/
 ├── programs/lockbox/src/
 │   └── lib.rs                      # Anchor program with PDA storage
-├── app/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ActivityLog.tsx     # Real-time transaction log
-│   │   │   ├── StorageHistory.tsx  # Transaction history display
-│   │   │   └── FAQ.tsx             # Interactive FAQ component
-│   │   ├── utils/
-│   │   │   └── secureStorage.ts    # Session storage utilities
-│   │   ├── App.tsx                 # Main React component
+├── nextjs-app/
+│   ├── app/
+│   │   ├── page.tsx                # Main page component
+│   │   ├── layout.tsx              # Root layout
+│   │   └── globals.css             # Global styles
+│   ├── components/
+│   │   ├── LockboxApp.tsx          # Main Lockbox component
+│   │   ├── ActivityLog.tsx         # Real-time transaction log
+│   │   ├── StorageHistory.tsx      # Transaction history display
+│   │   └── FAQ.tsx                 # Interactive FAQ component
+│   ├── lib/
 │   │   ├── crypto.ts               # Cryptography utilities
-│   │   └── main.tsx                # Entry point
-│   ├── public/
-│   │   └── manifest.json           # PWA manifest
-│   └── vite.config.ts              # Vite configuration
+│   │   ├── secureStorage.ts        # Session storage utilities
+│   │   └── idl/
+│   │       └── lockbox.json        # Program IDL
+│   └── next.config.ts              # Next.js configuration
 ├── sdk/
 │   ├── src/
 │   │   ├── index.ts                # TypeScript SDK
@@ -222,7 +224,7 @@ Bytes ...:     Bump seed (1 byte)
 
 ```bash
 # Test frontend locally
-cd app
+cd nextjs-app
 npm run dev
 
 # Build for production
@@ -243,7 +245,7 @@ solana config set --url devnet
 # Deploy program
 anchor deploy
 
-# Update program ID in app/src/App.tsx
+# Update program ID in nextjs-app/components/LockboxApp.tsx
 ```
 
 ### Mainnet
@@ -255,7 +257,7 @@ solana config set --url mainnet-beta
 # Deploy with sufficient SOL
 anchor deploy
 
-# Update endpoint in app/src/App.tsx
+# Update endpoint in nextjs-app/components/LockboxApp.tsx
 ```
 
 ## License
@@ -267,7 +269,7 @@ ISC
 PRs welcome! Please ensure:
 
 1. All tests pass: `anchor test`
-2. Frontend builds: `cd app && npm run build`
+2. Frontend builds: `cd nextjs-app && npm run build`
 3. No ESLint errors
 4. Security-focused changes documented
 
@@ -335,6 +337,6 @@ See [SDK Documentation](./sdk/README.md) for complete API reference.
 
 ---
 
-Built with [Anchor](https://www.anchor-lang.com/) • [Solana](https://solana.com/) • [React](https://react.dev/)
+Built with [Anchor](https://www.anchor-lang.com/) • [Solana](https://solana.com/) • [Next.js](https://nextjs.org/)
 
 Created with <3 by [GRAFFITO](https://x.com/0xgraffito)

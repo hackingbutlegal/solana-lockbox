@@ -1,0 +1,233 @@
+.activity-log {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-top: 30px;
+}
+
+.activity-log-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.activity-log-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.log-count {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.activity-log-content {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.log-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #95a5a6;
+}
+
+.log-entry {
+  border-left: 4px solid;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  background: #f8f9fa;
+  transition: all 0.3s;
+}
+
+.log-entry:hover {
+  background: #e9ecef;
+  transform: translateX(2px);
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.log-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+  width: 24px;
+  text-align: center;
+}
+
+.log-time {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  font-family: 'Courier New', monospace;
+}
+
+.log-message {
+  font-size: 0.95rem;
+  color: #2c3e50;
+  margin-left: 34px;
+  line-height: 1.4;
+}
+
+.log-tx-hash {
+  margin-top: 10px;
+  margin-left: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tx-hash-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 600;
+}
+
+.tx-hash-value {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  background: #e9ecef;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #495057;
+}
+
+.tx-action-btn {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.tx-action-btn:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+}
+
+.tx-explorer-btn {
+  background: #3498db;
+}
+
+.tx-explorer-btn:hover {
+  background: #2980b9;
+}
+
+/* Log level colors */
+.log-info {
+  border-left-color: #3498db;
+}
+
+.log-info .log-icon {
+  color: #3498db;
+}
+
+.log-success {
+  border-left-color: #27ae60;
+  background: #e8f8f5;
+}
+
+.log-success .log-icon {
+  color: #27ae60;
+}
+
+.log-warning {
+  border-left-color: #f39c12;
+  background: #fef9e7;
+}
+
+.log-warning .log-icon {
+  color: #f39c12;
+}
+
+.log-error {
+  border-left-color: #e74c3c;
+  background: #fadbd8;
+}
+
+.log-error .log-icon {
+  color: #e74c3c;
+}
+
+.log-progress {
+  border-left-color: #9b59b6;
+  background: #f4ecf7;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.log-progress .log-icon {
+  color: #9b59b6;
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Scrollbar styling */
+.activity-log-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.activity-log-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.activity-log-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.activity-log-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .log-tx-hash {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tx-action-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .activity-log-content {
+    max-height: 300px;
+  }
+}
