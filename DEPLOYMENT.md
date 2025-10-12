@@ -2,11 +2,11 @@
 
 ## ✅ Current Status
 
-**Program**: ✅ Deployed to Solana Devnet
-**Program ID**: `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ`
-**Frontend**: ✅ Fully functional at http://localhost:5173
-**Network**: Devnet
-**Status**: Live and working
+1. **Program**: ✅ Deployed to Solana Devnet
+2. **Program ID**: `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ`
+3. **Frontend**: ✅ Fully functional at http://localhost:5173
+4. **Network**: Devnet
+5. **Status**: Live and working
 
 [View Program on Explorer](https://explorer.solana.com/address/5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ?cluster=devnet)
 
@@ -295,24 +295,24 @@ cd app && npm run build
 
 ### Implemented Security Features
 
-✅ **Client-Side Encryption**: All encryption happens off-chain
-✅ **Wallet-Derived Keys**: Keys derived from wallet signatures
-✅ **No Persistent Secrets**: Keys exist only in session memory
-✅ **Memory Scrubbing**: Sensitive data wiped after use
-✅ **Session Timeouts**: 15-minute inactivity auto-disconnect
-✅ **Rate Limiting**: 10-slot cooldown between operations
-✅ **Size Limits**: 1 KiB maximum to prevent abuse
-✅ **Fee Requirement**: 0.001 SOL prevents spam
-✅ **Owner-Only Access**: PDA ensures isolation
-✅ **AEAD Encryption**: XChaCha20-Poly1305 with authentication
+- ✅ **Client-Side Encryption**: All encryption happens off-chain
+- ✅ **Wallet-Derived Keys**: Keys derived from wallet signatures
+- ✅ **No Persistent Secrets**: Keys exist only in session memory
+- ✅ **Memory Scrubbing**: Sensitive data wiped after use
+- ✅ **Session Timeouts**: 15-minute inactivity auto-disconnect
+- ✅ **Rate Limiting**: 10-slot cooldown between operations
+- ✅ **Size Limits**: 1 KiB maximum to prevent abuse
+- ✅ **Fee Requirement**: 0.001 SOL prevents spam
+- ✅ **Owner-Only Access**: PDA ensures isolation
+- ✅ **AEAD Encryption**: XChaCha20-Poly1305 with authentication
 
 ### Known Limitations
 
-⚠️ **Wallet Compromise**: If wallet is compromised, all data is accessible
-⚠️ **Side-Channel Attacks**: Standard implementation-dependent risks
-⚠️ **Browser Extensions**: Malicious extensions could intercept in-memory data
-⚠️ **No Forward Secrecy**: Compromised wallet exposes historical data
-⚠️ **Single Key Derivation**: All data encrypted with same derivation method
+- ⚠️ **Wallet Compromise**: If wallet is compromised, all data is accessible
+- ⚠️ **Side-Channel Attacks**: Standard implementation-dependent risks
+- ⚠️ **Browser Extensions**: Malicious extensions could intercept in-memory data
+- ⚠️ **No Forward Secrecy**: Compromised wallet exposes historical data
+- ⚠️ **Single Key Derivation**: All data encrypted with same derivation method
 
 ### Threat Model
 
