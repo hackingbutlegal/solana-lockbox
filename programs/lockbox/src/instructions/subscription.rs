@@ -1,9 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::state::{MasterLockbox, SubscriptionTier};
 
-/// Fee receiver for subscription payments
-const FEE_RECEIVER: &str = "5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ";
-
 /// Upgrade subscription tier
 #[derive(Accounts)]
 pub struct UpgradeSubscription<'info> {
@@ -18,10 +15,10 @@ pub struct UpgradeSubscription<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    /// CHECK: Fee receiver account
+    /// CHECK: Fee receiver account - validated against program ID
     #[account(
         mut,
-        address = FEE_RECEIVER.parse::<Pubkey>().unwrap() @ crate::errors::LockboxError::Unauthorized
+        constraint = fee_receiver.key() == crate::ID @ crate::errors::LockboxError::Unauthorized
     )]
     pub fee_receiver: AccountInfo<'info>,
 
@@ -91,10 +88,10 @@ pub struct RenewSubscription<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    /// CHECK: Fee receiver account
+    /// CHECK: Fee receiver account - validated against program ID
     #[account(
         mut,
-        address = FEE_RECEIVER.parse::<Pubkey>().unwrap() @ crate::errors::LockboxError::Unauthorized
+        constraint = fee_receiver.key() == crate::ID @ crate::errors::LockboxError::Unauthorized
     )]
     pub fee_receiver: AccountInfo<'info>,
 

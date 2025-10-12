@@ -62,6 +62,9 @@ pub enum LockboxError {
     #[msg("Chunk already exists")]
     ChunkAlreadyExists,
 
+    #[msg("Duplicate chunk index")]
+    DuplicateChunk,
+
     #[msg("Master lockbox not initialized")]
     NotInitialized,
 

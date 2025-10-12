@@ -76,6 +76,18 @@ pub fn initialize_storage_chunk_handler(
     let bump = ctx.bumps.storage_chunk;
     let current_timestamp = Clock::get()?.unix_timestamp;
 
+    // Validate chunk index matches expected sequence
+    require!(
+        chunk_index == master_lockbox.storage_chunks_count,
+        crate::errors::LockboxError::InvalidChunkIndex
+    );
+
+    // Check for duplicate chunk (shouldn't happen with PDA, but defensive check)
+    require!(
+        !master_lockbox.storage_chunks.iter().any(|c| c.chunk_index == chunk_index),
+        crate::errors::LockboxError::DuplicateChunk
+    );
+
     // Validate capacity
     require!(
         initial_capacity >= StorageChunk::MIN_CHUNK_SIZE,
@@ -86,8 +98,10 @@ pub fn initialize_storage_chunk_handler(
         crate::errors::LockboxError::InvalidDataSize
     );
 
-    // Check subscription limits
-    let new_total_capacity = master_lockbox.total_capacity + initial_capacity as u64;
+    // Check subscription limits (use checked arithmetic to prevent overflow)
+    let new_total_capacity = master_lockbox.total_capacity
+        .checked_add(initial_capacity as u64)
+        .ok_or(crate::errors::LockboxError::InvalidDataSize)?;
     let max_capacity = master_lockbox.subscription_tier.max_capacity();
     require!(
         new_total_capacity <= max_capacity,

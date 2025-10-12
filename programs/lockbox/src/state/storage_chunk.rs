@@ -221,9 +221,11 @@ impl StorageChunk {
             new_data.extend_from_slice(&self.encrypted_data[offset + size..]);
         }
 
-        // Update all headers after this one
+        // Update all headers after this one (use checked_sub to prevent underflow)
         for h in self.entry_headers.iter_mut().skip(header_idx + 1) {
-            h.offset -= size as u32;
+            h.offset = h.offset
+                .checked_sub(size as u32)
+                .ok_or(crate::errors::LockboxError::InvalidEntryOffset)?;
         }
 
         // Remove header
