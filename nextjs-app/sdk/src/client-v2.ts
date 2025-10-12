@@ -24,7 +24,24 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
-import IDL from '../idl/lockbox-v2.json';
+// Import IDL - handle both ESM and CommonJS module formats
+import IDLData from '../idl/lockbox-v2.json';
+
+// Safely extract the IDL, handling various module formats
+function getIDL() {
+  // If it's already a plain object with 'address' field, use it directly
+  if (IDLData && typeof IDLData === 'object' && 'address' in IDLData) {
+    return IDLData;
+  }
+  // If it's wrapped in a default export
+  if ((IDLData as any)?.default && typeof (IDLData as any).default === 'object') {
+    return (IDLData as any).default;
+  }
+  // Last resort: return as-is and hope for the best
+  return IDLData;
+}
+
+const IDL = getIDL();
 
 export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
@@ -51,19 +68,31 @@ export class LockboxV2Client {
     );
 
     // Initialize program with IDL
-    // Note: Using a minimal placeholder until full IDL is available
-    // The program binary is deployed and functional, but automated IDL generation
-    // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
+    // Note: The program binary is deployed and functional
+    // Using manually-created IDL due to toolchain issues (proc-macro2/anchor-syn incompatibility)
     try {
+      // Debug: Log IDL structure
+      if (typeof window !== 'undefined') {
+        console.log('IDL type:', typeof IDL);
+        console.log('IDL has address:', !!(IDL as any)?.address);
+        console.log('IDL address:', (IDL as any)?.address);
+      }
+
       // Try to create program with IDL, but gracefully fallback
       // Note: Cast to unknown first to bypass TypeScript's type checking
       // The IDL is manually created and structurally correct for the program
       this.program = new Program(IDL as unknown as Idl, provider);
-      console.log('Program initialized successfully with IDL');
-      console.log('Program methods available:', Object.keys((this.program as any).methods || {}));
+
+      if (typeof window !== 'undefined') {
+        console.log('✓ Program initialized successfully with IDL');
+        console.log('  Program ID:', this.program.programId.toBase58());
+        console.log('  Methods:', Object.keys((this.program as any).methods || {}).length);
+      }
     } catch (error) {
-      console.error('IDL initialization failed:', error);
+      console.error('❌ IDL initialization failed:', error);
       console.error('Error details:', error instanceof Error ? error.message : String(error));
+      console.error('IDL structure:', JSON.stringify(IDL).substring(0, 200));
+
       // Fallback: Create a minimal program interface
       this.program = {
         programId: PROGRAM_ID,
@@ -71,6 +100,8 @@ export class LockboxV2Client {
         methods: {},
         account: {},
       } as any as Program;
+
+      console.warn('⚠️  Using fallback program interface (limited functionality)');
     }
   }
 
