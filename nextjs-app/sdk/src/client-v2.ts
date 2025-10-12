@@ -51,11 +51,22 @@ export class LockboxV2Client {
     );
 
     // Initialize program with IDL
+    // Note: Using a minimal placeholder until full IDL is available
+    // The program binary is deployed and functional, but automated IDL generation
+    // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
     try {
+      // Try to create program with IDL, but gracefully fallback
       this.program = new Program(IDL as Idl, provider);
+      console.log('Program initialized successfully with IDL');
     } catch (error) {
-      console.error('Failed to initialize program with IDL:', error);
-      this.program = {} as Program; // Fallback
+      console.warn('IDL initialization failed, using placeholder:', error);
+      // Fallback: Create a minimal program interface
+      this.program = {
+        programId: PROGRAM_ID,
+        provider,
+        methods: {},
+        account: {},
+      } as any as Program;
     }
   }
 
