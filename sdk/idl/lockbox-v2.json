@@ -93,7 +93,7 @@
         {
           "name": "dataType",
           "type": {
-            "defined": "StorageType"
+            "defined": { "name": "StorageType" }
           }
         }
       ]
@@ -129,7 +129,7 @@
         {
           "name": "entryType",
           "type": {
-            "defined": "PasswordEntryType"
+            "defined": { "name": "PasswordEntryType" }
           }
         },
         {
@@ -267,7 +267,7 @@
         {
           "name": "newTier",
           "type": {
-            "defined": "SubscriptionTier"
+            "defined": { "name": "SubscriptionTier" }
           }
         }
       ]
@@ -336,7 +336,7 @@
           {
             "name": "subscriptionTier",
             "type": {
-              "defined": "SubscriptionTier"
+              "defined": { "name": "SubscriptionTier" }
             }
           },
           {
@@ -359,7 +359,7 @@
             "name": "storageChunks",
             "type": {
               "vec": {
-                "defined": "StorageChunkInfo"
+                "defined": { "name": "StorageChunkInfo" }
               }
             }
           },
@@ -414,7 +414,7 @@
           {
             "name": "dataType",
             "type": {
-              "defined": "StorageType"
+              "defined": { "name": "StorageType" }
             }
           },
           {
@@ -425,7 +425,7 @@
             "name": "entryHeaders",
             "type": {
               "vec": {
-                "defined": "DataEntryHeader"
+                "defined": { "name": "DataEntryHeader" }
               }
             }
           },
@@ -494,7 +494,7 @@
           {
             "name": "dataType",
             "type": {
-              "defined": "StorageType"
+              "defined": { "name": "StorageType" }
             }
           },
           {
@@ -577,7 +577,7 @@
           {
             "name": "entryType",
             "type": {
-              "defined": "PasswordEntryType"
+              "defined": { "name": "PasswordEntryType" }
             }
           },
           {
