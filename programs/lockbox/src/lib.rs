@@ -1,8 +1,16 @@
-//! # Lockbox: Wallet-Tied Encrypted Storage on Solana
+//! # Lockbox v2.0: Decentralized Password Manager on Solana
 //!
-//! This program provides secure, wallet-derived encrypted storage on the Solana blockchain.
-//! Users can store encrypted data tied to their wallet keypair, with all encryption happening
-//! client-side. The program only stores the ciphertext, never the plaintext or encryption keys.
+//! This program provides a scalable, wallet-derived encrypted password manager on Solana.
+//! It features multi-tier storage, unlimited password entries, encrypted search, and
+//! subscription-based capacity tiers. All encryption happens client-side.
+//!
+//! ## Features
+//!
+//! - **Multi-Tier Storage**: Scale from 1KB to 1MB+ via dynamic chunk allocation
+//! - **Unlimited Entries**: Store unlimited passwords within subscription limits
+//! - **Encrypted Search**: Search without decrypting using blind indexes
+//! - **Subscription Tiers**: Free (1KB), Basic (10KB), Premium (100KB), Enterprise (1MB+)
+//! - **Zero-Knowledge**: Client-side encryption with XChaCha20-Poly1305 AEAD
 //!
 //! ## Security Model
 //!
@@ -11,20 +19,18 @@
 //! - **AEAD Encryption**: XChaCha20-Poly1305 with authentication
 //! - **No Key Storage**: Program never sees or stores encryption keys
 //! - **PDA Isolation**: Each user gets their own Program Derived Address
-//! - **Rate Limiting**: Cooldown period prevents brute force attacks
 //!
-//! ## Data Flow
+//! ## Architecture
 //!
-//! ### Storage:
-//! 1. Client generates session key from wallet signature
-//! 2. Client encrypts plaintext with XChaCha20-Poly1305
-//! 3. Client sends (ciphertext, nonce, salt) to program
-//! 4. Program validates size and stores in user's PDA
+//! ### V2 Multi-Tier System:
+//! - **MasterLockbox**: Manages metadata, subscriptions, and chunk references
+//! - **StorageChunks**: Hold encrypted password entries (expandable via realloc)
+//! - **Subscription System**: Paid tiers unlock more storage capacity
 //!
-//! ### Retrieval:
-//! 1. Client retrieves (ciphertext, nonce, salt) from PDA
-//! 2. Client derives session key from wallet signature + salt
-//! 3. Client decrypts ciphertext locally
+//! ### V1 Compatibility (Legacy):
+//! - Single Lockbox account with 1KB limit
+//! - Maintained for backward compatibility
+//! - Can be migrated to v2 system
 //!
 //! ## Program ID
 //! `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ` (Devnet)
@@ -32,6 +38,15 @@
 use anchor_lang::prelude::*;
 
 declare_id!("5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ");
+
+// Import v2 modules
+pub mod state;
+pub mod instructions;
+pub mod errors;
+
+use instructions::*;
+use state::*;
+use errors::*;
 
 /// Maximum encrypted payload size: 1024 bytes (1 KiB)
 /// This limit prevents excessive storage costs and transaction size issues
@@ -57,7 +72,105 @@ const COOLDOWN_SLOTS: u64 = 10;
 pub mod lockbox {
     use super::*;
 
-    /// Initialize or update a user's lockbox with encrypted data
+    // ============================================================================
+    // V2 Instructions - Multi-Tier Password Manager
+    // ============================================================================
+
+    /// Initialize a new master lockbox account (v2)
+    pub fn initialize_master_lockbox(ctx: Context<InitializeMasterLockbox>) -> Result<()> {
+        instructions::initialize::handler(ctx)
+    }
+
+    /// Initialize a new storage chunk (v2)
+    pub fn initialize_storage_chunk(
+        ctx: Context<InitializeStorageChunk>,
+        chunk_index: u16,
+        initial_capacity: u32,
+        data_type: StorageType,
+    ) -> Result<()> {
+        instructions::initialize::initialize_storage_chunk_handler(
+            ctx,
+            chunk_index,
+            initial_capacity,
+            data_type,
+        )
+    }
+
+    /// Store a new password entry (v2)
+    pub fn store_password_entry(
+        ctx: Context<StorePasswordEntry>,
+        chunk_index: u16,
+        encrypted_data: Vec<u8>,
+        entry_type: PasswordEntryType,
+        category: u32,
+        title_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::password_entry::store_password_entry_handler(
+            ctx,
+            chunk_index,
+            encrypted_data,
+            entry_type,
+            category,
+            title_hash,
+        )
+    }
+
+    /// Retrieve a password entry (v2)
+    pub fn retrieve_password_entry(
+        ctx: Context<RetrievePasswordEntry>,
+        chunk_index: u16,
+        entry_id: u64,
+    ) -> Result<Vec<u8>> {
+        instructions::password_entry::retrieve_password_entry_handler(ctx, chunk_index, entry_id)
+    }
+
+    /// Update a password entry (v2)
+    pub fn update_password_entry(
+        ctx: Context<UpdatePasswordEntry>,
+        chunk_index: u16,
+        entry_id: u64,
+        new_encrypted_data: Vec<u8>,
+    ) -> Result<()> {
+        instructions::password_entry::update_password_entry_handler(
+            ctx,
+            chunk_index,
+            entry_id,
+            new_encrypted_data,
+        )
+    }
+
+    /// Delete a password entry (v2)
+    pub fn delete_password_entry(
+        ctx: Context<DeletePasswordEntry>,
+        chunk_index: u16,
+        entry_id: u64,
+    ) -> Result<()> {
+        instructions::password_entry::delete_password_entry_handler(ctx, chunk_index, entry_id)
+    }
+
+    /// Upgrade subscription tier (v2)
+    pub fn upgrade_subscription(
+        ctx: Context<UpgradeSubscription>,
+        new_tier: SubscriptionTier,
+    ) -> Result<()> {
+        instructions::subscription::upgrade_subscription_handler(ctx, new_tier)
+    }
+
+    /// Renew subscription (v2)
+    pub fn renew_subscription(ctx: Context<RenewSubscription>) -> Result<()> {
+        instructions::subscription::renew_subscription_handler(ctx)
+    }
+
+    /// Downgrade to free tier (v2)
+    pub fn downgrade_subscription(ctx: Context<DowngradeSubscription>) -> Result<()> {
+        instructions::subscription::downgrade_subscription_handler(ctx)
+    }
+
+    // ============================================================================
+    // V1 Instructions - Legacy (Backward Compatibility)
+    // ============================================================================
+
+    /// Initialize or update a user's lockbox with encrypted data (v1 - LEGACY)
     ///
     /// This instruction stores client-encrypted data on-chain. The program performs
     /// validation but never sees the plaintext or encryption keys.
@@ -136,11 +249,11 @@ pub mod lockbox {
         lockbox.last_action_slot = clock.slot;
         lockbox.bump = ctx.bumps.lockbox;
 
-        msg!("Encrypted data stored successfully");
+        msg!("Encrypted data stored successfully (v1)");
         Ok(())
     }
 
-    /// Retrieve encrypted data (client-side decryption required)
+    /// Retrieve encrypted data (v1 - LEGACY)
     ///
     /// Returns the encrypted data stored in the user's lockbox. The client must
     /// derive the session key from their wallet signature to decrypt.
