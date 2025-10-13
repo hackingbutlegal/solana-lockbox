@@ -197,12 +197,43 @@ export function decryptAEAD(
 }
 
 /**
- * Generate a challenge message for wallet signing
- * This creates a domain-separated message that the wallet will sign
+ * Generate a challenge message for wallet signing with replay protection
+ *
+ * SECURITY FIX (H-2): Added random nonce to prevent signature replay attacks
+ *
+ * Each challenge now includes:
+ * - Public key (domain separation)
+ * - Timestamp (temporal context)
+ * - Random nonce (uniqueness guarantee)
+ * - Chain identifier (network separation)
+ *
+ * This ensures that each challenge is unique and cannot be replayed,
+ * even if the same public key and timestamp are used.
+ *
+ * @param publicKey - User's wallet public key
+ * @returns Challenge message as Uint8Array for wallet signing
  */
 export function generateChallenge(publicKey: PublicKey): Uint8Array {
   const timestamp = Date.now();
-  const message = `Lockbox Session Key Derivation\n\nPublic Key: ${publicKey.toBase58()}\nTimestamp: ${timestamp}\n\nSign this message to derive an encryption key for this session.`;
+
+  // SECURITY FIX (H-2): Generate random 32-byte nonce for replay protection
+  const nonce = crypto.getRandomValues(new Uint8Array(32));
+  const nonceHex = Array.from(nonce)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  const message = `Lockbox Session Key Derivation
+
+Public Key: ${publicKey.toBase58()}
+Timestamp: ${timestamp}
+Nonce: ${nonceHex}
+Chain: solana-devnet
+
+Sign this message to derive an encryption key for this session.
+
+⚠️  WARNING: Only sign this on trusted applications.
+⚠️  DO NOT sign if you did not initiate this request.`;
+
   return new TextEncoder().encode(message);
 }
 
