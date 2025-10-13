@@ -608,24 +608,60 @@ export class LockboxV2Client {
       await this.initializeStorageChunk(newChunkIndex);
 
       // CRITICAL: Refresh master lockbox after creating chunk to verify it was properly registered
+      // Due to RPC data lag, we may need to retry a few times
       console.log('[storePassword] Refreshing master lockbox to verify chunk creation...');
-      const refreshedMaster = await this.getMasterLockbox();
 
-      // Verify the new chunk was properly registered in the master lockbox
-      const chunkRegistered = refreshedMaster.storageChunks.some(c => c.chunkIndex === newChunkIndex);
+      let chunkRegistered = false;
+      let retries = 0;
+      const maxRetries = 5;
 
-      if (!chunkRegistered) {
-        console.error('[storePassword] Chunk creation failed - chunk not registered in master lockbox');
-        console.error('  Expected chunk index:', newChunkIndex);
-        console.error('  Registered chunks:', refreshedMaster.storageChunks.map(c => c.chunkIndex));
-        throw new Error(
-          `Storage chunk ${newChunkIndex} was not properly registered in master lockbox. ` +
-          `This may indicate a partially failed transaction. Please try again or contact support.`
-        );
+      while (!chunkRegistered && retries < maxRetries) {
+        // Wait a bit for RPC to catch up (exponential backoff)
+        if (retries > 0) {
+          const delay = Math.min(500 * Math.pow(2, retries - 1), 2000); // 500ms, 1s, 2s, 2s, 2s
+          console.log(`[storePassword] Waiting ${delay}ms for RPC to update (retry ${retries}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        const refreshedMaster = await this.getMasterLockbox();
+        chunkRegistered = refreshedMaster.storageChunks.some(c => c.chunkIndex === newChunkIndex);
+
+        if (chunkRegistered) {
+          console.log(`[storePassword] Chunk ${newChunkIndex} verified - registered successfully`);
+          break;
+        }
+
+        retries++;
       }
 
-      console.log(`[storePassword] Chunk ${newChunkIndex} verified - registered successfully`);
-      chunkIndex = newChunkIndex;
+      if (!chunkRegistered) {
+        // Final check - verify the chunk account exists even if master lockbox isn't updated
+        try {
+          const [chunkPDA] = this.getStorageChunkAddress(newChunkIndex);
+          const chunkAccount = await this.connection.getAccountInfo(chunkPDA);
+
+          if (chunkAccount) {
+            console.warn('[storePassword] Chunk exists on-chain but not yet reflected in master lockbox metadata');
+            console.warn('[storePassword] This is likely due to RPC lag - proceeding anyway');
+            chunkIndex = newChunkIndex;
+          } else {
+            console.error('[storePassword] Chunk creation failed - chunk not registered in master lockbox');
+            console.error('  Expected chunk index:', newChunkIndex);
+            throw new Error(
+              `Storage chunk ${newChunkIndex} was not properly registered in master lockbox. ` +
+              `This may indicate a partially failed transaction. Please try again or contact support.`
+            );
+          }
+        } catch (verifyError) {
+          console.error('[storePassword] Failed to verify chunk existence:', verifyError);
+          throw new Error(
+            `Storage chunk ${newChunkIndex} was not properly registered in master lockbox. ` +
+            `This may indicate a partially failed transaction. Please try again or contact support.`
+          );
+        }
+      } else {
+        chunkIndex = newChunkIndex;
+      }
     }
 
     const [masterLockbox] = this.getMasterLockboxAddress();
