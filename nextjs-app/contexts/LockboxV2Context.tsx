@@ -24,7 +24,8 @@ interface LockboxV2ContextType {
   client: LockboxV2Client | null;
 
   // Session
-  sessionKey: Uint8Array | null;
+  // SECURITY FIX (C-2): sessionKey no longer exposed in context
+  // Use isInitialized to check session status
   isInitialized: boolean;
   initializeSession: () => Promise<boolean>;
   clearSession: () => void;
@@ -67,13 +68,69 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
   const { publicKey, signMessage, signTransaction } = wallet;
   const { connection } = useConnection();
 
+  // SECURITY FIX (C-2): Use secure session key storage
+  // WeakMap prevents session key from being exposed in React DevTools
+  // and provides better memory isolation from browser extensions
+  const sessionKeyStorage = useMemo(() => new WeakMap<symbol, Uint8Array>(), []);
+  const [sessionKeyRef] = useState(() => Symbol('sessionKey'));
+
+  // Helper to get session key from secure storage
+  const getSessionKey = useCallback((): Uint8Array | null => {
+    return sessionKeyStorage.get(sessionKeyRef) || null;
+  }, [sessionKeyStorage, sessionKeyRef]);
+
+  // Helper to set session key in secure storage
+  const setSessionKey = useCallback((key: Uint8Array | null) => {
+    if (key === null) {
+      sessionKeyStorage.delete(sessionKeyRef);
+    } else {
+      sessionKeyStorage.set(sessionKeyRef, key);
+    }
+  }, [sessionKeyStorage, sessionKeyRef]);
+
   // State
-  const [sessionKey, setSessionKey] = useState<Uint8Array | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [masterLockbox, setMasterLockbox] = useState<MasterLockbox | null>(null);
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // SECURITY FIX (C-3): Session timeout management
+  // Track session creation time and last activity for timeout enforcement
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [lastActivityTime, setLastActivityTime] = useState<number | null>(null);
+
+  // SECURITY FIX (C-3): Session timeout constants
+  const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity
+
+  // SECURITY FIX (C-3): Check if session has timed out
+  const isSessionTimedOut = useCallback((): boolean => {
+    if (!sessionStartTime || !lastActivityTime) {
+      return false; // No session active
+    }
+
+    const now = Date.now();
+    const sessionAge = now - sessionStartTime;
+    const inactivityTime = now - lastActivityTime;
+
+    // Check absolute timeout (15 minutes from session start)
+    if (sessionAge > SESSION_TIMEOUT_MS) {
+      return true;
+    }
+
+    // Check inactivity timeout (5 minutes since last activity)
+    if (inactivityTime > INACTIVITY_TIMEOUT_MS) {
+      return true;
+    }
+
+    return false;
+  }, [sessionStartTime, lastActivityTime]);
+
+  // SECURITY FIX (C-3): Update last activity timestamp
+  const updateActivity = useCallback(() => {
+    setLastActivityTime(Date.now());
+  }, []);
 
   // Create client instance (memoized)
   const client = useMemo(() => {
@@ -99,7 +156,8 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       return false;
     }
 
-    if (sessionKey) {
+    // SECURITY FIX (C-2): Use secure storage accessor
+    if (getSessionKey()) {
       return true; // Already initialized
     }
 
@@ -117,8 +175,14 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
         signature
       );
 
+      // SECURITY FIX (C-2): Store in secure WeakMap storage
       setSessionKey(derivedKey);
       setIsInitialized(true);
+
+      // SECURITY FIX (C-3): Set session timestamps
+      const now = Date.now();
+      setSessionStartTime(now);
+      setLastActivityTime(now);
 
       return true;
     } catch (err) {
@@ -128,18 +192,24 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [publicKey, signMessage, sessionKey]);
+  }, [publicKey, signMessage, getSessionKey, setSessionKey]);
 
   // Clear session and wipe sensitive data
   const clearSession = useCallback(() => {
-    if (sessionKey) {
-      wipeSensitiveData(sessionKey);
+    // SECURITY FIX (C-2): Use secure storage accessor
+    const key = getSessionKey();
+    if (key) {
+      wipeSensitiveData(key);
     }
     setSessionKey(null);
     setIsInitialized(false);
     setEntries([]);
     setMasterLockbox(null);
-  }, [sessionKey]);
+
+    // SECURITY FIX (C-3): Clear session timestamps
+    setSessionStartTime(null);
+    setLastActivityTime(null);
+  }, [getSessionKey, setSessionKey]);
 
   // Refresh master lockbox data
   const refreshMasterLockbox = useCallback(async () => {
@@ -179,7 +249,9 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
 
   // Refresh password entries
   const refreshEntries = useCallback(async () => {
-    if (!client || !sessionKey) return;
+    // SECURITY FIX (C-2): Use secure storage accessor
+    const key = getSessionKey();
+    if (!client || !key) return;
 
     try {
       setLoading(true);
@@ -194,7 +266,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey]);
+  }, [client, getSessionKey]);
 
   // Create new password entry
   const createEntry = useCallback(async (entry: PasswordEntry): Promise<number | null> => {
@@ -203,14 +275,25 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       return null;
     }
 
+    // SECURITY FIX (C-3): Check for session timeout
+    if (getSessionKey() && isSessionTimedOut()) {
+      clearSession();
+      setError('Session expired. Please sign in again.');
+      return null;
+    }
+
+    // SECURITY FIX (C-2): Use secure storage accessor
     // Initialize session if needed (will prompt for signature ONCE)
-    if (!sessionKey) {
+    if (!getSessionKey()) {
       const initialized = await initializeSession();
       if (!initialized) {
         setError('Failed to initialize session');
         return null;
       }
     }
+
+    // SECURITY FIX (C-3): Update activity timestamp
+    updateActivity();
 
     try {
       setLoading(true);
@@ -229,7 +312,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries, initializeSession]);
+  }, [client, getSessionKey, refreshEntries, initializeSession, isSessionTimedOut, clearSession, updateActivity]);
 
   // Update existing password entry
   const updateEntry = useCallback(async (
@@ -242,14 +325,25 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       return false;
     }
 
+    // SECURITY FIX (C-3): Check for session timeout
+    if (getSessionKey() && isSessionTimedOut()) {
+      clearSession();
+      setError('Session expired. Please sign in again.');
+      return false;
+    }
+
+    // SECURITY FIX (C-2): Use secure storage accessor
     // Initialize session if needed (will prompt for signature ONCE)
-    if (!sessionKey) {
+    if (!getSessionKey()) {
       const initialized = await initializeSession();
       if (!initialized) {
         setError('Failed to initialize session');
         return false;
       }
     }
+
+    // SECURITY FIX (C-3): Update activity timestamp
+    updateActivity();
 
     try {
       setLoading(true);
@@ -268,7 +362,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries, initializeSession]);
+  }, [client, getSessionKey, refreshEntries, initializeSession, isSessionTimedOut, clearSession, updateActivity]);
 
   // Delete password entry
   const deleteEntry = useCallback(async (
@@ -280,14 +374,25 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       return false;
     }
 
+    // SECURITY FIX (C-3): Check for session timeout
+    if (getSessionKey() && isSessionTimedOut()) {
+      clearSession();
+      setError('Session expired. Please sign in again.');
+      return false;
+    }
+
+    // SECURITY FIX (C-2): Use secure storage accessor
     // Initialize session if needed (will prompt for signature ONCE)
-    if (!sessionKey) {
+    if (!getSessionKey()) {
       const initialized = await initializeSession();
       if (!initialized) {
         setError('Failed to initialize session');
         return false;
       }
     }
+
+    // SECURITY FIX (C-3): Update activity timestamp
+    updateActivity();
 
     try {
       setLoading(true);
@@ -306,7 +411,22 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries, initializeSession]);
+  }, [client, getSessionKey, refreshEntries, initializeSession, isSessionTimedOut, clearSession, updateActivity]);
+
+  // SECURITY FIX (C-3): Automatic session timeout checking
+  // Poll every 30 seconds to check for timeout
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const intervalId = setInterval(() => {
+      if (isSessionTimedOut()) {
+        clearSession();
+        setError('Session expired due to inactivity. Please sign in again.');
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [isInitialized, isSessionTimedOut, clearSession]);
 
   // Auto-refresh master lockbox when wallet connects
   useEffect(() => {
@@ -325,15 +445,17 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (sessionKey) {
-        wipeSensitiveData(sessionKey);
+      // SECURITY FIX (C-2): Use secure storage accessor
+      const key = getSessionKey();
+      if (key) {
+        wipeSensitiveData(key);
       }
     };
-  }, []);
+  }, [getSessionKey]);
 
   const contextValue: LockboxV2ContextType = {
     client,
-    sessionKey,
+    // SECURITY FIX (C-2): sessionKey no longer exposed in context
     isInitialized,
     initializeSession,
     clearSession,

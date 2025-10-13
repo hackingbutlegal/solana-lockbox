@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   },
   // Turbopack configuration
   turbopack: {
+    root: __dirname, // Fix: Explicitly set workspace root to nextjs-app directory
     resolveAlias: {
       // Ensure consistent module resolution
     },

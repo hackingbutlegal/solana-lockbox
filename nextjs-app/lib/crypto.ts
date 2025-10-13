@@ -189,17 +189,31 @@ export function generateChallenge(publicKey: PublicKey): Uint8Array {
 }
 
 /**
- * Create session key from wallet signature
+ * Create session key from wallet signature with deterministic salt
+ *
+ * SECURITY FIX (C-1): Salt is now derived deterministically from the public key
+ * This ensures the same wallet signature always produces the same session key.
+ *
+ * Salt derivation: SHA-256(public_key || "lockbox-salt-v1")
+ *
  * Full flow: generate challenge → sign with wallet → derive session key
  */
 export async function createSessionKeyFromSignature(
   publicKey: PublicKey,
   signature: Uint8Array
 ): Promise<{ sessionKey: Uint8Array; salt: Uint8Array }> {
-  // Generate fresh salt for this session
-  const salt = nacl.randomBytes(SALT_SIZE);
+  // SECURITY FIX: Derive deterministic salt from public key
+  // This ensures consistent key derivation from the same signature
+  const saltInput = new Uint8Array([
+    ...publicKey.toBytes(),
+    ...new TextEncoder().encode('lockbox-salt-v1'),
+  ]);
 
-  // Derive session key from signature + salt
+  // Use SHA-256 to derive 32-byte salt
+  const saltBuffer = await crypto.subtle.digest('SHA-256', saltInput);
+  const salt = new Uint8Array(saltBuffer);
+
+  // Derive session key from signature + deterministic salt
   const sessionKey = await deriveSessionKey(publicKey, signature, salt);
 
   return { sessionKey, salt };

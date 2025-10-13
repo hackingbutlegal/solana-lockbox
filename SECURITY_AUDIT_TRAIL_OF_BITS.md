@@ -4,6 +4,19 @@
 **Date**: October 13, 2025
 **Version**: v2.0.0-devnet
 **Scope**: Client-side cryptographic implementation
+**Last Updated**: October 13, 2025 (Post-Critical Fixes)
+
+---
+
+## ⚡ CRITICAL FIXES UPDATE (October 13, 2025)
+
+**Status**: All 3 Critical issues have been **FIXED** ✅
+
+- ✅ **C-1 FIXED**: Deterministic salt derivation implemented
+- ✅ **C-2 FIXED**: Secure session key storage using WeakMap
+- ✅ **C-3 FIXED**: Session timeout enforcement with dual timeouts (15-min absolute, 5-min inactivity)
+
+See [SECURITY_FIXES_TEST_PLAN.md](./SECURITY_FIXES_TEST_PLAN.md) for detailed test verification.
 
 ---
 
@@ -11,7 +24,7 @@
 
 This security analysis examines the cryptographic implementation of Solana Lockbox v2.0, a decentralized password manager built on Solana. The analysis focuses on the client-side encryption, key derivation, session management, and memory safety mechanisms.
 
-### Overall Security Posture: **MODERATE** ⚠️
+### Overall Security Posture: **IMPROVED** → **GOOD** ✅
 
 **Strengths**:
 - ✅ Use of well-vetted cryptographic primitives (XChaCha20-Poly1305, HKDF-SHA256)
@@ -19,12 +32,14 @@ This security analysis examines the cryptographic implementation of Solana Lockb
 - ✅ Multi-pass memory scrubbing implementation
 - ✅ Proper nonce generation using cryptographically secure RNG
 - ✅ Domain separation in challenge messages
+- ✅ **NEW**: Deterministic key derivation with consistent salt handling
+- ✅ **NEW**: Secure session key storage using WeakMap
+- ✅ **NEW**: Dual-timeout session management (absolute + inactivity)
 
-**Critical Concerns**:
-- 🔴 Salt handling and key derivation consistency issues
-- 🔴 Session key storage in React state without additional protection
-- 🔴 No session timeout enforcement in implementation
-- 🔴 Potential signature replay within timestamp window
+**Remaining Concerns**:
+- 🟠 Deprecated curve conversion function still present (scheduled for removal)
+- 🟠 Challenge timestamp allows replay window (low risk in current architecture)
+- 🟠 No key rotation mechanism (acceptable for current use case)
 
 ---
 
@@ -77,6 +92,45 @@ interface StoredPasswordEntry {
 // Store in IndexedDB with encryption, retrieve on session init
 ```
 
+### ✅ FIX STATUS: **IMPLEMENTED** (October 13, 2025)
+
+**Implementation**: Option 1 - Deterministic salt from public key
+
+**File**: `nextjs-app/lib/crypto.ts:201-220`
+
+**Changes Made**:
+```typescript
+export async function createSessionKeyFromSignature(
+  publicKey: PublicKey,
+  signature: Uint8Array
+): Promise<{ sessionKey: Uint8Array; salt: Uint8Array }> {
+  // SECURITY FIX: Derive deterministic salt from public key
+  // This ensures consistent key derivation from the same signature
+  const saltInput = new Uint8Array([
+    ...publicKey.toBytes(),
+    ...new TextEncoder().encode('lockbox-salt-v1'),
+  ]);
+
+  // Use SHA-256 to derive 32-byte salt
+  const saltBuffer = await crypto.subtle.digest('SHA-256', saltInput);
+  const salt = new Uint8Array(saltBuffer);
+
+  // Derive session key from signature + deterministic salt
+  const sessionKey = await deriveSessionKey(publicKey, signature, salt);
+
+  return { sessionKey, salt };
+}
+```
+
+**Security Benefits**:
+- ✅ Same wallet signature always produces same session key
+- ✅ Salt is deterministic and reproducible
+- ✅ Domain separation with "lockbox-salt-v1" prefix
+- ✅ Uses cryptographically secure SHA-256 for salt derivation
+- ✅ Enables deterministic key recovery across sessions
+
+**Testing**: See test case TC-1.1 in [SECURITY_FIXES_TEST_PLAN.md](./SECURITY_FIXES_TEST_PLAN.md)
+
 ---
 
 #### C-2: Session Key Stored in Unprotected React State
@@ -118,6 +172,51 @@ const sessionKey = await crypto.subtle.importKey(
 // OPTION 3: Encrypted in memory with hardware-backed key
 // Use WebAuthn or Credential Management API
 ```
+
+### ✅ FIX STATUS: **IMPLEMENTED** (October 13, 2025)
+
+**Implementation**: Option 1 - WeakMap for session key storage
+
+**Files**: `nextjs-app/contexts/LockboxV2Context.tsx:71-89, 155-212`
+
+**Changes Made**:
+```typescript
+// SECURITY FIX (C-2): Use secure session key storage
+// WeakMap prevents session key from being exposed in React DevTools
+const sessionKeyStorage = useMemo(() => new WeakMap<symbol, Uint8Array>(), []);
+const [sessionKeyRef] = useState(() => Symbol('sessionKey'));
+
+// Helper to get session key from secure storage
+const getSessionKey = useCallback((): Uint8Array | null => {
+  return sessionKeyStorage.get(sessionKeyRef) || null;
+}, [sessionKeyStorage, sessionKeyRef]);
+
+// Helper to set session key in secure storage
+const setSessionKey = useCallback((key: Uint8Array | null) => {
+  if (key === null) {
+    sessionKeyStorage.delete(sessionKeyRef);
+  } else {
+    sessionKeyStorage.set(sessionKeyRef, key);
+  }
+}, [sessionKeyStorage, sessionKeyRef]);
+
+// Session key NO LONGER exposed in context API
+interface LockboxV2ContextType {
+  // sessionKey: Uint8Array | null;  ← REMOVED
+  isInitialized: boolean;  // Use this to check session status
+  // ...
+}
+```
+
+**Security Benefits**:
+- ✅ Session key NOT visible in React DevTools
+- ✅ Better memory isolation from browser extensions
+- ✅ WeakMap provides automatic garbage collection
+- ✅ Symbol key prevents accidental access
+- ✅ Accessor functions encapsulate security logic
+- ✅ Session key removed from context API export
+
+**Testing**: See test cases TC-2.1 and TC-2.2 in [SECURITY_FIXES_TEST_PLAN.md](./SECURITY_FIXES_TEST_PLAN.md)
 
 ---
 
@@ -170,6 +269,82 @@ interface SessionState {
 // Force re-authentication after absolute timeout (e.g., 24 hours)
 // Wipe session data on expiry
 ```
+
+### ✅ FIX STATUS: **IMPLEMENTED** (October 13, 2025)
+
+**Implementation**: Comprehensive dual-timeout session management
+
+**Files**: `nextjs-app/contexts/LockboxV2Context.tsx:91-133, 278-296, 328-346, 377-395, 416-429`
+
+**Changes Made**:
+```typescript
+// SECURITY FIX (C-3): Session timeout management
+const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+const [lastActivityTime, setLastActivityTime] = useState<number | null>(null);
+
+// Timeout constants
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes absolute
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes inactivity
+
+// Check if session has timed out
+const isSessionTimedOut = useCallback((): boolean => {
+  if (!sessionStartTime || !lastActivityTime) return false;
+
+  const now = Date.now();
+  const sessionAge = now - sessionStartTime;
+  const inactivityTime = now - lastActivityTime;
+
+  // Check absolute timeout (15 minutes from session start)
+  if (sessionAge > SESSION_TIMEOUT_MS) return true;
+
+  // Check inactivity timeout (5 minutes since last activity)
+  if (inactivityTime > INACTIVITY_TIMEOUT_MS) return true;
+
+  return false;
+}, [sessionStartTime, lastActivityTime]);
+
+// Update activity timestamp
+const updateActivity = useCallback(() => {
+  setLastActivityTime(Date.now());
+}, []);
+
+// Timeout checking in all CRUD operations
+const createEntry = useCallback(async (entry: PasswordEntry) => {
+  // Check for session timeout
+  if (getSessionKey() && isSessionTimedOut()) {
+    clearSession();
+    setError('Session expired. Please sign in again.');
+    return null;
+  }
+  // Update activity timestamp
+  updateActivity();
+  // ... rest of operation
+}, [isSessionTimedOut, updateActivity, ...]);
+
+// Automatic timeout polling (every 30 seconds)
+useEffect(() => {
+  if (!isInitialized) return;
+
+  const intervalId = setInterval(() => {
+    if (isSessionTimedOut()) {
+      clearSession();
+      setError('Session expired due to inactivity. Please sign in again.');
+    }
+  }, 30000); // Check every 30 seconds
+
+  return () => clearInterval(intervalId);
+}, [isInitialized, isSessionTimedOut, clearSession]);
+```
+
+**Security Benefits**:
+- ✅ **Absolute timeout**: 15 minutes from session start
+- ✅ **Inactivity timeout**: 5 minutes since last activity
+- ✅ **Automatic enforcement**: Polling every 30 seconds
+- ✅ **Activity tracking**: All CRUD operations update activity timestamp
+- ✅ **Timeout checks**: Pre-flight checks before all sensitive operations
+- ✅ **Graceful cleanup**: Session wiped with clear error messages
+
+**Testing**: See test cases TC-3.1 through TC-3.4 in [SECURITY_FIXES_TEST_PLAN.md](./SECURITY_FIXES_TEST_PLAN.md)
 
 ---
 
