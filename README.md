@@ -5,9 +5,9 @@
 > This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.  
 > For the production v1.1 release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Status**: ✅ Live on Devnet
+**Current Status**: ✅ Live on Devnet with Dynamic Storage
 **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
-**Last Deployed**: October 12, 2025
+**Last Deployed**: October 13, 2025 (Realloc Implementation)
 **Target Mainnet**: Q1 2026
 **Network**: Solana Devnet → Mainnet Beta
 
@@ -133,11 +133,12 @@ Visit http://localhost:3000
 
 ## Development Roadmap
 
-### Phase 1: Foundation (Months 1-3) ✅ In Progress
-- [ ] Multi-tier storage architecture
-- [ ] Dynamic chunk allocation
-- [ ] Subscription tier system
-- [ ] Enhanced password entry schema
+### Phase 1: Foundation (Months 1-3) ✅ Partially Complete
+- [x] Multi-tier storage architecture (MasterLockbox + StorageChunks)
+- [x] Dynamic chunk allocation (realloc implementation)
+- [x] Storage chunks with automatic expansion
+- [x] Enhanced password entry schema (v2 with compression)
+- [ ] Subscription tier system (Basic/Premium/Enterprise UI pending)
 
 ### Phase 2: Search & Organization (Months 2-4)
 - [ ] Blind index search system

@@ -2,12 +2,13 @@
 
 ## ✅ Current Status
 
-1. **Program**: ✅ Deployed to Solana Devnet
+1. **Program**: ✅ Deployed to Solana Devnet with Dynamic Storage
 2. **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
 3. **Frontend**: ✅ Next.js 15.5.4 at http://localhost:3000
 4. **Network**: Devnet
-5. **Status**: Live and working
-6. **Last Deployed**: October 12, 2025 (Slot 414207771)
+5. **Status**: Live with automatic account reallocation
+6. **Last Deployed**: October 13, 2025 (Realloc implementation)
+7. **Latest Feature**: Dynamic master lockbox expansion
 
 [View Program on Explorer](https://explorer.solana.com/address/7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB?cluster=devnet)
 
@@ -694,8 +695,115 @@ npm run build
 
 ---
 
-**Last Updated**: October 12, 2025
-**Version**: v2.0.0-devnet
-**Status**: ✅ Live on Devnet
+### Issue 6: AccountDidNotSerialize on Storage Chunk Creation (October 13, 2025)
+
+**Problem**: When users tried to create their first password entry, they encountered `AccountDidNotSerialize` error (0xbbc) during storage chunk initialization. The error occurred specifically when the program tried to add chunk metadata to the master lockbox's `storage_chunks` vector.
+
+**Error Details**:
+```
+SendTransactionError: Simulation failed
+Error Code: 0xbbc (AccountDidNotSerialize)
+Message: Failed to serialize the account
+Logs:
+  - "Storage chunk 0 initialized with 1KB capacity"
+  - "AnchorError caused by account: master_lockbox"
+  - "Error Number: 3004"
+```
+
+**Root Cause**:
+The master lockbox account was initialized with fixed space (106 bytes) that included space for 0 storage chunks. When `initialize_storage_chunk` instruction tried to add the first chunk's metadata to the `storage_chunks` vector, the account needed to grow but had no realloc capability. This is a fundamental requirement of the subscription/payment model where users pay incrementally for storage expansion.
+
+**The Fix - Dynamic Account Reallocation**:
+
+1. **Added realloc constraint** to `InitializeStorageChunk` in `programs/lockbox/src/instructions/initialize.rs`:
+```rust
+#[account(
+    mut,
+    seeds = [MasterLockbox::SEEDS_PREFIX, owner.key().as_ref()],
+    bump = master_lockbox.bump,
+    constraint = master_lockbox.owner == owner.key(),
+    realloc = MasterLockbox::calculate_space(master_lockbox.storage_chunks.len() + 1),
+    realloc::payer = owner,
+    realloc::zero = false,
+)]
+pub master_lockbox: Account<'info, MasterLockbox>,
+```
+
+2. **Space calculation method** in `programs/lockbox/src/state/master_lockbox.rs`:
+```rust
+/// Size of a single StorageChunkInfo entry
+const STORAGE_CHUNK_INFO_SIZE: usize = 59; // 32+2+4+4+1+8+8
+
+/// Calculate space needed for a specific number of chunks
+pub fn calculate_space(num_chunks: usize) -> usize {
+    Self::BASE_SPACE + (num_chunks * Self::STORAGE_CHUNK_INFO_SIZE)
+}
+```
+
+**Space Growth Pattern**:
+- Initial (0 chunks): 106 bytes
+- After 1 chunk: 106 + 59 = 165 bytes (+59 bytes)
+- After 2 chunks: 106 + 118 = 224 bytes (+59 bytes)
+- After 10 chunks: 106 + 590 = 696 bytes
+- After 100 chunks: 106 + 5900 = 6006 bytes (max)
+
+**Connection to Payment Model**:
+This implementation directly supports the subscription system described in PASSWORD_MANAGER_EXPANSION.md:
+- **Free tier**: 1KB, 1 chunk - user pays rent once for initial chunk
+- **Basic tier**: 10KB, 2 chunks - pays rent + 0.001 SOL/month subscription
+- **Premium tier**: 100KB, 10 chunks - pays rent + 0.01 SOL/month
+- **Enterprise tier**: 1MB+, 100 chunks - pays rent + 0.1 SOL/month
+
+Each time a chunk is added:
+1. Master lockbox reallocates with `realloc`
+2. User pays additional rent for expanded space
+3. New chunk is initialized and registered
+4. Total capacity increases
+
+**Frontend Improvements**:
+
+1. **Fixed storage_chunks deserialization** in `nextjs-app/sdk/src/client-v2.ts` (lines 913-957):
+   - Was returning empty array
+   - Now properly reads and deserializes each StorageChunkInfo item
+   - Correctly handles chunk metadata (address, index, capacity, usage)
+
+2. **Enhanced error handling** in `nextjs-app/components/PasswordManager.tsx`:
+   - User-friendly message for AccountDidNotSerialize errors
+   - Explains connection to subscription tiers
+   - Guides users toward upgrade path
+
+**Deployment**:
+- Built with: `cargo build-sbf` (bypasses toolchain issues)
+- Deployed to devnet: October 13, 2025
+- Transaction: `3rGucWFr4XoTXFvoUH4eEjxaF8RWBN9SgY14FYAvesFKGoPYYEMmjrAo2R9hT1yVWCYSGAijZBQiNNDH5SvbYYi4`
+- Program size: 355,672 bytes
+
+**Testing Flow**:
+1. ✅ Initialize master lockbox (106 bytes, 0 chunks)
+2. ✅ Create first password entry
+3. ✅ System auto-creates storage chunk (triggers realloc)
+4. ✅ Master lockbox expands to 165 bytes
+5. ✅ User pays rent for additional 59 bytes
+6. ✅ Password is stored successfully
+
+**Files Modified**:
+- `/Users/graffito/solana-lockbox/programs/lockbox/src/instructions/initialize.rs`
+- `/Users/graffito/solana-lockbox/programs/lockbox/src/state/master_lockbox.rs`
+- `/Users/graffito/solana-lockbox/nextjs-app/sdk/src/client-v2.ts`
+- `/Users/graffito/solana-lockbox/nextjs-app/components/PasswordManager.tsx`
+- `/Users/graffito/solana-lockbox/nextjs-app/contexts/LockboxV2Context.tsx`
+
+**What This Enables**:
+- ✅ Dynamic storage expansion (Phase 1.2 complete)
+- ✅ Foundation for subscription tiers
+- ✅ Users pay rent incrementally as they grow
+- ✅ Scalable from 1KB to 1MB+ storage
+- 🔜 Subscription upgrade UI (Phase 5 next)
+
+---
+
+**Last Updated**: October 13, 2025
+**Version**: v2.0.1-devnet (Realloc Implementation)
+**Status**: ✅ Live on Devnet with Dynamic Storage
 
 Created with <3 by [GRAFFITO](https://x.com/0xgraffito)
