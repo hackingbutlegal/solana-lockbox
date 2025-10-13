@@ -5,9 +5,13 @@
 > This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.  
 > For the production v1.1 release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Status**: Development  
-**Target Release**: Q1 2026  
+**Current Status**: ✅ Live on Devnet
+**Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
+**Last Deployed**: October 12, 2025
+**Target Mainnet**: Q1 2026
 **Network**: Solana Devnet → Mainnet Beta
+
+📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** - Complete v2 deployment guide with recent fixes
 
 ---
 
@@ -60,7 +64,15 @@ Master Lockbox Account
 
 ## Documentation
 
-📖 **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**  
+📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** ⭐ NEW
+Complete v2 deployment guide including:
+- Current devnet deployment status
+- Recent critical fixes (discriminators, INIT_SPACE)
+- Program instructions and discriminators
+- Testing procedures
+- Troubleshooting common issues
+
+📖 **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**
 Complete technical specification for v2.0 architecture, including:
 - Multi-tier storage design
 - Enhanced password entry structure
@@ -69,7 +81,7 @@ Complete technical specification for v2.0 architecture, including:
 - Subscription management system
 - 12-month implementation roadmap
 
-📖 **[MIGRATION_GUIDE_V2.md](./MIGRATION_GUIDE_V2.md)**  
+📖 **[MIGRATION_GUIDE_V2.md](./MIGRATION_GUIDE_V2.md)**
 Migration path from v1.1 to v2.0, including:
 - Backward compatibility strategy
 - Data migration procedures

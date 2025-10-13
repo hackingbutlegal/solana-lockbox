@@ -54,19 +54,15 @@ export function PasswordManager() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<PasswordEntry | null>(null);
 
-  // Initialize session on mount if wallet connected
-  useEffect(() => {
-    if (publicKey && !isInitialized && !sessionKey) {
-      initializeSession();
-    }
-  }, [publicKey, isInitialized, sessionKey, initializeSession]);
+  // DON'T initialize session automatically - only when needed for encryption/decryption
+  // The session key is only required for storing/retrieving passwords, not for viewing the lockbox
 
-  // Refresh entries when session is initialized
+  // Refresh entries when master lockbox is loaded (but only if session exists)
   useEffect(() => {
-    if (isInitialized && sessionKey) {
+    if (masterLockbox && sessionKey) {
       refreshEntries();
     }
-  }, [isInitialized, sessionKey]);
+  }, [masterLockbox, sessionKey, refreshEntries]);
 
   // Filtered and sorted entries
   const filteredEntries = useMemo(() => {
@@ -336,13 +332,24 @@ export function PasswordManager() {
 
                 <button
                   onClick={async () => {
-                    if (client) {
+                    if (client && !loading) {
                       try {
+                        console.log('Creating password vault...');
                         await client.initializeMasterLockbox();
+                        console.log('Vault created! Refreshing page...');
                         // Refresh to show new lockbox
-                        window.location.reload();
-                      } catch (err) {
+                        setTimeout(() => window.location.reload(), 1000);
+                      } catch (err: any) {
                         console.error('Failed to initialize:', err);
+
+                        // Handle specific errors
+                        if (err.message?.includes('already initialized') ||
+                            err.message?.includes('already been processed')) {
+                          alert('Your password vault already exists! Refreshing page...');
+                          window.location.reload();
+                        } else {
+                          alert(`Failed to create vault: ${err.message || 'Unknown error'}`);
+                        }
                       }
                     }
                   }}

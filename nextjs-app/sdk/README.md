@@ -2,6 +2,16 @@
 
 Official TypeScript SDK for the Lockbox Solana program - wallet-tied encrypted storage on-chain.
 
+## Versions
+
+- **v1.x**: Basic encrypted storage (1KB, single entry)
+  - Program ID: `5nr7xe1U3k6U6zPEmW3FCbPyXCa7jr7JpudaLKuVNyvZ`
+- **v2.x**: Full password manager (unlimited storage, multi-tier)
+  - Program ID: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
+  - ✅ Live on Devnet (deployed October 12, 2025)
+
+This README covers **v2.x** (password manager). For v1 docs, see the v1 branch.
+
 ## Installation
 
 ```bash
@@ -10,19 +20,60 @@ npm install @lockbox/sdk
 
 ## Quick Start
 
+### v2 - Password Manager
+
 ```typescript
-import { LockboxClient } from '@lockbox/sdk';
-import { Connection, clusterApiUrl } from '@solana/web3.js';
+import { LockboxV2Client } from '@lockbox/sdk/client-v2';
+import { Connection, PublicKey } from '@solana/web3.js';
 
 // Initialize connection and wallet
-const connection = new Connection(clusterApiUrl('devnet'));
+const connection = new Connection('https://api.devnet.solana.com');
 const wallet = // your Solana wallet adapter
 
-// Create client
-const client = new LockboxClient({
+// Create v2 client
+const client = new LockboxV2Client({
   connection,
   wallet,
+  programId: new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB'),
 });
+
+// Initialize master lockbox (first time only)
+await client.initializeMasterLockbox();
+
+// Store a password entry
+const result = await client.storePassword({
+  title: 'GitHub',
+  username: 'myuser',
+  password: 'mypassword',
+  url: 'https://github.com',
+  notes: 'My GitHub account',
+});
+console.log('Stored password with ID:', result.entryId);
+
+// List all passwords
+const passwords = await client.listPasswords();
+console.log('Total passwords:', passwords.length);
+
+// Retrieve specific password
+const password = await client.retrievePassword(0, result.entryId);
+console.log('Retrieved:', password);
+
+// Update password
+await client.updatePassword(0, result.entryId, {
+  ...password,
+  password: 'newpassword',
+});
+
+// Delete password
+await client.deletePassword(0, result.entryId);
+```
+
+### v1 - Basic Storage (Legacy)
+
+```typescript
+import { LockboxClient } from '@lockbox/sdk';
+
+const client = new LockboxClient({ connection, wallet });
 
 // Store encrypted data
 const tx = await client.store('My secret data');

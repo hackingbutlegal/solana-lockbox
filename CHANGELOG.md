@@ -5,6 +5,61 @@ All notable changes to the Lockbox project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-10-12 (v2 Devnet Release)
+
+### 🚀 Deployed
+- **v2 Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
+- **Network**: Solana Devnet
+- **Slot**: 414207771
+- **Transaction**: 9yTWHq4kbJAhEuaqvbUedgnsU9vjBzyE83zbWKFL735T5V9rN8K4HeZ4U7qCuaPdoXRukxdSQem3aWkYua7PQpt
+- **Size**: 355,672 bytes (347 KB)
+
+### 🐛 Critical Fixes
+1. **Instruction Discriminators** - Fixed incorrect values causing InstructionFallbackNotFound (0x65)
+   - All discriminators were placeholder values instead of SHA256 hashes
+   - Created `scripts/generate-discriminators.js` to calculate correct values
+   - Updated `client-v2.ts` with correct discriminators for all 9 instructions
+   - See: [TECHNICAL_FIXES_OCT_2025.md](./TECHNICAL_FIXES_OCT_2025.md#issue-1)
+
+2. **INIT_SPACE Calculation** - Fixed missing 4 bytes causing AccountDidNotDeserialize (0xbbb)
+   - Missing length prefix for `encrypted_index` Vec in master_lockbox.rs
+   - Account deserialization failed immediately after creation
+   - Fixed: Changed INIT_SPACE from 102 to 106 bytes
+   - See: [TECHNICAL_FIXES_OCT_2025.md](./TECHNICAL_FIXES_OCT_2025.md#issue-2)
+
+3. **UI Error Handling** - Fixed missing "Initialize Lockbox" button
+   - Context treated "account not found" as error instead of expected state
+   - Updated LockboxV2Context.tsx to clear error for uninitialized accounts
+   - See: [TECHNICAL_FIXES_OCT_2025.md](./TECHNICAL_FIXES_OCT_2025.md#issue-3)
+
+4. **Lazy Session Initialization** - Eliminated double signature prompts
+   - Users were prompted to sign twice: once on connect, once on transaction
+   - Session key only needed for encryption/decryption, not viewing vault
+   - Deferred session initialization until first CRUD operation
+   - Users now sign only once when performing password operations
+   - See: [DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md#issue-4-double-signature-prompts-lazy-session-initialization)
+
+### 📚 Documentation
+- Added [DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md) - Complete v2 deployment guide
+- Added [TECHNICAL_FIXES_OCT_2025.md](./TECHNICAL_FIXES_OCT_2025.md) - Detailed bug analysis
+- Updated [README.md](./README.md) with v2 deployment status
+- Updated SDK README with v2 documentation
+
+### 🔧 Developer Tools
+- Added `npm run generate-discriminators` - Generate instruction discriminators
+- Added `npm run test-initialize` - Test master lockbox initialization
+- Added `npm run check-lockbox` - Check if master lockbox exists for a wallet
+- Added discriminator generation script
+- Added test initialization script
+- Added lockbox verification utility
+
+### ✨ Features
+- Full password manager functionality
+- Multi-tier subscription system (Free, Basic, Premium, Enterprise)
+- Dynamic storage chunk allocation
+- Encrypted search indexes
+- Rate limiting and access control
+
 ## [2.2.0] - 2025-10-12
 
 ### Changed

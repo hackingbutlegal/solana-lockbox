@@ -9,7 +9,10 @@
     "build": "cd nextjs-app && npm install && npm run build",
     "build:anchor": "anchor build && cd nextjs-app && npm run build",
     "test": "anchor test",
-    "deploy": "anchor deploy"
+    "deploy": "anchor deploy",
+    "generate-discriminators": "node scripts/generate-discriminators.js",
+    "test-initialize": "ts-node scripts/test-initialize.ts",
+    "check-lockbox": "ts-node scripts/check-lockbox.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

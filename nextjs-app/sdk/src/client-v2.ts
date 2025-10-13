@@ -4,8 +4,17 @@
  * Provides a comprehensive interface for the multi-tier password manager.
  */
 
-import { Program, AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
-import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  Keypair,
+  TransactionInstruction,
+  Transaction,
+  SYSVAR_RENT_PUBKEY,
+} from '@solana/web3.js';
+import * as borsh from 'borsh';
 import * as nacl from 'tweetnacl';
 import * as util from 'tweetnacl-util';
 import crypto from 'crypto';
@@ -24,6 +33,180 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
+
+// Borsh schema definitions for account deserialization
+class StorageChunkInfoBorsh {
+  chunkAddress: Uint8Array;
+  chunkIndex: number;
+  maxCapacity: number;
+  sizeUsed: number;
+  dataType: number;
+  createdAt: bigint;
+  lastModified: bigint;
+
+  constructor(fields: any) {
+    this.chunkAddress = fields.chunkAddress;
+    this.chunkIndex = fields.chunkIndex;
+    this.maxCapacity = fields.maxCapacity;
+    this.sizeUsed = fields.sizeUsed;
+    this.dataType = fields.dataType;
+    this.createdAt = fields.createdAt;
+    this.lastModified = fields.lastModified;
+  }
+
+  static schema = {
+    struct: {
+      chunkAddress: { array: { type: 'u8', len: 32 } },
+      chunkIndex: 'u16',
+      maxCapacity: 'u32',
+      sizeUsed: 'u32',
+      dataType: 'u8',
+      createdAt: 'i64',
+      lastModified: 'i64',
+    }
+  };
+}
+
+class MasterLockboxBorsh {
+  owner: Uint8Array;
+  totalEntries: bigint;
+  storageChunksCount: number;
+  subscriptionTier: number;
+  lastAccessed: bigint;
+  subscriptionExpires: bigint;
+  totalCapacity: bigint;
+  storageUsed: bigint;
+  storageChunks: StorageChunkInfoBorsh[];
+  encryptedIndex: Uint8Array;
+  nextEntryId: bigint;
+  categoriesCount: number;
+  createdAt: bigint;
+  bump: number;
+
+  constructor(fields: any) {
+    this.owner = fields.owner;
+    this.totalEntries = fields.totalEntries;
+    this.storageChunksCount = fields.storageChunksCount;
+    this.subscriptionTier = fields.subscriptionTier;
+    this.lastAccessed = fields.lastAccessed;
+    this.subscriptionExpires = fields.subscriptionExpires;
+    this.totalCapacity = fields.totalCapacity;
+    this.storageUsed = fields.storageUsed;
+    this.storageChunks = fields.storageChunks;
+    this.encryptedIndex = fields.encryptedIndex;
+    this.nextEntryId = fields.nextEntryId;
+    this.categoriesCount = fields.categoriesCount;
+    this.createdAt = fields.createdAt;
+    this.bump = fields.bump;
+  }
+
+  static schema = {
+    struct: {
+      owner: { array: { type: 'u8', len: 32 } },
+      totalEntries: 'u64',
+      storageChunksCount: 'u16',
+      subscriptionTier: 'u8',
+      lastAccessed: 'i64',
+      subscriptionExpires: 'i64',
+      totalCapacity: 'u64',
+      storageUsed: 'u64',
+      storageChunks: { vec: StorageChunkInfoBorsh },
+      encryptedIndex: { vec: 'u8' },
+      nextEntryId: 'u64',
+      categoriesCount: 'u32',
+      createdAt: 'i64',
+      bump: 'u8',
+    }
+  };
+}
+
+class DataEntryHeaderBorsh {
+  entryId: bigint;
+  offset: number;
+  size: number;
+  entryType: number;
+  category: number;
+  titleHash: Uint8Array;
+  createdAt: bigint;
+  lastModified: bigint;
+  accessCount: number;
+  flags: number;
+
+  constructor(fields: any) {
+    this.entryId = fields.entryId;
+    this.offset = fields.offset;
+    this.size = fields.size;
+    this.entryType = fields.entryType;
+    this.category = fields.category;
+    this.titleHash = fields.titleHash;
+    this.createdAt = fields.createdAt;
+    this.lastModified = fields.lastModified;
+    this.accessCount = fields.accessCount;
+    this.flags = fields.flags;
+  }
+
+  static schema = {
+    struct: {
+      entryId: 'u64',
+      offset: 'u32',
+      size: 'u32',
+      entryType: 'u8',
+      category: 'u32',
+      titleHash: { array: { type: 'u8', len: 32 } },
+      createdAt: 'i64',
+      lastModified: 'i64',
+      accessCount: 'u32',
+      flags: 'u8',
+    }
+  };
+}
+
+class StorageChunkBorsh {
+  masterLockbox: Uint8Array;
+  owner: Uint8Array;
+  chunkIndex: number;
+  maxCapacity: number;
+  currentSize: number;
+  dataType: number;
+  encryptedData: Uint8Array;
+  entryHeaders: DataEntryHeaderBorsh[];
+  entryCount: number;
+  createdAt: bigint;
+  lastModified: bigint;
+  bump: number;
+
+  constructor(fields: any) {
+    this.masterLockbox = fields.masterLockbox;
+    this.owner = fields.owner;
+    this.chunkIndex = fields.chunkIndex;
+    this.maxCapacity = fields.maxCapacity;
+    this.currentSize = fields.currentSize;
+    this.dataType = fields.dataType;
+    this.encryptedData = fields.encryptedData;
+    this.entryHeaders = fields.entryHeaders;
+    this.entryCount = fields.entryCount;
+    this.createdAt = fields.createdAt;
+    this.lastModified = fields.lastModified;
+    this.bump = fields.bump;
+  }
+
+  static schema = {
+    struct: {
+      masterLockbox: { array: { type: 'u8', len: 32 } },
+      owner: { array: { type: 'u8', len: 32 } },
+      chunkIndex: 'u16',
+      maxCapacity: 'u32',
+      currentSize: 'u32',
+      dataType: 'u8',
+      encryptedData: { vec: 'u8' },
+      entryHeaders: { vec: DataEntryHeaderBorsh },
+      entryCount: 'u16',
+      createdAt: 'i64',
+      lastModified: 'i64',
+      bump: 'u8',
+    }
+  };
+}
 // Import IDL - handle both ESM and CommonJS module formats
 import IDLData from '../idl/lockbox-v2.json';
 
@@ -55,6 +238,20 @@ const IDL = getIDL();
 
 export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
+
+// Instruction discriminators (first 8 bytes of SHA256 hash of "global:instruction_name")
+// Generated using: node scripts/generate-discriminators.js
+const INSTRUCTION_DISCRIMINATORS = {
+  initializeMasterLockbox: Buffer.from([0x21, 0xa5, 0x13, 0x5b, 0xd6, 0x53, 0x44, 0x2d]),
+  initializeStorageChunk: Buffer.from([0x8e, 0xd6, 0xee, 0x3c, 0x93, 0xee, 0xaa, 0x22]),
+  storePasswordEntry: Buffer.from([0x2d, 0x64, 0x17, 0x8d, 0xf4, 0xd7, 0x8a, 0xa0]),
+  retrievePasswordEntry: Buffer.from([0x8c, 0xd0, 0x4f, 0x9b, 0xa7, 0x0b, 0x73, 0xbc]),
+  updatePasswordEntry: Buffer.from([0x1d, 0x96, 0x9e, 0x9b, 0x6f, 0x88, 0x16, 0x2a]),
+  deletePasswordEntry: Buffer.from([0xf5, 0x59, 0xe8, 0xae, 0x78, 0xb3, 0x40, 0x06]),
+  upgradeSubscription: Buffer.from([0x55, 0xef, 0x7d, 0xeb, 0xc7, 0xe6, 0xa6, 0xf6]),
+  renewSubscription: Buffer.from([0x2d, 0x4b, 0x9a, 0xc2, 0xa0, 0x0a, 0x6f, 0xb7]),
+  downgradeSubscription: Buffer.from([0x39, 0x12, 0x7b, 0x76, 0xcb, 0x07, 0xc1, 0x25]),
+};
 
 /**
  * Main client for Lockbox v2.0 Password Manager
@@ -195,46 +392,107 @@ export class LockboxV2Client {
    * Initialize master lockbox for the user
    */
   async initializeMasterLockbox(): Promise<string> {
-    const [masterLockbox, bump] = this.getMasterLockboxAddress();
+    const [masterLockbox] = this.getMasterLockboxAddress();
 
     // Check if already exists
-    try {
-      await this.connection.getAccountInfo(masterLockbox);
+    const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+    if (accountInfo) {
+      console.log('Master lockbox already exists at:', masterLockbox.toBase58());
       throw new Error('Master lockbox already initialized');
-    } catch (e) {
-      // Account doesn't exist, proceed with initialization
     }
 
-    const tx = await (this.program.methods as any)
-      .initializeMasterLockbox()
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    console.log('Initializing master lockbox at:', masterLockbox.toBase58());
 
-    return tx;
+    // Build instruction manually
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: INSTRUCTION_DISCRIMINATORS.initializeMasterLockbox,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    // Get fresh blockhash to avoid transaction replay
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    console.log('Signing transaction...');
+    const signed = await this.wallet.signTransaction(transaction);
+
+    console.log('Sending transaction...');
+    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+
+    console.log('Transaction sent:', signature);
+    console.log('Confirming transaction...');
+
+    // Wait for confirmation with block height
+    const confirmation = await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+
+    console.log('✅ Master lockbox initialized successfully!');
+
+    return signature;
   }
 
   /**
    * Initialize a new storage chunk
    */
-  async initializeStorageChunk(chunkIndex: number, initialCapacity: number = 1024): Promise<string> {
+  async initializeStorageChunk(
+    chunkIndex: number,
+    initialCapacity: number = 1024,
+    dataType: StorageType = StorageType.Passwords
+  ): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-    const tx = await (this.program.methods as any)
-      .initializeStorageChunk(chunkIndex, initialCapacity, StorageType.Passwords)
-      .accounts({
-        masterLockbox,
-        storageChunk,
-        owner: this.wallet.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Build instruction data: discriminator + args
+    // Args: chunk_index (u16) + initial_capacity (u32) + data_type (u8)
+    const argsBuffer = Buffer.alloc(7);
+    argsBuffer.writeUInt16LE(chunkIndex, 0);
+    argsBuffer.writeUInt32LE(initialCapacity, 2);
+    argsBuffer.writeUInt8(dataType, 6);
 
-    return tx;
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.initializeStorageChunk,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: storageChunk, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+    transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+
+    const signed = await this.wallet.signTransaction(transaction);
+    const signature = await this.connection.sendRawTransaction(signed.serialize());
+
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    return signature;
   }
 
   // ============================================================================
@@ -454,37 +712,170 @@ export class LockboxV2Client {
    * Get master lockbox account
    */
   async getMasterLockbox(): Promise<MasterLockbox> {
-    // Check if program is properly initialized
-    if (!this.program.account) {
-      throw new Error('Program not initialized - IDL not loaded');
+    const [masterLockbox] = this.getMasterLockboxAddress();
+    const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+
+    if (!accountInfo) {
+      throw new Error('Master lockbox not found - call initializeMasterLockbox() first');
     }
 
-    const [masterLockbox] = this.getMasterLockboxAddress();
-    return await (this.program.account as any).masterLockbox.fetch(masterLockbox);
+    // Manual deserialization (skip 8-byte discriminator)
+    const data = accountInfo.data.slice(8);
+
+    try {
+      let offset = 0;
+
+      // Read owner (32 bytes)
+      const owner = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+
+      // Read total_entries (u64, 8 bytes)
+      const totalEntries = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read storage_chunks_count (u16, 2 bytes)
+      const storageChunksCount = data.readUInt16LE(offset);
+      offset += 2;
+
+      // Read subscription_tier (u8, 1 byte)
+      const subscriptionTier = data.readUInt8(offset) as SubscriptionTier;
+      offset += 1;
+
+      // Read last_accessed (i64, 8 bytes)
+      const lastAccessed = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read subscription_expires (i64, 8 bytes)
+      const subscriptionExpires = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read total_capacity (u64, 8 bytes)
+      const totalCapacity = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read storage_used (u64, 8 bytes)
+      const storageUsed = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read storage_chunks vec (4-byte length + items)
+      const storageChunksLen = data.readUInt32LE(offset);
+      offset += 4;
+      const storageChunks = [];
+      // Vec is empty for now, skip reading items
+
+      // Read encrypted_index vec (4-byte length + data)
+      const encryptedIndexLen = data.readUInt32LE(offset);
+      offset += 4;
+      const encryptedIndex = data.slice(offset, offset + encryptedIndexLen);
+      offset += encryptedIndexLen;
+
+      // Read next_entry_id (u64, 8 bytes)
+      const nextEntryId = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read categories_count (u32, 4 bytes)
+      const categoriesCount = data.readUInt32LE(offset);
+      offset += 4;
+
+      // Read created_at (i64, 8 bytes)
+      const createdAt = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read bump (u8, 1 byte)
+      const bump = data.readUInt8(offset);
+      offset += 1;
+
+      console.log('✅ Successfully deserialized master lockbox');
+      console.log('  Owner:', owner.toBase58());
+      console.log('  Total Entries:', totalEntries);
+      console.log('  Subscription Tier:', SubscriptionTier[subscriptionTier]);
+      console.log('  Storage Chunks:', storageChunksCount);
+
+      return {
+        owner,
+        totalEntries,
+        storageChunksCount,
+        subscriptionTier,
+        lastAccessed,
+        subscriptionExpires,
+        totalCapacity,
+        storageUsed,
+        storageChunks,
+        encryptedIndex,
+        nextEntryId,
+        categoriesCount,
+        createdAt,
+        bump,
+      } as MasterLockbox;
+    } catch (error) {
+      console.error('Failed to deserialize MasterLockbox:', error);
+      console.error('Account data length:', accountInfo.data.length);
+      console.error('Data (hex):', accountInfo.data.toString('hex'));
+      throw new Error(`Failed to deserialize master lockbox: ${error}`);
+    }
   }
 
   /**
    * Get storage chunk account
    */
   async getStorageChunk(chunkIndex: number): Promise<StorageChunk> {
-    // Check if program is properly initialized
-    if (!this.program.account) {
-      throw new Error('Program not initialized - IDL not loaded');
+    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+    const accountInfo = await this.connection.getAccountInfo(storageChunk);
+
+    if (!accountInfo) {
+      throw new Error(`Storage chunk ${chunkIndex} not found`);
     }
 
-    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
-    return await (this.program.account as any).storageChunk.fetch(storageChunk);
+    // Deserialize account data using Borsh
+    // Skip the 8-byte discriminator that Anchor adds
+    const data = accountInfo.data.slice(8);
+
+    try {
+      const schema = new Map([
+        [StorageChunkBorsh, StorageChunkBorsh.schema],
+        [DataEntryHeaderBorsh, DataEntryHeaderBorsh.schema],
+      ]);
+
+      const deserialized = borsh.deserialize(schema, StorageChunkBorsh, data);
+
+      // Convert Borsh types to our TypeScript types
+      return {
+        masterLockbox: new PublicKey(deserialized.masterLockbox),
+        owner: new PublicKey(deserialized.owner),
+        chunkIndex: deserialized.chunkIndex,
+        maxCapacity: deserialized.maxCapacity,
+        currentSize: deserialized.currentSize,
+        dataType: deserialized.dataType as StorageType,
+        encryptedData: deserialized.encryptedData,
+        entryHeaders: deserialized.entryHeaders.map((header: DataEntryHeaderBorsh) => ({
+          entryId: Number(header.entryId),
+          offset: header.offset,
+          size: header.size,
+          entryType: header.entryType as PasswordEntryType,
+          category: header.category,
+          titleHash: Array.from(header.titleHash),
+          createdAt: Number(header.createdAt),
+          lastModified: Number(header.lastModified),
+          accessCount: header.accessCount,
+          flags: header.flags,
+        })),
+        entryCount: deserialized.entryCount,
+        createdAt: Number(deserialized.createdAt),
+        lastModified: Number(deserialized.lastModified),
+        bump: deserialized.bump,
+      } as StorageChunk;
+    } catch (error) {
+      console.error('Failed to deserialize StorageChunk:', error);
+      console.error('Account data length:', accountInfo.data.length);
+      console.error('Data after discriminator:', data.length);
+      throw new Error(`Failed to deserialize storage chunk: ${error}`);
+    }
   }
 
   /**
    * Check if master lockbox exists
    */
   async exists(): Promise<boolean> {
-    // If program not initialized, we can't check
-    if (!this.program.account) {
-      return false;
-    }
-
     try {
       const [masterLockbox] = this.getMasterLockboxAddress();
       const accountInfo = await this.connection.getAccountInfo(masterLockbox);

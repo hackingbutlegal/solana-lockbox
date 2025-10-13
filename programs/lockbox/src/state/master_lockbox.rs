@@ -64,7 +64,8 @@ impl MasterLockbox {
         8 +  // subscription_expires
         8 +  // total_capacity
         8 +  // storage_used
-        4 +  // storage_chunks vec length
+        4 +  // storage_chunks vec length (starts at 0)
+        4 +  // encrypted_index vec length (starts at 0)
         8 +  // next_entry_id
         4 +  // categories_count
         8 +  // created_at

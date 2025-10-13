@@ -63,7 +63,8 @@ interface LockboxV2ProviderProps {
 }
 
 export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProps) {
-  const { publicKey, signMessage } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, signMessage, signTransaction } = wallet;
   const { connection } = useConnection();
 
   // State
@@ -76,17 +77,10 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
 
   // Create client instance (memoized)
   const client = useMemo(() => {
-    if (!publicKey || !connection) return null;
+    if (!publicKey || !connection || !signTransaction) return null;
 
     try {
-      // Create minimal wallet interface for client
-      const wallet = {
-        publicKey,
-        signTransaction: async (tx: any) => tx, // Not needed for most operations
-        signAllTransactions: async (txs: any[]) => txs,
-      };
-
-      // Create client with options
+      // Use the actual wallet from useWallet hook
       return new LockboxV2Client({
         connection,
         wallet: wallet as any,
@@ -96,7 +90,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       console.error('Failed to create LockboxV2Client:', err);
       return null;
     }
-  }, [publicKey, connection, programId]);
+  }, [publicKey, connection, signTransaction, wallet, programId]);
 
   // Initialize session key from wallet signature
   const initializeSession = useCallback(async (): Promise<boolean> => {
@@ -170,10 +164,10 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch master lockbox';
       console.error('Failed to refresh master lockbox:', errorMsg);
 
-      // Program not properly initialized - this is expected for v2
-      if (errorMsg.includes('program') || errorMsg.includes('masterLockbox') || errorMsg.includes('undefined')) {
-        setError('v2 Program IDL not loaded. Using v1 lockbox for now.');
+      // If master lockbox not found, that's expected - don't show as error
+      if (errorMsg.includes('not found') || errorMsg.includes('call initializeMasterLockbox')) {
         setMasterLockbox(null);
+        setError(null); // Clear any previous error
       } else {
         setError(errorMsg);
         setMasterLockbox(null);
@@ -204,9 +198,18 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
 
   // Create new password entry
   const createEntry = useCallback(async (entry: PasswordEntry): Promise<number | null> => {
-    if (!client || !sessionKey) {
-      setError('Session not initialized');
+    if (!client) {
+      setError('Client not initialized');
       return null;
+    }
+
+    // Initialize session if needed (will prompt for signature ONCE)
+    if (!sessionKey) {
+      const initialized = await initializeSession();
+      if (!initialized) {
+        setError('Failed to initialize session');
+        return null;
+      }
     }
 
     try {
@@ -226,7 +229,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries]);
+  }, [client, sessionKey, refreshEntries, initializeSession]);
 
   // Update existing password entry
   const updateEntry = useCallback(async (
@@ -234,9 +237,18 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     entryId: number,
     entry: PasswordEntry
   ): Promise<boolean> => {
-    if (!client || !sessionKey) {
-      setError('Session not initialized');
+    if (!client) {
+      setError('Client not initialized');
       return false;
+    }
+
+    // Initialize session if needed (will prompt for signature ONCE)
+    if (!sessionKey) {
+      const initialized = await initializeSession();
+      if (!initialized) {
+        setError('Failed to initialize session');
+        return false;
+      }
     }
 
     try {
@@ -256,16 +268,25 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries]);
+  }, [client, sessionKey, refreshEntries, initializeSession]);
 
   // Delete password entry
   const deleteEntry = useCallback(async (
     chunkIndex: number,
     entryId: number
   ): Promise<boolean> => {
-    if (!client || !sessionKey) {
-      setError('Session not initialized');
+    if (!client) {
+      setError('Client not initialized');
       return false;
+    }
+
+    // Initialize session if needed (will prompt for signature ONCE)
+    if (!sessionKey) {
+      const initialized = await initializeSession();
+      if (!initialized) {
+        setError('Failed to initialize session');
+        return false;
+      }
     }
 
     try {
@@ -285,7 +306,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } finally {
       setLoading(false);
     }
-  }, [client, sessionKey, refreshEntries]);
+  }, [client, sessionKey, refreshEntries, initializeSession]);
 
   // Auto-refresh master lockbox when wallet connects
   useEffect(() => {
