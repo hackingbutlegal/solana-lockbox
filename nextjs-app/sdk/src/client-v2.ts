@@ -2,6 +2,63 @@
  * Lockbox v2.0 Client - Password Manager
  *
  * Provides a comprehensive interface for the multi-tier password manager.
+ *
+ * ## Orphaned Chunk Prevention Strategy
+ *
+ * This client implements comprehensive prevention against "orphaned storage chunks" - a situation
+ * where storage chunk accounts exist on-chain but are not registered in the master lockbox.
+ * This can occur due to:
+ * - Transaction failures during chunk creation
+ * - RPC data lag causing incomplete state updates
+ * - Network interruptions during multi-step operations
+ *
+ * ### Prevention Measures:
+ *
+ * 1. **Pre-initialization Checks** (initializeMasterLockbox):
+ *    - Scans for existing chunk accounts before creating master lockbox
+ *    - Prevents initialization if orphaned chunks are detected
+ *    - Provides clear recovery instructions to users
+ *
+ * 2. **Duplicate Prevention** (initializeStorageChunk):
+ *    - Checks if chunk already exists before attempting creation
+ *    - Verifies chunk is registered in master lockbox
+ *    - Throws descriptive error if orphaned chunk is detected
+ *
+ * 3. **Confirmation Retries** (storePassword):
+ *    - After creating a new chunk, retries verification up to 5 times
+ *    - Uses exponential backoff to allow RPC to catch up
+ *    - Falls back to direct chunk account verification if master lockbox lags
+ *    - Prevents password storage if chunk registration cannot be confirmed
+ *
+ * 4. **Pending Transaction Tracking**:
+ *    - Maintains a set of in-flight operations to prevent double-submission
+ *    - Ensures operations are not retried while still pending
+ *
+ * ### Recovery Options (if orphaned chunks are detected):
+ *
+ * 1. **Use Different Wallet** (Recommended):
+ *    - Create a new wallet and initialize fresh master lockbox
+ *    - No orphaned accounts, immediate access
+ *
+ * 2. **Wait for Program Upgrade**:
+ *    - Future program versions may include `force_close_orphaned_chunk` instruction
+ *    - Would allow recovery of locked rent without wallet switch
+ *
+ * 3. **Manual Recovery** (Advanced):
+ *    - Contact support with affected wallet address
+ *    - May require custom recovery transaction
+ *
+ * ### Error Messages:
+ *
+ * All orphaned chunk errors include:
+ * - Clear explanation of the issue
+ * - Affected chunk indices and addresses
+ * - Amount of SOL locked in rent
+ * - Specific recovery steps
+ * - Technical details for debugging
+ *
+ * This multi-layered approach ensures users are protected from orphaned chunks and provided
+ * with clear guidance if the issue is detected.
  */
 
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
@@ -252,6 +309,7 @@ const INSTRUCTION_DISCRIMINATORS = {
   upgradeSubscription: Buffer.from([0x55, 0xef, 0x7d, 0xeb, 0xc7, 0xe6, 0xa6, 0xf6]),
   renewSubscription: Buffer.from([0x2d, 0x4b, 0x9a, 0xc2, 0xa0, 0x0a, 0x6f, 0xb7]),
   downgradeSubscription: Buffer.from([0x39, 0x12, 0x7b, 0x76, 0xcb, 0x07, 0xc1, 0x25]),
+  closeStorageChunk: Buffer.from([0x79, 0xb6, 0xfd, 0x51, 0x67, 0xd2, 0x2e, 0xe9]),
 };
 
 /**
@@ -424,6 +482,38 @@ export class LockboxV2Client {
     try {
       this.pendingTransactions.add(operationKey);
 
+      // PREVENTION STEP 1: Check for orphaned chunks before initializing
+      // This detects if there are any storage chunk accounts from a previous failed initialization
+      console.log('[initializeMasterLockbox] Checking for orphaned chunks...');
+      const orphanedChunks: number[] = [];
+
+      // Check the first few chunk indices (0-4) for orphaned accounts
+      for (let i = 0; i < 5; i++) {
+        const [chunkPDA] = this.getStorageChunkAddress(i);
+        const chunkAccount = await this.connection.getAccountInfo(chunkPDA);
+        if (chunkAccount) {
+          orphanedChunks.push(i);
+          console.warn(`[initializeMasterLockbox] Found orphaned chunk at index ${i}: ${chunkPDA.toBase58()}`);
+        }
+      }
+
+      if (orphanedChunks.length > 0) {
+        console.error('[initializeMasterLockbox] ORPHANED CHUNKS DETECTED');
+        console.error('  Orphaned chunk indices:', orphanedChunks);
+        console.error('  These chunks exist from a previous failed transaction');
+        console.error('  Total rent locked:', orphanedChunks.length * 0.00878352, 'SOL');
+
+        throw new Error(
+          `Cannot initialize: ${orphanedChunks.length} orphaned storage chunk(s) detected (indices: ${orphanedChunks.join(', ')}). ` +
+          `These chunks exist from previous failed transactions and are locking approximately ${(orphanedChunks.length * 0.00878352).toFixed(4)} SOL. ` +
+          `To recover, you have two options:\n` +
+          `1. Use a different wallet address (recommended)\n` +
+          `2. Wait for a program upgrade that includes recovery functionality\n\n` +
+          `This prevention check protects you from creating more orphaned accounts.`
+        );
+      }
+
+      console.log('[initializeMasterLockbox] ✓ No orphaned chunks detected');
       console.log('Initializing master lockbox at:', masterLockbox.toBase58());
 
       // Build instruction manually
@@ -501,8 +591,31 @@ export class LockboxV2Client {
     // Check if chunk already exists (from a previous failed transaction)
     const existingChunk = await this.connection.getAccountInfo(storageChunk);
     if (existingChunk) {
-      console.log(`[initializeStorageChunk] Chunk ${chunkIndex} already exists at ${storageChunk.toBase58()}, skipping initialization`);
-      return 'chunk-already-exists';
+      console.warn(`[initializeStorageChunk] Chunk ${chunkIndex} already exists at ${storageChunk.toBase58()}`);
+
+      // Check if it's registered in master lockbox
+      const master = await this.getMasterLockbox();
+      const isRegistered = master.storageChunks.some(c => c.chunkIndex === chunkIndex);
+
+      if (isRegistered) {
+        console.log(`[initializeStorageChunk] Chunk ${chunkIndex} is properly registered, skipping`);
+        return 'chunk-already-exists';
+      }
+
+      // Orphaned chunk detected - it exists but isn't registered
+      console.error(`[initializeStorageChunk] ORPHANED CHUNK DETECTED!`);
+      console.error(`  Chunk ${chunkIndex} exists on-chain but is not registered in master lockbox`);
+      console.error(`  This is likely due to a previous failed transaction or RPC lag`);
+      console.error(`  Account: ${storageChunk.toBase58()}`);
+      console.error(`  Rent locked: ${existingChunk.lamports / 1e9} SOL`);
+
+      throw new Error(
+        `Orphaned storage chunk detected at index ${chunkIndex}. ` +
+        `The chunk account exists but is not registered in your master lockbox. ` +
+        `This can happen due to transaction failures or RPC lag. ` +
+        `Unfortunately, this chunk cannot be automatically recovered. ` +
+        `Please contact support or use a different wallet address.`
+      );
     }
 
     console.log(`[initializeStorageChunk] Creating chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
@@ -818,9 +931,35 @@ export class LockboxV2Client {
       return { txSignature: signature, entryId };
     } catch (error: any) {
       console.error('[storePassword] Transaction failed with error:', error);
+      console.error('[storePassword] Error type:', typeof error);
       console.error('[storePassword] Error name:', error?.name);
       console.error('[storePassword] Error message:', error?.message);
-      console.error('[storePassword] Error stack:', error?.stack);
+
+      // InstructionError format: { InstructionError: [index, error_type] }
+      if (error && typeof error === 'object') {
+        // Try to stringify the error object to see its structure
+        try {
+          console.error('[storePassword] Error object keys:', Object.keys(error));
+          console.error('[storePassword] Full error (stringified):', JSON.stringify(error, null, 2));
+        } catch (e) {
+          console.error('[storePassword] Could not stringify error');
+        }
+
+        // Check for InstructionError specifically
+        if ('InstructionError' in error && Array.isArray(error.InstructionError)) {
+          const [instructionIndex, errorType] = error.InstructionError;
+          console.error(`[storePassword] InstructionError at index ${instructionIndex}:`, errorType);
+
+          // Try to decode the error type
+          if (typeof errorType === 'object') {
+            const errorName = Object.keys(errorType)[0];
+            console.error(`[storePassword] Error type: ${errorName}`);
+            if (errorType[errorName]) {
+              console.error(`[storePassword] Error details:`, errorType[errorName]);
+            }
+          }
+        }
+      }
 
       // Try to extract more detailed error information
       if (error?.logs) {
@@ -840,7 +979,20 @@ export class LockboxV2Client {
 
       // Extract the most useful error message
       let errorMsg = error?.message || String(error);
-      if (error?.logs && error.logs.length > 0) {
+
+      // Handle InstructionError
+      if (error && typeof error === 'object' && 'InstructionError' in error) {
+        const [idx, errType] = error.InstructionError;
+        if (typeof errType === 'object') {
+          const errorName = Object.keys(errType)[0];
+          errorMsg = `InstructionError[${idx}]: ${errorName}`;
+          if (errType[errorName]) {
+            errorMsg += ` - ${JSON.stringify(errType[errorName])}`;
+          }
+        } else {
+          errorMsg = `InstructionError[${idx}]: ${errType}`;
+        }
+      } else if (error?.logs && error.logs.length > 0) {
         // Look for program errors in logs
         const programError = error.logs.find((log: string) =>
           log.includes('Program log:') || log.includes('Error:')

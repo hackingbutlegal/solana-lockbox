@@ -122,3 +122,74 @@ pub struct CloseStorageChunk<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 }
+
+/**
+ * Force Close Orphaned Storage Chunk
+ *
+ * Closes a storage chunk account without validating its structure.
+ * This is used for recovery when a chunk exists but is corrupted or orphaned
+ * (not properly registered in the master lockbox).
+ *
+ * # Safety
+ * - Uses AccountInfo instead of Account<StorageChunk> to bypass discriminator validation
+ * - Still validates PDA derivation and ownership
+ * - Can only be called by the master lockbox owner
+ *
+ * # Arguments
+ * - `chunk_index`: Index of the chunk to force close
+ *
+ * # Returns
+ * - `Ok(())` on successful closure
+ */
+pub fn force_close_orphaned_chunk_handler(
+    ctx: Context<ForceCloseOrphanedChunk>,
+    _chunk_index: u16,
+) -> Result<()> {
+    // Transfer all lamports from chunk to owner
+    let chunk_account = &ctx.accounts.storage_chunk;
+    let owner_account = &ctx.accounts.owner;
+
+    let rent_lamports = chunk_account.lamports();
+
+    **chunk_account.try_borrow_mut_lamports()? -= rent_lamports;
+    **owner_account.try_borrow_mut_lamports()? += rent_lamports;
+
+    msg!("Orphaned storage chunk force-closed - {} lamports reclaimed", rent_lamports);
+    Ok(())
+}
+
+/**
+ * Account validation for force_close_orphaned_chunk instruction
+ *
+ * Uses AccountInfo instead of Account to bypass discriminator checks,
+ * allowing cleanup of corrupted/orphaned chunks.
+ */
+#[derive(Accounts)]
+#[instruction(chunk_index: u16)]
+pub struct ForceCloseOrphanedChunk<'info> {
+    /// The Storage Chunk PDA to force close (uses AccountInfo to bypass validation)
+    /// CHECK: PDA derivation is validated, but account structure is not
+    #[account(
+        mut,
+        seeds = [
+            b"storage_chunk",
+            master_lockbox.key().as_ref(),
+            &chunk_index.to_le_bytes()
+        ],
+        bump
+    )]
+    pub storage_chunk: AccountInfo<'info>,
+
+    /// The Master Lockbox (for ownership verification)
+    #[account(
+        seeds = [b"master_lockbox", owner.key().as_ref()],
+        bump = master_lockbox.bump,
+        constraint = master_lockbox.owner == owner.key() @ LockboxError::Unauthorized
+    )]
+    pub master_lockbox: Account<'info, MasterLockbox>,
+
+    /// The owner/signer who is force-closing the chunk
+    /// Receives all rent lamports
+    #[account(mut)]
+    pub owner: Signer<'info>,
+}

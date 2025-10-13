@@ -295,6 +295,34 @@ pub mod lockbox {
         instructions::close_account::close_storage_chunk_handler(ctx, chunk_index)
     }
 
+    /// Force close an orphaned storage chunk (v2)
+    ///
+    /// Recovery instruction for closing storage chunks that exist on-chain but
+    /// are not properly registered in the master lockbox or have corrupted data.
+    /// This bypasses normal account validation to allow cleanup of orphaned accounts.
+    ///
+    /// # Use Cases
+    /// - Chunk created but not registered in master lockbox due to transaction lag
+    /// - Chunk has corrupted discriminator or data structure
+    /// - Account exists but cannot be closed via normal `close_storage_chunk`
+    ///
+    /// # Security
+    /// - Only the master lockbox owner can force close chunks
+    /// - PDA derivation is validated to ensure correct ownership
+    /// - All rent is returned to the owner
+    ///
+    /// # Arguments
+    /// * `chunk_index` - Index of the orphaned chunk to force close
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful closure and rent reclamation
+    pub fn force_close_orphaned_chunk(
+        ctx: Context<ForceCloseOrphanedChunk>,
+        chunk_index: u16,
+    ) -> Result<()> {
+        instructions::close_account::force_close_orphaned_chunk_handler(ctx, chunk_index)
+    }
+
     // ============================================================================
     // V1 Instructions - Legacy (Backward Compatibility)
     // ============================================================================
