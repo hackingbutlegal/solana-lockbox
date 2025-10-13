@@ -14,30 +14,48 @@ export const NONCE_SIZE = 24;
 /**
  * Convert Ed25519 public key to Curve25519 for X25519 operations
  *
- * SECURITY NOTE: TweetNaCl does not provide Ed25519→Curve25519 conversion.
- * For now, we avoid this conversion entirely by using the signature-based
- * key derivation approach instead. This function is kept for API compatibility
- * but should not be used in production code paths.
+ * SECURITY FIX (H-1): This function has been removed for security reasons.
  *
- * TODO: If X25519 key agreement is needed in the future, use:
- * - @stablelib/ed25519 for proper conversion
- * - OR use native crypto.subtle.deriveKey with ECDH
+ * The previous implementation did not perform actual curve conversion and simply
+ * returned the Ed25519 key as-is, which is cryptographically unsafe.
  *
- * @deprecated Avoid using this function. Use signature-based key derivation instead.
+ * For secure key derivation, use:
+ * - `createSessionKeyFromSignature()` for wallet-based session keys
+ * - @stablelib/ed25519 for proper Ed25519→Curve25519 conversion (if needed)
+ * - crypto.subtle.deriveKey with ECDH for X25519 key agreement
+ *
+ * @deprecated REMOVED - This function is unsafe and has been disabled.
+ * @throws {Error} Always throws to prevent unsafe usage
  */
-export function ed25519ToCurve25519PublicKey(ed25519PublicKey: Uint8Array): Uint8Array {
-  console.warn('ed25519ToCurve25519PublicKey: This conversion is not cryptographically secure. Use signature-based key derivation.');
-  // Return as-is to avoid breaking existing code, but this should not be used
-  return ed25519PublicKey;
+export function ed25519ToCurve25519PublicKey(_ed25519PublicKey: Uint8Array): never {
+  throw new Error(
+    'SECURITY: ed25519ToCurve25519PublicKey is unsafe and has been removed. ' +
+    'Use signature-based key derivation with createSessionKeyFromSignature() instead. ' +
+    'See SECURITY_AUDIT_TRAIL_OF_BITS.md for details.'
+  );
 }
 
 /**
  * Convert Ed25519 secret key to Curve25519 for X25519 operations
+ *
+ * SECURITY FIX (H-1): This function has been removed for security reasons.
+ *
+ * The previous implementation used nacl.hash() which is not the correct
+ * Ed25519→Curve25519 secret key conversion algorithm.
+ *
+ * For secure key derivation, use:
+ * - `createSessionKeyFromSignature()` for wallet-based session keys
+ * - @stablelib/ed25519 for proper Ed25519→Curve25519 conversion (if needed)
+ *
+ * @deprecated REMOVED - This function is unsafe and has been disabled.
+ * @throws {Error} Always throws to prevent unsafe usage
  */
-export function ed25519ToCurve25519SecretKey(ed25519SecretKey: Uint8Array): Uint8Array {
-  // TweetNaCl expects 64-byte secret key (32-byte seed + 32-byte public key)
-  // For wallet signatures, we derive from the 32-byte seed
-  return nacl.hash(ed25519SecretKey).slice(0, 32);
+export function ed25519ToCurve25519SecretKey(_ed25519SecretKey: Uint8Array): never {
+  throw new Error(
+    'SECURITY: ed25519ToCurve25519SecretKey is unsafe and has been removed. ' +
+    'Use signature-based key derivation with createSessionKeyFromSignature() instead. ' +
+    'See SECURITY_AUDIT_TRAIL_OF_BITS.md for details.'
+  );
 }
 
 /**
