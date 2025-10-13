@@ -167,6 +167,82 @@ if (!sessionKey) {
 - Follows principle of least privilege
 - Better UX for users who just want to browse/view their vault metadata
 
+### Issue 5: Responsive Design & Global Styles
+
+**Problem**:
+1. Desktop layout was left-aligned with blank space on right side
+2. Dark vertical bar visible on right side of viewport
+3. Poor mobile responsiveness
+
+**Root Cause**:
+1. Layout container had `max-width: 1400px` but wasn't centered
+2. `globals.css` had legacy dark theme background color (#242424)
+3. Body was using flexbox with `place-items: center` causing layout issues
+4. No responsive breakpoints for mobile/tablet
+
+**Fixes Implemented**:
+
+1. **Responsive Design** (`PasswordManager.tsx`):
+```css
+.pm-container {
+  max-width: 1400px;
+  margin: 0 auto;  /* Center on desktop */
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+/* Tablet and below */
+@media (max-width: 1024px) {
+  .pm-container {
+    grid-template-columns: 1fr;  /* Single column */
+    padding: 1rem;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .pm-header h1 {
+    font-size: 1.2rem;  /* Smaller fonts */
+  }
+  .pm-container {
+    padding: 0.75rem;  /* Tighter spacing */
+  }
+}
+```
+
+2. **Global Styles** (`globals.css`):
+```css
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 100%;
+  background: #f5f7fa;  /* Light background */
+  color: #2c3e50;       /* Readable text */
+}
+```
+
+**Result**:
+- ✅ Centered layout on desktop
+- ✅ Full-width light background
+- ✅ Responsive on mobile and tablet
+- ✅ No dark bars or layout issues
+- ✅ Sticky header for better navigation
+
+**Files Modified**:
+- `/Users/graffito/solana-lockbox/nextjs-app/components/PasswordManager.tsx`
+- `/Users/graffito/solana-lockbox/nextjs-app/app/globals.css`
+
+**Responsive Breakpoints**:
+- Desktop (> 1024px): Two-column layout with sidebar
+- Tablet (768-1024px): Single column, reordered content
+- Mobile (< 768px): Touch-optimized, stacked elements
+
 ---
 
 ## Quick Start
