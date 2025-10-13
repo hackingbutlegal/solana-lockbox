@@ -498,6 +498,15 @@ export class LockboxV2Client {
     const [masterLockbox] = this.getMasterLockboxAddress();
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
+    // Check if chunk already exists (from a previous failed transaction)
+    const existingChunk = await this.connection.getAccountInfo(storageChunk);
+    if (existingChunk) {
+      console.log(`[initializeStorageChunk] Chunk ${chunkIndex} already exists at ${storageChunk.toBase58()}, skipping initialization`);
+      return 'chunk-already-exists';
+    }
+
+    console.log(`[initializeStorageChunk] Creating chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
+
     // Build instruction data: discriminator + args
     // Args: chunk_index (u16) + initial_capacity (u32) + data_type (u8)
     const argsBuffer = Buffer.alloc(7);
@@ -525,12 +534,25 @@ export class LockboxV2Client {
     transaction.feePayer = this.wallet.publicKey;
     transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
 
-    const signed = await this.wallet.signTransaction(transaction);
-    const signature = await this.connection.sendRawTransaction(signed.serialize());
+    try {
+      const signed = await this.wallet.signTransaction(transaction);
+      const signature = await this.connection.sendRawTransaction(signed.serialize());
 
-    await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction(signature, 'confirmed');
 
-    return signature;
+      console.log(`[initializeStorageChunk] Chunk ${chunkIndex} created successfully`);
+
+      return signature;
+    } catch (error: any) {
+      // Check if error is "account already in use" - this can happen with RPC data lag
+      const errorMsg = error?.message || String(error);
+      if (errorMsg.includes('already in use') || errorMsg.includes('0x0')) {
+        console.log(`[initializeStorageChunk] Chunk ${chunkIndex} already exists (caught during transaction), continuing...`);
+        return 'chunk-exists-error-caught';
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -581,8 +603,29 @@ export class LockboxV2Client {
     if (chunkIndex === -1) {
       // Need to create a new chunk
       console.log(`[storePassword] No chunk with space, creating chunk ${master.storageChunksCount}`);
-      await this.initializeStorageChunk(master.storageChunksCount);
-      chunkIndex = master.storageChunksCount; // Use the newly created chunk
+      const newChunkIndex = master.storageChunksCount;
+
+      await this.initializeStorageChunk(newChunkIndex);
+
+      // CRITICAL: Refresh master lockbox after creating chunk to verify it was properly registered
+      console.log('[storePassword] Refreshing master lockbox to verify chunk creation...');
+      const refreshedMaster = await this.getMasterLockbox();
+
+      // Verify the new chunk was properly registered in the master lockbox
+      const chunkRegistered = refreshedMaster.storageChunks.some(c => c.chunkIndex === newChunkIndex);
+
+      if (!chunkRegistered) {
+        console.error('[storePassword] Chunk creation failed - chunk not registered in master lockbox');
+        console.error('  Expected chunk index:', newChunkIndex);
+        console.error('  Registered chunks:', refreshedMaster.storageChunks.map(c => c.chunkIndex));
+        throw new Error(
+          `Storage chunk ${newChunkIndex} was not properly registered in master lockbox. ` +
+          `This may indicate a partially failed transaction. Please try again or contact support.`
+        );
+      }
+
+      console.log(`[storePassword] Chunk ${newChunkIndex} verified - registered successfully`);
+      chunkIndex = newChunkIndex;
     }
 
     const [masterLockbox] = this.getMasterLockboxAddress();
@@ -646,46 +689,65 @@ export class LockboxV2Client {
 
     console.log('[storePassword] Signing and sending transaction...');
 
-    // Use sendTransaction if available (preferred for wallet adapters)
-    let signature: string;
-    if (this.wallet.sendTransaction) {
-      signature = await this.wallet.sendTransaction(transaction, this.connection, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      });
-    } else {
-      // Fallback to manual signing + sending
-      const signed = await this.wallet.signTransaction(transaction);
-      signature = await this.connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      });
+    try {
+      // Use sendTransaction if available (preferred for wallet adapters)
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        // Fallback to manual signing + sending
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
+
+      console.log('[storePassword] Transaction sent:', signature);
+      console.log('[storePassword] Confirming transaction...');
+
+      const confirmation = await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('✅ Password entry stored successfully!');
+
+      // Fetch updated master to get entry ID
+      const updatedMaster = await this.getMasterLockbox();
+      const entryId = Number(updatedMaster.nextEntryId) - 1;
+
+      console.log(`[storePassword] Entry ID: ${entryId}`);
+
+      return { txSignature: signature, entryId };
+    } catch (error: any) {
+      console.error('[storePassword] Transaction failed with error:', error);
+      console.error('[storePassword] Error name:', error?.name);
+      console.error('[storePassword] Error message:', error?.message);
+      console.error('[storePassword] Error stack:', error?.stack);
+      console.error('[storePassword] Full error object:', JSON.stringify(error, null, 2));
+
+      // Log the transaction details for debugging
+      console.error('[storePassword] Transaction details:');
+      console.error('  - Chunk index:', chunkIndex);
+      console.error('  - Storage chunk PDA:', storageChunk.toBase58());
+      console.error('  - Master lockbox PDA:', masterLockbox.toBase58());
+      console.error('  - Instruction data length:', instructionData.length);
+      console.error('  - Encrypted data size:', combined.length);
+
+      // Re-throw with more context
+      throw new Error(`Failed to store password: ${error?.message || String(error)}`);
     }
-
-    console.log('[storePassword] Transaction sent:', signature);
-    console.log('[storePassword] Confirming transaction...');
-
-    const confirmation = await this.connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, 'confirmed');
-
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-    }
-
-    console.log('✅ Password entry stored successfully!');
-
-    // Fetch updated master to get entry ID
-    const updatedMaster = await this.getMasterLockbox();
-    const entryId = Number(updatedMaster.nextEntryId) - 1;
-
-    console.log(`[storePassword] Entry ID: ${entryId}`);
-
-    return { txSignature: signature, entryId };
   }
 
   /**

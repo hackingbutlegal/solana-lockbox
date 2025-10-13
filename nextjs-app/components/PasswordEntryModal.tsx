@@ -5,6 +5,7 @@ import { PasswordEntry, PasswordEntryType } from '../sdk/src/types-v2';
 import { PasswordGeneratorModal } from './PasswordGeneratorModal';
 import { PasswordGenerator } from '../lib/password-generator';
 import { useToast } from './Toast';
+import { normalizeUrl, isValidUrl } from '../lib/url-validation';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export function PasswordEntryModal({
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
+  const [urlError, setUrlError] = useState<string>('');
 
   // Initialize form data when entry changes
   useEffect(() => {
@@ -134,6 +136,25 @@ export function PasswordEntryModal({
     } catch (error) {
       console.error('Failed to copy:', error);
       toast.showError('Failed to copy to clipboard');
+    }
+  };
+
+  // Handle URL blur - normalize and validate URL when user leaves the field
+  const handleUrlBlur = (currentUrl: string) => {
+    if (!currentUrl || currentUrl.trim() === '') {
+      setUrlError('');
+      return;
+    }
+
+    // Normalize URL (auto-prepend https:// if missing)
+    const normalized = normalizeUrl(currentUrl);
+
+    // Validate normalized URL
+    if (isValidUrl(normalized)) {
+      setFormData({ ...formData, url: normalized });
+      setUrlError('');
+    } else {
+      setUrlError('Please enter a valid URL (e.g., microsoft.com or https://example.com)');
     }
   };
 
@@ -284,10 +305,14 @@ export function PasswordEntryModal({
                     <label>Website URL</label>
                     <div className="input-with-action">
                       <input
-                        type="url"
+                        type="text"
                         value={formData.url}
-                        onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                        placeholder="https://example.com"
+                        onChange={(e) => {
+                          setFormData({ ...formData, url: e.target.value });
+                          setUrlError(''); // Clear error on change
+                        }}
+                        onBlur={(e) => handleUrlBlur(e.target.value)}
+                        placeholder="microsoft.com or https://example.com"
                         disabled={!isEditing}
                       />
                       {mode === 'view' && formData.url && (
@@ -301,6 +326,9 @@ export function PasswordEntryModal({
                         </a>
                       )}
                     </div>
+                    {urlError && isEditing && (
+                      <p className="form-error">{urlError}</p>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -601,21 +629,28 @@ export function PasswordEntryModal({
                   <div className="form-group">
                     <label>API URL</label>
                     <input
-                      type="url"
+                      type="text"
                       value={formData.url}
-                      onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                      placeholder="https://api.example.com"
+                      onChange={(e) => {
+                        setFormData({ ...formData, url: e.target.value });
+                        setUrlError('');
+                      }}
+                      onBlur={(e) => handleUrlBlur(e.target.value)}
+                      placeholder="api.example.com or https://api.example.com"
                       disabled={!isEditing}
                     />
+                    {urlError && isEditing && (
+                      <p className="form-error">{urlError}</p>
+                    )}
                   </div>
 
                   <div className="form-group">
                     <label>API Documentation</label>
                     <input
-                      type="url"
+                      type="text"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="https://docs.example.com"
+                      placeholder="docs.example.com or https://docs.example.com"
                       disabled={!isEditing}
                     />
                   </div>
@@ -1049,6 +1084,13 @@ export function PasswordEntryModal({
               margin: 0.5rem 0 0 0;
               font-size: 0.85rem;
               color: #7f8c8d;
+            }
+
+            .form-error {
+              margin: 0.5rem 0 0 0;
+              font-size: 0.85rem;
+              color: #e74c3c;
+              font-weight: 500;
             }
 
             .modal-footer {

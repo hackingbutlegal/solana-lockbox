@@ -6,7 +6,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useLockboxV2 } from '../contexts/LockboxV2Context';
 import { PasswordEntry, PasswordEntryType, TIER_INFO } from '../sdk/src/types-v2';
 import { searchEntries, sortEntries, groupByCategory, checkPasswordStrength, analyzePasswordHealth } from '../sdk/src/utils';
-import { sanitizePasswordEntry } from '../lib/input-sanitization';
+import { sanitizePasswordEntry } from '../lib/input-sanitization-v2';
 import { PasswordGeneratorModal } from './PasswordGeneratorModal';
 import { PasswordEntryModal } from './PasswordEntryModal';
 import { TOTPManagerModal } from './TOTPManagerModal';

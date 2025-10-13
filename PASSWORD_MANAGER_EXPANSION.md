@@ -1451,91 +1451,612 @@ class PasswordHealthAnalyzer {
 
 ---
 
-## Implementation Roadmap
+## Phase 7: Blockchain-Native Innovations
 
-### Month 1-3: Foundation
-- [ ] Implement multi-tier storage architecture
-- [ ] Add dynamic chunk allocation and realloc
-- [ ] Create subscription tier system
-- [ ] Build comprehensive password entry schema
-- [ ] Implement category management
+### 7.1 Social Recovery via Threshold Cryptography
 
-### Month 2-4: Search & Organization
-- [ ] Implement blind index search system
-- [ ] Add fuzzy search on client side
-- [ ] Create folder/tag organization
-- [ ] Build search index management
-- [ ] Add batch operations support
+**The Problem**: Wallet loss = permanent loss of all passwords (fatal flaw of Web3)
 
-### Month 3-5: Security Enhancements
-- [ ] Implement secure sharing protocol
-- [ ] Add asymmetric encryption for shares
-- [ ] Build permission management system
-- [ ] Create audit log infrastructure
-- [ ] Add 2FA/TOTP support
+**The Solution**: Shamir Secret Sharing + Guardian Network
 
-### Month 4-6: Subscription System
-- [ ] Implement subscription management
-- [ ] Add payment processing
-- [ ] Build auto-renewal system
-- [ ] Create revenue distribution
-- [ ] Add usage analytics
+#### Guardian System Architecture
 
-### Month 5-7: Advanced Features
-- [ ] Build password generator
-- [ ] Add password health analyzer
-- [ ] Implement breach monitoring
-- [ ] Create import/export tools
-- [ ] Add browser extension support
+```rust
+#[account]
+pub struct RecoveryConfig {
+    pub owner: Pubkey,
+    pub threshold: u8,                    // M of N (e.g., 3 of 5)
+    pub total_guardians: u8,              // N
+    pub guardians: Vec<Guardian>,
+    pub recovery_delay: i64,              // Mandatory delay (e.g., 7 days)
+    pub created_at: i64,
+    pub last_modified: i64,
+}
 
-### Month 6-12: Enterprise Features
-- [ ] Team management and roles
-- [ ] Advanced audit logging
-- [ ] Custom branding options
-- [ ] API access for integrations
-- [ ] Compliance reporting tools
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Guardian {
+    pub guardian_pubkey: Pubkey,
+    pub share_index: u8,
+    pub encrypted_share: Vec<u8>,         // Encrypted with guardian's public key
+    pub added_at: i64,
+    pub nickname_encrypted: Vec<u8>,      // "Mom", "Best Friend", etc.
+    pub status: GuardianStatus,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub enum GuardianStatus {
+    Active,
+    PendingAcceptance,
+    Revoked,
+}
+
+#[account]
+pub struct RecoveryRequest {
+    pub owner: Pubkey,
+    pub requester: Pubkey,                // Guardian who initiated recovery
+    pub requested_at: i64,
+    pub ready_at: i64,                    // After delay period
+    pub approvals: Vec<RecoveryApproval>,
+    pub status: RecoveryStatus,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct RecoveryApproval {
+    pub guardian: Pubkey,
+    pub share_decrypted: Vec<u8>,         // Guardian's share (verified)
+    pub approved_at: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub enum RecoveryStatus {
+    Pending,
+    ReadyForReconstruction,
+    Completed,
+    Cancelled,
+}
+```
+
+#### Key Features:
+1. **Shamir Secret Sharing (M-of-N)**
+   - Owner chooses threshold (e.g., 3-of-5, 2-of-3)
+   - Master key split into N shares
+   - Any M shares can reconstruct the key
+   - Individual shares reveal nothing
+
+2. **Guardian Management**
+   - Add/remove guardians at any time
+   - Guardians accept invitation via on-chain transaction
+   - Each guardian receives encrypted share (only they can decrypt)
+   - Supports nicknames for easy identification
+
+3. **Recovery Process with Time-Lock**
+   - Guardian initiates recovery request
+   - Mandatory waiting period (e.g., 7 days)
+   - Owner receives notifications and can cancel
+   - After delay, M guardians submit their shares
+   - Shares reconstructed on-chain into master key
+   - New wallet can claim ownership
+
+4. **Security Properties**
+   - Guardians never see plaintext shares
+   - Shares encrypted with guardian's public key (X25519)
+   - Time-lock prevents instant takeover
+   - Owner can cancel recovery if wallet is recovered
+   - Audit trail of all recovery attempts
+
+**Client-Side Implementation:**
+
+```typescript
+class SocialRecoveryManager {
+  // Split master key into shares
+  async createRecoveryConfig(
+    masterKey: Uint8Array,
+    guardians: PublicKey[],
+    threshold: number
+  ): Promise<RecoveryConfig> {
+    // Use Shamir's Secret Sharing
+    const shares = shamirSplit(masterKey, threshold, guardians.length);
+
+    const guardianShares = await Promise.all(
+      guardians.map(async (guardianPubkey, index) => {
+        // Encrypt share with guardian's public key
+        const encryptedShare = await this.encryptForGuardian(
+          shares[index],
+          guardianPubkey
+        );
+
+        return {
+          guardian_pubkey: guardianPubkey,
+          share_index: index,
+          encrypted_share: encryptedShare,
+          added_at: Date.now() / 1000,
+          status: GuardianStatus.PendingAcceptance,
+        };
+      })
+    );
+
+    // Store on-chain
+    return await this.client.setupRecovery(guardianShares, threshold);
+  }
+
+  // Guardian accepts their role
+  async acceptGuardianship(recoveryConfig: RecoveryConfig): Promise<void> {
+    // Guardian signs acceptance
+    await this.client.acceptGuardian(recoveryConfig.owner);
+  }
+
+  // Initiate recovery (called by guardian)
+  async initiateRecovery(
+    ownerPubkey: PublicKey,
+    myShare: Uint8Array
+  ): Promise<RecoveryRequest> {
+    return await this.client.requestRecovery(ownerPubkey, myShare);
+  }
+
+  // Owner cancels recovery
+  async cancelRecovery(request: RecoveryRequest): Promise<void> {
+    await this.client.cancelRecovery(request.requester);
+  }
+
+  // Guardian approves recovery after time-lock
+  async approveRecovery(
+    request: RecoveryRequest,
+    myShare: Uint8Array
+  ): Promise<void> {
+    await this.client.submitShare(request.owner, myShare);
+  }
+
+  // Reconstruct master key from M shares
+  async reconstructMasterKey(
+    approvals: RecoveryApproval[]
+  ): Promise<Uint8Array> {
+    const shares = approvals.map(a => a.share_decrypted);
+    return shamirRecombine(shares);
+  }
+
+  private async encryptForGuardian(
+    share: Uint8Array,
+    guardianPubkey: PublicKey
+  ): Promise<Uint8Array> {
+    // X25519 encryption (similar to sharing protocol)
+    const guardianX25519 = ed25519ToX25519PublicKey(guardianPubkey);
+    const ephemeralKeypair = nacl.box.keyPair();
+
+    const nonce = nacl.randomBytes(24);
+    const encrypted = nacl.box(
+      share,
+      nonce,
+      guardianX25519,
+      ephemeralKeypair.secretKey
+    );
+
+    return Buffer.concat([ephemeralKeypair.publicKey, nonce, encrypted]);
+  }
+}
+```
+
+### 7.2 Time-Locked Emergency Access
+
+**The Problem**: What happens to your passwords when you're incapacitated?
+
+**The Solution**: Dead Man's Switch with Time-Lock
+
+#### Emergency Access Architecture
+
+```rust
+#[account]
+pub struct EmergencyAccess {
+    pub owner: Pubkey,
+    pub emergency_contacts: Vec<EmergencyContact>,
+    pub inactivity_period: i64,           // e.g., 90 days
+    pub last_activity: i64,
+    pub countdown_started: Option<i64>,   // When countdown began
+    pub status: EmergencyStatus,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct EmergencyContact {
+    pub contact_pubkey: Pubkey,
+    pub contact_name_encrypted: Vec<u8>,  // "Spouse", "Lawyer", etc.
+    pub access_level: EmergencyAccessLevel,
+    pub encrypted_key: Vec<u8>,           // Emergency access key
+    pub added_at: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub enum EmergencyAccessLevel {
+    ViewOnly,          // Can view specified entries
+    FullAccess,        // Can view and export all entries
+    TransferOwnership, // Can take full ownership
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub enum EmergencyStatus {
+    Active,            // Normal operation
+    CountdownStarted,  // No activity, countdown in progress
+    EmergencyActive,   // Emergency access granted
+    Cancelled,         // Owner cancelled countdown
+}
+
+pub fn check_and_activate_emergency(
+    ctx: Context<CheckEmergency>,
+) -> Result<()> {
+    let emergency_access = &mut ctx.accounts.emergency_access;
+    let now = Clock::get()?.unix_timestamp;
+
+    // Check if enough time has passed since last activity
+    if now - emergency_access.last_activity >= emergency_access.inactivity_period {
+        if emergency_access.countdown_started.is_none() {
+            // Start countdown
+            emergency_access.countdown_started = Some(now);
+            emergency_access.status = EmergencyStatus::CountdownStarted;
+
+            emit!(EmergencyCountdownStarted {
+                owner: emergency_access.owner,
+                ready_at: now + EMERGENCY_GRACE_PERIOD,
+            });
+        } else {
+            // Check if grace period has elapsed
+            let countdown_start = emergency_access.countdown_started.unwrap();
+            if now - countdown_start >= EMERGENCY_GRACE_PERIOD {
+                // Activate emergency access
+                emergency_access.status = EmergencyStatus::EmergencyActive;
+
+                emit!(EmergencyAccessActivated {
+                    owner: emergency_access.owner,
+                    contacts: emergency_access.emergency_contacts.len() as u16,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn record_activity(
+    ctx: Context<RecordActivity>,
+) -> Result<()> {
+    let emergency_access = &mut ctx.accounts.emergency_access;
+
+    // Owner is active, reset everything
+    emergency_access.last_activity = Clock::get()?.unix_timestamp;
+    emergency_access.countdown_started = None;
+    emergency_access.status = EmergencyStatus::Active;
+
+    Ok(())
+}
+```
+
+#### Key Features:
+1. **Inactivity Detection**
+   - User sets inactivity period (e.g., 90 days)
+   - Every password operation updates last_activity
+   - Cron job checks for inactivity
+
+2. **Two-Stage Countdown**
+   - Stage 1: Inactivity detected → countdown starts
+   - Owner gets email/SMS notifications
+   - Grace period (e.g., 7 days) to cancel
+   - Stage 2: Grace period expires → emergency access granted
+
+3. **Emergency Contacts**
+   - Owner designates trusted contacts
+   - Each contact has specific access level
+   - Contacts receive encrypted emergency keys
+   - Access automatically revokes when owner returns
+
+4. **Activity Tracking**
+   - Every password operation extends countdown
+   - Manual "I'm alive" button in UI
+   - Activity notifications to emergency contacts
+
+### 7.3 Gasless Transactions via Subscription Pool
+
+**The Problem**: Users need SOL for every password operation (friction)
+
+**The Solution**: Transaction Delegation + Prepaid Pool
+
+#### Gasless Transaction Architecture
+
+```rust
+#[account]
+pub struct GaslessPool {
+    pub authority: Pubkey,
+    pub total_funded: u64,
+    pub total_spent: u64,
+    pub active_subscriptions: u32,
+    pub transactions_this_month: u64,
+}
+
+#[account]
+pub struct UserGaslessAccount {
+    pub owner: Pubkey,
+    pub subscription_tier: SubscriptionTier,
+    pub transactions_used: u32,
+    pub transactions_limit: u32,      // Based on tier
+    pub last_reset: i64,
+}
+
+// User signs transaction, but doesn't pay gas
+pub fn gasless_store_password(
+    ctx: Context<GaslessStorePassword>,
+    encrypted_data: Vec<u8>,
+    // ... other params
+) -> Result<()> {
+    let gasless_account = &mut ctx.accounts.user_gasless_account;
+
+    // Verify user has subscription
+    require!(
+        matches!(
+            gasless_account.subscription_tier,
+            SubscriptionTier::Basic | SubscriptionTier::Premium | SubscriptionTier::Enterprise
+        ),
+        ErrorCode::GaslessNotAvailable
+    );
+
+    // Check transaction limit
+    require!(
+        gasless_account.transactions_used < gasless_account.transactions_limit,
+        ErrorCode::GaslessLimitExceeded
+    );
+
+    // Gas paid from pool account
+    let pool = &mut ctx.accounts.gasless_pool;
+    pool.total_spent += AVERAGE_TRANSACTION_COST;
+    pool.transactions_this_month += 1;
+
+    // Increment user's usage
+    gasless_account.transactions_used += 1;
+
+    // Perform actual password storage
+    // ... (same logic as regular store_password)
+
+    Ok(())
+}
+```
+
+#### Key Features:
+1. **Transaction Limits by Tier**
+   - Free: 0 gasless transactions
+   - Basic: 100 gasless transactions/month
+   - Premium: 1,000 gasless transactions/month
+   - Enterprise: Unlimited gasless transactions
+
+2. **Pool Funding**
+   - Protocol maintains pool of SOL
+   - Funded from subscription revenue
+   - Auto-refills when depleted
+   - Transparent on-chain accounting
+
+3. **UX Flow**
+   - User clicks "Store Password"
+   - Wallet prompts for signature (NOT payment)
+   - Transaction submitted via RPC
+   - Gas deducted from pool
+   - User sees instant confirmation
+
+4. **Abuse Prevention**
+   - Rate limiting per user (e.g., max 10 tx/minute)
+   - Monthly transaction caps
+   - Automatic suspension for suspicious activity
+   - Pool draining protection
+
+---
+
+## Implementation Roadmap (REVISED)
+
+### Phase 1-3: Foundation & Core Features (✅ COMPLETE)
+- [x] Multi-tier storage architecture
+- [x] Dynamic chunk allocation and realloc
+- [x] Subscription tier system with UI
+- [x] Password entry schema with versioning
+- [x] Category management
+- [x] Client-side encryption (XChaCha20-Poly1305)
+- [x] Session management with timeout
+- [x] Storage usage monitoring
+
+### Phase 4: Search & Intelligence (Q1 2026 - NEXT)
+- [ ] **Blind Index Search System**
+  - HMAC-based keyword hashing
+  - Trigram fuzzy matching
+  - Prefix search for autocomplete
+- [ ] **Smart Filters**
+  - Recently used entries
+  - Weak passwords
+  - Old passwords (>90 days)
+  - Duplicate passwords
+  - Favorited entries
+- [ ] **Password Health Dashboard**
+  - Individual security score
+  - Weak/reused/old password detection
+  - Password strength analyzer
+  - Breach detection (HaveIBeenPwned API)
+- [ ] **Batch Operations**
+  - Import from CSV/JSON
+  - Export encrypted vault
+  - Bulk update categories
+  - Bulk delete archived entries
+
+**Timeline**: 6-8 weeks
+**Priority**: HIGH - Core functionality users expect
+
+### Phase 5: Social Recovery & Emergency Access (Q1 2026) 🔥
+- [ ] **Social Recovery System**
+  - Shamir Secret Sharing implementation
+  - Guardian invitation and acceptance
+  - Recovery request with time-lock
+  - Share reconstruction on-chain
+  - Multi-wallet support (same vault, different keys)
+- [ ] **Emergency Access**
+  - Time-locked emergency contacts
+  - Inactivity detection (dead man's switch)
+  - Two-stage countdown with notifications
+  - Configurable access levels per contact
+  - Activity tracking and "I'm alive" button
+- [ ] **Recovery Testing Tools**
+  - Simulate wallet loss scenarios
+  - Guardian communication testing
+  - Recovery time estimation
+  - Backup verification
+
+**Timeline**: 8-10 weeks
+**Priority**: CRITICAL - Solves Web3's biggest UX problem
+
+### Phase 6: Gasless Transactions & UX (Q2 2026)
+- [ ] **Gasless Transaction Pool**
+  - On-chain pool management
+  - Per-tier transaction limits
+  - Automatic pool refilling
+  - Usage analytics dashboard
+- [ ] **Enhanced Onboarding**
+  - First-time user tutorial
+  - Guardian setup wizard
+  - Emergency access configuration
+  - Test recovery flow
+- [ ] **Performance Optimizations**
+  - Lazy loading of storage chunks
+  - Client-side caching layer
+  - Batch transaction submission
+  - Optimistic UI updates
+
+**Timeline**: 4-6 weeks
+**Priority**: MEDIUM - Dramatically improves UX
+
+### Phase 7: Sharing & Collaboration (Q2 2026)
+- [ ] **Secure Password Sharing**
+  - X25519 asymmetric encryption
+  - Per-entry permission management
+  - Share expiration and revocation
+  - Share access audit logs
+- [ ] **Team Vaults** (Enterprise)
+  - Role-based access control (RBAC)
+  - Admin, Manager, Member roles
+  - Team activity logs
+  - Shared subscription billing
+- [ ] **Password Health Monitoring**
+  - Automatic weak password detection
+  - Password expiration reminders
+  - Security alerts for breached passwords
+
+**Timeline**: 6-8 weeks
+**Priority**: MEDIUM - Enables team use cases
+
+### Phase 8: Advanced Security (Q3 2026)
+- [ ] **TOTP/2FA Integration**
+  - TOTP code generation
+  - 2FA secret storage
+  - Auto-copy to clipboard
+  - Browser integration
+- [ ] **Password Generator**
+  - Customizable strength options
+  - Memorable passphrase generation
+  - Pattern-based generation
+  - Password history
+- [ ] **Audit Logs**
+  - On-chain activity tracking
+  - Exportable audit reports
+  - Access pattern analysis
+  - Anomaly detection
+
+**Timeline**: 4-6 weeks
+**Priority**: MEDIUM - Security enthusiast features
+
+### Phase 9: Platform Expansion (Q3-Q4 2026)
+- [ ] **Mobile PWA**
+  - iOS/Android installable web app
+  - Touch-optimized interface
+  - Biometric authentication (WebAuthn)
+  - Offline mode support
+- [ ] **WalletConnect Integration**
+  - Auto-fill for dApps
+  - Phishing-resistant authentication
+  - Domain verification
+- [ ] **CLI Tool**
+  - Command-line interface for power users
+  - Automation and scripting support
+  - CI/CD integration
+
+**Timeline**: 8-10 weeks
+**Priority**: LOW - Future expansion
+
+---
+
+## Future Innovations (Post-Mainnet)
+
+### Possible Features for 2027+
+- **Cross-Chain Portability**: Export encrypted vault to Ethereum, Polygon, etc.
+- **Browser Extension**: Chrome/Firefox/Brave extension with auto-fill
+- **AI-Powered Security**: On-device ML for leak detection
+- **NFT-Gated Passwords**: Unlock entries with NFT ownership
+- **Programmable Access Rules**: Time-based, location-based, NFT-based access
+- **Zero-Knowledge Proofs**: Prove password strength without revealing password
+- **Hardware Wallet Integration**: YubiKey, Ledger support
+
+### Deprioritized Features
+- ~~Custom branding~~ - Not worth complexity for <1% of users
+- ~~SSO Integration~~ - Conflicts with Web3-first philosophy
+- ~~Desktop Apps~~ - PWA covers 90% of use cases
+- ~~Compliance Reporting~~ - Premature for pre-mainnet product
 
 ---
 
 ## Technical Considerations
 
 ### Performance Optimization
-1. **Lazy Loading**: Load only necessary chunks
-2. **Caching**: Cache frequently accessed entries
-3. **Batch Operations**: Group multiple updates
-4. **Index Optimization**: Maintain efficient search indexes
-5. **Compression**: Use zstd for large entries
+1. **Lazy Loading**: Load only necessary chunks on-demand
+2. **Client-Side Caching**: Cache decrypted entries in memory
+3. **Batch Operations**: Group multiple updates into single transaction
+4. **Index Optimization**: Maintain efficient blind indexes
+5. **Compression**: Optional zstd compression for large entries
 
 ### Security Best Practices
-1. **Zero-Knowledge**: Never transmit plaintext
-2. **Client-Side Encryption**: All crypto in browser
-3. **Forward Secrecy**: Rotate encryption keys
-4. **Secure Sharing**: Use asymmetric encryption
-5. **Audit Logging**: Track all access
+1. **Zero-Knowledge**: Never transmit plaintext to server
+2. **Client-Side Encryption**: All crypto operations in browser
+3. **No Persistent Secrets**: Session keys stored in WeakMap
+4. **Secure Sharing**: Asymmetric encryption for sharing
+5. **Audit Logging**: Track all access on-chain
 
 ### Cost Analysis
-- **Storage Rent**: ~0.0069 SOL per KB per 2 years
-- **Transaction Fees**: ~0.000005 SOL per transaction
-- **Subscription Revenue**: 0.001-0.1 SOL per month
+- **Storage Rent**: ~0.0069 SOL per KB per 2 years (~$0.96 at $140/SOL)
+- **Transaction Fees**: ~0.000005 SOL per transaction (~$0.0007)
+- **Subscription Revenue**: 0.001-0.1 SOL per month ($0.14-$14)
 - **Break-even**: ~50-100 paid users
+- **Gasless Pool**: ~0.5 SOL per 1000 transactions (~$70)
 
---
+### Blockchain Trade-offs
+
+**Why Solana Over Ethereum:**
+- **Low Fees**: ~$0.0007 per transaction vs. $50+ on Ethereum
+- **Fast Finality**: 400ms vs. 12+ seconds
+- **Account Model**: Easier to implement dynamic storage with realloc
+- **Native Throughput**: 65k TPS without L2 complexity
+
+**Trade-offs:**
+- **Network Stability**: Solana has had outages (improving)
+- **Developer Tooling**: Less mature than Ethereum ecosystem
+- **User Base**: Smaller than Ethereum (but growing rapidly)
+
+---
 
 ## Conclusion
 
-This expansion strategy transforms Lockbox into a comprehensive, enterprise-ready decentralized password manager while maintaining its core principles of zero-knowledge encryption and user sovereignty. The phased approach allows for iterative development and user feedback integration.
+This revised expansion strategy focuses on **solving Web3's biggest problems first** while maintaining feature parity with traditional password managers.
 
 **Key Differentiators:**
-- Truly decentralized (no central servers)
-- Zero-knowledge architecture
-- Blockchain-backed security
-- Scalable to enterprise needs
-- Competitive with 1Password/Bitwarden
-- Crypto-native (wallet-based auth)
+1. **Social Recovery** - First password manager with trustless wallet recovery
+2. **Emergency Access** - Dead man's switch for digital estate planning
+3. **Gasless Transactions** - Web2 UX with Web3 security
+4. **Zero-Knowledge** - True decentralization without central servers
+5. **Blockchain-Native** - Programmable access rules, NFT-gating, time-locks
+
+**Competitive Advantages:**
+- **vs. 1Password/Bitwarden**: Decentralized, censorship-resistant, no data breaches possible
+- **vs. MetaMask**: Purpose-built for passwords, better UX, social recovery
+- **vs. Other Web3 Solutions**: Gasless transactions, emergency access, proven on devnet
 
 **Next Steps:**
-1. Review and refine specifications
-2. Create detailed technical designs
-3. Begin Phase 1 implementation
-4. Set up development environment
-5. Start building!
+1. Complete Phase 4 (Search & Intelligence) - Q1 2026
+2. Implement Phase 5 (Social Recovery) - Q1 2026
+3. Security audit by professional auditors
+4. Beta testing with select users
+5. Mainnet launch - Q2 2026

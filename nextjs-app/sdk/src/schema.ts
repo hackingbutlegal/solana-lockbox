@@ -21,6 +21,23 @@ import { PasswordEntryType } from './types-v2';
 import crypto from 'crypto';
 import pako from 'pako';
 
+// Import enhanced validation schemas from lib
+// These provide comprehensive validation rules for all fields
+import {
+  titleSchema,
+  usernameSchema,
+  passwordSchema,
+  urlSchema,
+  notesSchema,
+  emailSchema,
+  phoneSchema,
+  creditCardSchema,
+  cvvSchema,
+  expirationDateSchema,
+  tagsSchema,
+  categorySchema,
+} from '../../lib/validation-schemas';
+
 /**
  * Current schema version
  * Increment this when making breaking changes to PasswordEntry
@@ -36,48 +53,57 @@ export const COMPRESSION_THRESHOLD = 500; // 500 bytes
 /**
  * Zod schema for PasswordEntry validation
  * This ensures runtime type safety for decrypted data
+ *
+ * Uses enhanced validation schemas from lib/validation-schemas.ts
+ * which provide comprehensive validation rules for all fields:
+ * - Title: trimming, length limits, control character removal
+ * - Email: RFC 5322 compliant, normalization to lowercase
+ * - Phone: international format support, normalization
+ * - URL: auto-normalization with https://, XSS protection
+ * - Credit Card: Luhn algorithm validation
+ * - Tags: deduplication, lowercase normalization
  */
 export const PasswordEntrySchema = z.object({
   // Core fields (required)
   type: z.nativeEnum(PasswordEntryType),
-  title: z.string().min(1, 'Title is required'),
+  title: titleSchema, // Enhanced validation with trimming, length limits
 
-  // Optional fields
+  // Optional fields with enhanced validation
   id: z.number().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  url: z.string().optional(),
-  notes: z.string().optional(),
-  category: z.number().optional(),
-  tags: z.array(z.string()).optional(),
+  username: usernameSchema.optional(),
+  password: passwordSchema.optional(),
+  url: urlSchema.optional(), // Auto-normalizes URLs, adds https://
+  notes: notesSchema.optional(),
+  category: categorySchema.optional(),
+  tags: tagsSchema.optional(), // Deduplicates, normalizes to lowercase
   favorite: z.boolean().optional(),
   archived: z.boolean().optional(),
   createdAt: z.date().optional(),
   lastModified: z.date().optional(),
   accessCount: z.number().optional(),
 
-  // Type-specific fields (Credit Card)
-  cardNumber: z.string().optional(),
-  cardExpiry: z.string().optional(),
-  cardCvv: z.string().optional(),
-  cardHolder: z.string().optional(),
+  // Type-specific fields (Credit Card) with enhanced validation
+  cardNumber: creditCardSchema.optional(), // Luhn algorithm validation
+  cardExpiry: expirationDateSchema.optional(), // MM/YY or MM/YYYY format
+  cardCvv: cvvSchema.optional(), // 3-4 digit validation
+  cardHolder: z.string().max(100).optional(),
 
-  // Identity fields
-  fullName: z.string().optional(),
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  // Identity fields with enhanced validation
+  fullName: z.string().max(200).optional(),
+  email: emailSchema.optional(), // RFC 5322 compliant, lowercase normalization
+  phone: phoneSchema.optional(), // International format support
+  address: z.string().max(500).optional(),
 
   // API/SSH key fields
-  apiKey: z.string().optional(),
-  apiSecret: z.string().optional(),
-  sshPublicKey: z.string().optional(),
-  sshPrivateKey: z.string().optional(),
+  apiKey: z.string().max(1000).optional(),
+  apiSecret: z.string().max(1000).optional(),
+  sshPublicKey: z.string().max(10000).optional(),
+  sshPrivateKey: z.string().max(10000).optional(),
 
   // Crypto wallet fields
-  walletAddress: z.string().optional(),
-  privateKey: z.string().optional(),
-  seedPhrase: z.string().optional(),
+  walletAddress: z.string().max(200).optional(),
+  privateKey: z.string().max(1000).optional(),
+  seedPhrase: z.string().max(500).optional(),
 });
 
 export type ValidatedPasswordEntry = z.infer<typeof PasswordEntrySchema>;

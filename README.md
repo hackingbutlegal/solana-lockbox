@@ -17,16 +17,21 @@
 
 ## What's New in v2.0?
 
-Solana Lockbox v2.0 expands the original 1KB encrypted storage into a comprehensive password manager with:
+Solana Lockbox v2.0 expands the original 1KB encrypted storage into a comprehensive password manager with blockchain-native innovations:
+
+### 🚀 Blockchain-Native Innovations
+- **Social Recovery**: Never lose your passwords - trusted guardians can help recover access via Shamir Secret Sharing (M-of-N threshold cryptography)
+- **Emergency Access**: Dead man's switch for digital estate planning - designated contacts gain access after inactivity period
+- **Gasless Transactions**: Subscription pools cover transaction fees - Web2 UX with Web3 security
 
 ### 🎯 Core Features
 - **Unlimited Storage**: Scale from 1KB to 1MB+ via dynamic chunk allocation
 - **Password Management**: Store, organize, and retrieve unlimited password entries
 - **Categories & Folders**: Organize credentials with hierarchical structure
-- **Encrypted Search**: Search without decrypting using blind indexes
-- **Secure Sharing**: Share passwords with other users via asymmetric encryption
-- **TOTP/2FA**: Built-in 2FA code generation
-- **Password Health**: Analyze weak, reused, and old passwords
+- **Encrypted Search**: Search without decrypting using blind indexes (coming Q1 2026)
+- **Secure Sharing**: Share passwords with other users via asymmetric encryption (coming Q2 2026)
+- **TOTP/2FA**: Built-in 2FA code generation (coming Q3 2026)
+- **Password Health**: Analyze weak, reused, and old passwords (coming Q2 2026)
 
 ### 💎 Subscription Tiers
 - **Free**: 1KB (~10 passwords)
@@ -127,60 +132,134 @@ Visit http://localhost:3000
 
 ## Development Roadmap
 
-### Phase 1: Foundation (October 2025) ✅ Complete
+### Phase 1-3: Foundation & Core Features (October 2025) ✅ COMPLETE
+
+**Phase 1: Storage Architecture**
 - [x] Multi-tier storage architecture (MasterLockbox + StorageChunks)
-- [x] Dynamic chunk allocation (realloc implementation)
+- [x] Dynamic chunk allocation with on-chain realloc
 - [x] Storage chunks with automatic expansion
-- [x] Enhanced password entry schema (v2 with compression)
 - [x] Transaction deduplication and wallet adapter fixes
 - [x] Fixed discriminators and INIT_SPACE calculations
-- [x] Client-side encryption (XChaCha20-Poly1305)
+
+**Phase 2: Password Structure & Encryption**
+- [x] Enhanced password entry schema (v2 with versioning)
+- [x] Password entry type system (Login, SecureNote, CreditCard, etc.)
+- [x] Comprehensive category management system
+- [x] Client-side encryption (XChaCha20-Poly1305 AEAD)
 - [x] Wallet-derived keys with HKDF
 - [x] Session management with 15-minute timeout
+- [x] Secure WeakMap-based session storage
+- [x] Data integrity validation with Zod schema
+- [x] Serialization/deserialization with checksum verification
 
-### Phase 5: Subscription System UI (October 2025) ✅ Complete
+**Phase 3: Subscription System**
+- [x] Four-tier subscription system (Free, Basic, Premium, Enterprise)
+- [x] On-chain subscription management (upgrade, renew, downgrade)
+- [x] Storage capacity enforcement per tier
+- [x] Subscription expiration tracking
+- [x] Client-side storage limit validation (prevents failed transactions)
 - [x] Subscription tier display component (SubscriptionCard)
 - [x] Subscription upgrade modal with payment flow
 - [x] Storage usage visualization with tier limits
-- [x] Integration with on-chain upgradeSubscription instruction
 - [x] Real-time storage monitoring and warnings
 - [x] Responsive design for mobile/tablet/desktop
-- [x] Lazy signature prompts (single wallet signature)
 
-### Phase 2: Search & Organization (Q1 2026)
-- [ ] Blind index search system
-- [ ] Fuzzy search on client
-- [ ] Folder/tag organization
-- [ ] Batch operations
-- [ ] Import/export functionality
+---
 
-### Phase 3: Security Enhancements (Q1 2026)
-- [ ] Secure sharing protocol (asymmetric encryption)
-- [ ] Permission management
-- [ ] Audit log infrastructure
-- [ ] 2FA/TOTP support
-- [ ] Password history tracking
+### Phase 4: Search & Intelligence (Q1 2026) 🔍 NEXT - 6-8 weeks - HIGH priority
+- [ ] Blind index search system with HMAC-based keyword hashing
+- [ ] Fuzzy search on client side with trigram matching
+- [ ] Advanced filtering and sorting
+- [ ] Favorites and recently accessed entries
+- [ ] Import/export functionality (1Password, Bitwarden, LastPass formats)
+- [ ] Batch operations (import/update/delete multiple entries)
 
-### Phase 4: Subscription Management (Q2 2026)
-- [ ] Subscription renewal flow
-- [ ] Payment history and invoices
-- [ ] Auto-renewal system
-- [ ] Downgrade handling
-- [ ] Revenue distribution
+**Why**: Essential for usability at scale. Users need to find passwords quickly.
 
-### Phase 6: Advanced Features (Q2-Q3 2026)
-- [ ] Password generator with strength options
-- [ ] Password health analyzer
-- [ ] Breach monitoring integration
-- [ ] Browser extension (Chrome/Firefox)
-- [ ] Mobile applications
+---
 
-### Phase 7: Enterprise Features (Q3-Q4 2026)
-- [ ] Team management and sharing
-- [ ] Advanced audit logging
-- [ ] Custom branding options
-- [ ] API access for integrations
-- [ ] SSO support
+### Phase 5: Social Recovery & Emergency Access (Q1 2026) 🔥 CRITICAL - 8-10 weeks
+- [ ] **Social Recovery via Threshold Cryptography** (Shamir Secret Sharing)
+  - M-of-N guardian network for wallet recovery
+  - On-chain encrypted share distribution
+  - Guardian invitation and acceptance flow
+  - Recovery initiation with mandatory delay
+  - Guardian approval threshold enforcement
+- [ ] **Time-Locked Emergency Access** (Dead Man's Switch)
+  - Inactivity monitoring with on-chain countdown
+  - Emergency contact notification system
+  - Mandatory waiting period before access
+  - Owner cancellation mechanism
+  - Partial or full vault access grants
+
+**Why**: Solves Web3's biggest problem - wallet loss = permanent data loss. THIS is our killer feature.
+
+---
+
+### Phase 6: Gasless Transactions & UX (Q2 2026) - 4-6 weeks - MEDIUM priority
+- [ ] **Gasless Transaction Pool** (Subscription-Funded)
+  - Subscription SOL pools for transaction fees
+  - Transaction delegation system
+  - Fee-less password operations for paid users
+  - Usage quotas per tier
+  - Pool refill automation
+- [ ] Password generator with strength scoring
+- [ ] Password health dashboard (weak, reused, old passwords)
+- [ ] Password strength analyzer with suggestions
+
+**Why**: Makes Web3 feel like Web2. Users shouldn't think about gas.
+
+---
+
+### Phase 7: Sharing & Collaboration (Q2 2026) - 6-8 weeks - MEDIUM priority
+- [ ] Secure sharing protocol with asymmetric encryption (X25519)
+- [ ] Per-entry permission management (view, edit, share)
+- [ ] Share expiration and revocation
+- [ ] Audit log infrastructure for all operations
+
+**Why**: Teams need to share credentials securely. Builds foundation for enterprise features.
+
+---
+
+### Phase 8: Advanced Security (Q3 2026) - 4-6 weeks - MEDIUM priority
+- [ ] 2FA/TOTP code generation and storage
+- [ ] Password history tracking (last 10 versions)
+- [ ] Password expiration and rotation reminders
+- [ ] Breach monitoring integration (HaveIBeenPwned API)
+- [ ] Biometric authentication support (WebAuthn)
+
+**Why**: Security features that differentiate us from basic password managers.
+
+---
+
+### Phase 9: Platform Expansion (Q3-Q4 2026) - 8-10 weeks - LOW priority
+- [ ] Mobile applications (iOS, Android with React Native)
+- [ ] CLI tool for advanced users
+- [ ] Cross-platform synchronization
+- [ ] API access for third-party integrations
+
+**Why**: Expand reach after core product is solid.
+
+---
+
+### Future Innovations (Post-Mainnet)
+
+**Browser Extension**: Chrome, Firefox, Edge with auto-fill
+**Cross-Chain Portability**: Export encrypted vault to Ethereum, Polygon, Arbitrum
+**AI-Powered Security**: ML-based phishing detection, smart password suggestions
+**NFT-Gated Passwords**: Credentials that require NFT ownership to decrypt
+**Hardware Wallet Integration**: Ledger/Trezor as second factor
+
+---
+
+### Deprioritized Features
+
+These features have been removed from the roadmap as they don't align with our core value proposition or are premature for pre-mainnet:
+
+- ~~Custom branding~~ - Adds complexity for <1% of users
+- ~~SSO Integration (SAML, OAuth)~~ - Conflicts with Web3-first philosophy
+- ~~Desktop Apps (Electron)~~ - PWA covers 90% of use cases
+- ~~Compliance Reporting (SOC 2, ISO 27001)~~ - Premature for pre-mainnet product
 
 ---
 
@@ -218,11 +297,13 @@ solana-lockbox/
 |---------|----------------------|----------------|
 | Storage | 1KB fixed | 1KB - 1MB+ dynamic |
 | Entries | 1 entry | Unlimited |
-| Organization | None | Categories, folders, tags |
-| Search | None | Encrypted blind index search |
-| Sharing | None | Secure asymmetric sharing |
+| Organization | None | Categories + folders |
+| Search | None | Blind index (Q1 2026) |
+| Sharing | None | Asymmetric (Q2 2026) |
 | Subscriptions | Free only | Free + 3 paid tiers |
-| Features | Basic storage | Full password manager |
+| **Social Recovery** | **None** | **Shamir Secret Sharing (Q1 2026)** |
+| **Emergency Access** | **None** | **Time-locked (Q1 2026)** |
+| **Gasless Txns** | **None** | **Subscription pools (Q2 2026)** |
 | UI | Basic | Modern responsive design |
 | Session Mgmt | None | 15-min timeout with lazy init |
 
