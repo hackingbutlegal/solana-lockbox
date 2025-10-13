@@ -145,12 +145,21 @@ impl StorageChunk {
 
         // Get header info before mutable borrows
         let old_offset = self.entry_headers[header_idx].offset as usize;
-        let old_size = self.entry_headers[header_idx].size as usize;
-        let new_size = new_encrypted_data.len();
+        let old_size = self.entry_headers[header_idx].size;
+        let new_size = new_encrypted_data.len() as u32;
 
-        // Calculate size difference
-        let size_diff = new_size as i32 - old_size as i32;
-        let new_total_size = (self.current_size as i32 + size_diff) as u32;
+        // SECURITY: Calculate size difference using checked arithmetic to prevent overflows
+        let new_total_size = if new_size > old_size {
+            // Growing: add the difference
+            self.current_size
+                .checked_add(new_size - old_size)
+                .ok_or(crate::errors::LockboxError::InvalidDataSize)?
+        } else {
+            // Shrinking: subtract the difference
+            self.current_size
+                .checked_sub(old_size - new_size)
+                .ok_or(crate::errors::LockboxError::InvalidDataSize)?
+        };
 
         require!(
             new_total_size <= self.max_capacity,
@@ -158,9 +167,9 @@ impl StorageChunk {
         );
 
         // Replace data at offset
-        if size_diff == 0 {
-            // Same size, just replace
-            self.encrypted_data[old_offset..old_offset + new_size]
+        if new_size == old_size {
+            // Same size, just replace in-place
+            self.encrypted_data[old_offset..old_offset + (new_size as usize)]
                 .copy_from_slice(&new_encrypted_data);
         } else {
             // Different size, need to reorganize
@@ -173,14 +182,25 @@ impl StorageChunk {
             new_data.extend_from_slice(&new_encrypted_data);
 
             // Copy data after this entry
-            if old_offset + old_size < self.encrypted_data.len() {
-                new_data.extend_from_slice(&self.encrypted_data[old_offset + old_size..]);
+            let old_size_usize = old_size as usize;
+            if old_offset + old_size_usize < self.encrypted_data.len() {
+                new_data.extend_from_slice(&self.encrypted_data[old_offset + old_size_usize..]);
             }
 
-            // Update all headers after this one
+            // SECURITY: Update all headers after this one using checked arithmetic
             for (idx, h) in self.entry_headers.iter_mut().enumerate() {
                 if idx > header_idx {
-                    h.offset = (h.offset as i32 + size_diff) as u32;
+                    if new_size > old_size {
+                        // Growing: increase offset
+                        h.offset = h.offset
+                            .checked_add(new_size - old_size)
+                            .ok_or(crate::errors::LockboxError::InvalidEntryOffset)?;
+                    } else {
+                        // Shrinking: decrease offset
+                        h.offset = h.offset
+                            .checked_sub(old_size - new_size)
+                            .ok_or(crate::errors::LockboxError::InvalidEntryOffset)?;
+                    }
                 }
             }
 

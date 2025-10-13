@@ -33,6 +33,7 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
+import { serializeEntry, deserializeEntry, DataCorruptionError, SchemaValidationError, PasswordEntrySchema } from './schema';
 
 // Borsh schema definitions for account deserialization
 class StorageChunkInfoBorsh {
@@ -343,10 +344,15 @@ export class LockboxV2Client {
   }
 
   /**
-   * Encrypt password entry data
+   * Encrypt password entry data with versioning and integrity checking
    */
   private encryptEntry(entry: PasswordEntry, key: Uint8Array): { ciphertext: Uint8Array; nonce: Uint8Array } {
-    const json = JSON.stringify(entry);
+    // Validate entry before encryption
+    const validated = PasswordEntrySchema.parse(entry);
+
+    // Serialize with versioning and checksum
+    const json = serializeEntry(validated);
+
     const nonce = nacl.randomBytes(24);
     const messageUint8 = util.decodeUTF8(json);
     const ciphertext = nacl.secretbox(messageUint8, nonce, key);
@@ -355,7 +361,7 @@ export class LockboxV2Client {
   }
 
   /**
-   * Decrypt password entry data
+   * Decrypt password entry data with validation and migration support
    */
   private decryptEntry(ciphertext: Uint8Array, key: Uint8Array): PasswordEntry | null {
     // Extract nonce from the first 24 bytes
@@ -364,13 +370,27 @@ export class LockboxV2Client {
 
     const decrypted = nacl.secretbox.open(encrypted, nonce, key);
     if (!decrypted) {
+      console.error('Decryption failed: Authentication tag mismatch (wrong key or corrupted data)');
       return null;
     }
 
     try {
-      return JSON.parse(util.encodeUTF8(decrypted));
-    } catch {
-      return null;
+      const json = util.encodeUTF8(decrypted);
+
+      // Deserialize with version checking and validation
+      return deserializeEntry(json);
+    } catch (error) {
+      if (error instanceof DataCorruptionError) {
+        console.error('Data corruption detected:', error.message);
+        throw error; // Bubble up corruption errors
+      } else if (error instanceof SchemaValidationError) {
+        console.error('Schema validation failed:', error.message);
+        console.error('Validation details:', error.zodError);
+        throw error;
+      } else {
+        console.error('Failed to deserialize entry:', error);
+        return null;
+      }
     }
   }
 
@@ -393,13 +413,6 @@ export class LockboxV2Client {
    */
   async initializeMasterLockbox(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
-
-    // Check if already exists
-    const accountInfo = await this.connection.getAccountInfo(masterLockbox);
-    if (accountInfo) {
-      console.log('Master lockbox already exists at:', masterLockbox.toBase58());
-      throw new Error('Master lockbox already initialized');
-    }
 
     console.log('Initializing master lockbox at:', masterLockbox.toBase58());
 
@@ -617,14 +630,34 @@ export class LockboxV2Client {
   }
 
   /**
-   * List all password entries
+   * List all password entries with improved performance and error handling
+   *
+   * @returns Object containing entries and any errors encountered
    */
-  async listPasswords(): Promise<PasswordEntry[]> {
+  async listPasswords(): Promise<{
+    entries: PasswordEntry[];
+    errors: Array<{ entryId: number; chunkIndex: number; error: string }>;
+  }> {
     const master = await this.getMasterLockbox();
     const entries: PasswordEntry[] = [];
+    const errors: Array<{ entryId: number; chunkIndex: number; error: string }> = [];
 
-    for (const chunkInfo of master.storageChunks) {
-      const chunk = await this.getStorageChunk(chunkInfo.chunkIndex);
+    // Fetch all chunks in parallel for better performance
+    const chunkPromises = master.storageChunks.map(chunkInfo =>
+      this.getStorageChunk(chunkInfo.chunkIndex).catch(err => {
+        console.error(`Failed to fetch chunk ${chunkInfo.chunkIndex}:`, err);
+        return null;
+      })
+    );
+
+    const chunks = await Promise.all(chunkPromises);
+
+    // Process each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (!chunk) continue; // Skip failed chunks
+
+      const chunkInfo = master.storageChunks[i];
 
       for (const header of chunk.entryHeaders) {
         try {
@@ -636,13 +669,44 @@ export class LockboxV2Client {
             entry.accessCount = header.accessCount;
             entries.push(entry);
           }
-        } catch (e) {
-          console.error(`Failed to retrieve entry ${header.entryId}:`, e);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          // Different error types need different handling
+          if (error instanceof DataCorruptionError) {
+            errors.push({
+              entryId: header.entryId,
+              chunkIndex: chunkInfo.chunkIndex,
+              error: `Data corruption: ${errorMessage}`
+            });
+          } else if (error instanceof SchemaValidationError) {
+            errors.push({
+              entryId: header.entryId,
+              chunkIndex: chunkInfo.chunkIndex,
+              error: `Invalid schema: ${errorMessage}`
+            });
+          } else {
+            errors.push({
+              entryId: header.entryId,
+              chunkIndex: chunkInfo.chunkIndex,
+              error: `Decryption failed: ${errorMessage}`
+            });
+          }
+
+          console.error(`Failed to retrieve entry ${header.entryId}:`, error);
         }
       }
     }
 
-    return entries;
+    if (errors.length > 0) {
+      console.warn(`⚠️  ${errors.length} entries could not be decrypted. This may indicate:
+        - Data corruption
+        - Wrong encryption key
+        - Schema version mismatch
+        - Incomplete data`);
+    }
+
+    return { entries, errors };
   }
 
   // ============================================================================
@@ -921,6 +985,90 @@ export class LockboxV2Client {
       entriesCount: master.totalEntries,
       chunksCount: master.storageChunksCount,
     };
+  }
+
+  // ============================================================================
+  // Account Management
+  // ============================================================================
+
+  /**
+   * Close master lockbox and reclaim rent
+   *
+   * Permanently deletes the Master Lockbox account and returns all rent to the owner.
+   * This operation is irreversible and will delete all stored passwords.
+   *
+   * @returns Transaction signature
+   */
+  async closeMasterLockbox(): Promise<string> {
+    const [masterLockbox] = this.getMasterLockboxAddress();
+
+    // Check if account exists
+    const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+    if (!accountInfo) {
+      throw new Error('Master lockbox does not exist');
+    }
+
+    console.log('Closing master lockbox at:', masterLockbox.toBase58());
+    console.log('WARNING: This will permanently delete all data and cannot be undone!');
+
+    // Build instruction manually
+    // closeMasterLockbox instruction has no arguments, just the discriminator
+    const instructionData = Buffer.from([
+      // SHA256("global:close_master_lockbox")[0..8]
+      0xf0, 0xa3, 0x38, 0xe7, 0x99, 0xf6, 0x1d, 0x95
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    console.log('Signing transaction...');
+    const signed = await this.wallet.signTransaction(transaction);
+
+    console.log('Sending transaction...');
+    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+
+    console.log('Transaction sent:', signature);
+    console.log('Confirming transaction...');
+
+    const confirmation = await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+
+    console.log('✅ Master lockbox closed successfully! Rent reclaimed.');
+
+    // Clear session key since account no longer exists
+    this.clearSession();
+
+    return signature;
+  }
+
+  /**
+   * Get the master lockbox PDA for easier access
+   */
+  get masterLockboxPDA(): PublicKey {
+    const [pda] = this.getMasterLockboxAddress();
+    return pda;
   }
 
   // ============================================================================

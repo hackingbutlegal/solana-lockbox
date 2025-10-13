@@ -257,8 +257,22 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
       setLoading(true);
       setError(null);
 
-      const fetchedEntries = await client.listPasswords();
-      setEntries(fetchedEntries);
+      const result = await client.listPasswords();
+
+      // Handle new return format with errors
+      setEntries(result.entries);
+
+      // Surface decryption errors to user
+      if (result.errors && result.errors.length > 0) {
+        console.warn(`${result.errors.length} entries could not be decrypted:`, result.errors);
+
+        // Show warning to user (non-blocking)
+        const errorSummary = `Warning: ${result.errors.length} password(s) could not be loaded. This may indicate data corruption or a wrong encryption key.`;
+        setError(errorSummary);
+
+        // Store detailed errors for debugging
+        (window as any).__lockboxDecryptionErrors = result.errors;
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch entries';
       setError(errorMsg);

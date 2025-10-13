@@ -262,6 +262,39 @@ pub mod lockbox {
         instructions::category_management::delete_category_handler(ctx, category_id)
     }
 
+    /// Close Master Lockbox account and reclaim rent (v2)
+    ///
+    /// Permanently deletes the Master Lockbox account and returns all rent
+    /// to the owner. This operation is irreversible and will delete all
+    /// stored data.
+    ///
+    /// # Security
+    /// - Only the account owner can close their account
+    /// - All lamports (rent) are returned to the owner
+    /// - Account is marked for garbage collection
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful closure
+    /// * `Err(LockboxError::Unauthorized)` if signer is not owner
+    pub fn close_master_lockbox(ctx: Context<CloseMasterLockbox>) -> Result<()> {
+        instructions::close_account::close_master_lockbox_handler(ctx)
+    }
+
+    /// Close a storage chunk and reclaim rent (v2)
+    ///
+    /// Closes an individual storage chunk and returns rent to the owner.
+    /// Should be called before closing the Master Lockbox for maximum
+    /// rent recovery.
+    ///
+    /// # Arguments
+    /// * `chunk_index` - Index of the chunk to close
+    pub fn close_storage_chunk(
+        ctx: Context<CloseStorageChunk>,
+        chunk_index: u16,
+    ) -> Result<()> {
+        instructions::close_account::close_storage_chunk_handler(ctx, chunk_index)
+    }
+
     // ============================================================================
     // V1 Instructions - Legacy (Backward Compatibility)
     // ============================================================================

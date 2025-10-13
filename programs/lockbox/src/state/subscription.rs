@@ -1,16 +1,21 @@
 use anchor_lang::prelude::*;
 
 /// Subscription tiers for storage capacity
+///
+/// CRITICAL: These discriminants must NEVER change. The numeric values are
+/// stored on-chain and changing them would corrupt subscription data.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
+#[repr(u8)]
 pub enum SubscriptionTier {
     /// Free tier: 1KB storage (~10 passwords)
-    Free,
+    Free = 0,
     /// Basic tier: 10KB storage (~100 passwords) - 0.001 SOL/month
-    Basic,
+    Basic = 1,
     /// Premium tier: 100KB storage (~1,000 passwords) - 0.01 SOL/month
-    Premium,
+    Premium = 2,
     /// Enterprise tier: 1MB+ storage (unlimited) - 0.1 SOL/month
-    Enterprise,
+    Enterprise = 3,
+    // Reserve 4-254 for future tiers
 }
 
 impl SubscriptionTier {
@@ -81,35 +86,45 @@ pub struct StorageChunkInfo {
 }
 
 /// Types of storage chunks
+///
+/// CRITICAL: These discriminants must NEVER change.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
+#[repr(u8)]
 pub enum StorageType {
     /// Password entries
-    Passwords,
+    Passwords = 0,
     /// Shared vault items
-    SharedItems,
+    SharedItems = 1,
     /// Search index
-    SearchIndex,
+    SearchIndex = 2,
     /// Audit logs
-    AuditLogs,
+    AuditLogs = 3,
+    // Reserve 4-254 for future use
 }
 
 /// Password entry types
+///
+/// CRITICAL: These discriminants must NEVER change. Adding new types is safe,
+/// but reordering or changing existing values will corrupt all stored data.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
+#[repr(u8)]
 pub enum PasswordEntryType {
     /// Login credentials (username/password)
-    Login,
+    Login = 0,
     /// Credit card
-    CreditCard,
+    CreditCard = 1,
     /// Secure note
-    SecureNote,
+    SecureNote = 2,
     /// Identity information
-    Identity,
+    Identity = 3,
     /// API key
-    ApiKey,
+    ApiKey = 4,
     /// SSH key
-    SshKey,
+    SshKey = 5,
     /// Cryptocurrency wallet
-    CryptoWallet,
+    CryptoWallet = 6,
+    // Reserve 7-254 for future use
+    // 255 could be used for "Unknown" during migration
 }
 
 /// Password entry metadata header

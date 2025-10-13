@@ -32,9 +32,7 @@ export function PasswordManager() {
   const { publicKey } = useWallet();
   const {
     client,
-    sessionKey,
     isInitialized,
-    initializeSession,
     masterLockbox,
     entries,
     refreshEntries,
@@ -62,16 +60,17 @@ export function PasswordManager() {
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // DON'T initialize session automatically - only when needed for encryption/decryption
   // The session key is only required for storing/retrieving passwords, not for viewing the lockbox
 
   // Refresh entries when master lockbox is loaded (but only if session exists)
   useEffect(() => {
-    if (masterLockbox && sessionKey) {
+    if (masterLockbox && isInitialized) {
       refreshEntries();
     }
-  }, [masterLockbox, sessionKey, refreshEntries]);
+  }, [masterLockbox, isInitialized, refreshEntries]);
 
   // Filtered and sorted entries
   const filteredEntries = useMemo(() => {
@@ -111,19 +110,25 @@ export function PasswordManager() {
 
   // Handle create entry
   const handleCreateEntry = async (entry: PasswordEntry) => {
+    console.log('[DEBUG] handleCreateEntry called with:', entry);
     try {
       // Sanitize input
       const sanitized = sanitizePasswordEntry(entry);
+      console.log('[DEBUG] Sanitized entry:', sanitized);
 
+      console.log('[DEBUG] Calling createEntry...');
       const entryId = await createEntry(sanitized as PasswordEntry);
+      console.log('[DEBUG] Entry created with ID:', entryId);
 
       if (entryId) {
         setShowCreateModal(false);
-        // TODO: Show success notification
+        alert(`✅ Password saved successfully! Entry ID: ${entryId}`);
+      } else {
+        alert('❌ Failed to create password entry. Check console for details.');
       }
     } catch (err) {
-      console.error('Failed to create entry:', err);
-      // TODO: Show error notification
+      console.error('[DEBUG] Failed to create entry:', err);
+      alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -594,6 +599,8 @@ export function PasswordManager() {
   // Main password manager UI
   const tierInfo = TIER_INFO[masterLockbox.subscriptionTier];
 
+  console.log('[DEBUG] PasswordManager render - showCreateModal:', showCreateModal, 'entryModalMode:', entryModalMode);
+
   return (
     <div className="password-manager">
       <header className="pm-header">
@@ -616,10 +623,23 @@ export function PasswordManager() {
         <aside className="pm-sidebar">
           <button
             className="btn-new-entry"
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[DEBUG] New Password button clicked');
+              console.log('[DEBUG] showCreateModal BEFORE:', showCreateModal);
+
+              // Force state change by toggling: first set to false, then to true
+              // This ensures React sees a state change even if already true
+              setShowCreateModal(false);
               setEntryModalMode('create');
               setSelectedEntry(null);
-              setShowCreateModal(true);
+
+              // Use setTimeout to ensure the false state is applied first
+              setTimeout(() => {
+                setShowCreateModal(true);
+                console.log('[DEBUG] Modal opened');
+              }, 0);
             }}
             disabled={loading}
           >
@@ -716,6 +736,16 @@ export function PasswordManager() {
               </div>
             </div>
           )}
+
+          <div className="sidebar-section danger-zone">
+            <h3>Danger Zone</h3>
+            <button
+              className="btn-danger"
+              onClick={() => setShowResetModal(true)}
+            >
+              ⚠️ Reset Account
+            </button>
+          </div>
         </aside>
 
         {/* Main Content */}
@@ -824,10 +854,17 @@ export function PasswordManager() {
       </div>
 
       {/* Password Entry Modal (Create/Edit/View) */}
-      {(showCreateModal || showEditModal || showDetailsModal) && selectedEntry === null && entryModalMode === 'create' && (
+      {(() => {
+        console.log('[DEBUG] Modal render - showCreateModal:', showCreateModal, 'entryModalMode:', entryModalMode);
+        return null;
+      })()}
+      {showCreateModal && entryModalMode === 'create' && (
         <PasswordEntryModal
           isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => {
+            console.log('[DEBUG] Closing create modal');
+            setShowCreateModal(false);
+          }}
           onSave={handleCreateEntry}
           mode="create"
         />
@@ -922,6 +959,130 @@ export function PasswordManager() {
           console.log('Delete category:', id);
         }}
       />
+
+      {/* Reset Account Modal */}
+      {showResetModal && (
+        <div className="modal-overlay" onClick={() => setShowResetModal(false)}>
+          <div className="modal-content reset-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>⚠️ Reset Account</h2>
+              <button className="modal-close" onClick={() => setShowResetModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="warning-box">
+                <h3>🚨 Warning: Permanent Data Loss</h3>
+                <p>
+                  Resetting your account will permanently delete all stored passwords and cannot be undone.
+                  Make sure you have backed up any important passwords before proceeding.
+                </p>
+              </div>
+
+              <div className="account-info">
+                <h3>Your Master Lockbox PDA</h3>
+                <div className="pda-address-box">
+                  <code className="pda-address">
+                    {client?.masterLockboxPDA?.toString() || 'Not available'}
+                  </code>
+                  <button
+                    className="btn-copy"
+                    onClick={() => {
+                      if (client?.masterLockboxPDA) {
+                        navigator.clipboard.writeText(client.masterLockboxPDA.toString());
+                        alert('PDA address copied to clipboard!');
+                      }
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="instructions-box">
+                <h3>Option 1: Permanent Account Closure</h3>
+                <p>Permanently close your account and reclaim all rent (irreversible):</p>
+                <button
+                  className="btn-danger-action"
+                  onClick={async () => {
+                    if (!client) return;
+
+                    const confirmed = window.confirm(
+                      '⚠️ WARNING: This will permanently delete ALL passwords and cannot be undone!\n\n' +
+                      'Are you absolutely sure you want to close your account and reclaim rent?'
+                    );
+
+                    if (!confirmed) return;
+
+                    try {
+                      setShowResetModal(false);
+
+                      const signature = await client.closeMasterLockbox();
+
+                      alert(`✅ Account closed successfully!\n\nTransaction: ${signature}\n\nRent has been returned to your wallet.\n\nThe page will now reload.`);
+
+                      // Clear session and reload
+                      sessionStorage.clear();
+                      setTimeout(() => window.location.reload(), 1000);
+                    } catch (error: any) {
+                      console.error('Failed to close account:', error);
+
+                      // Check if error is due to already processed transaction
+                      if (error.message?.includes('already been processed') ||
+                          error.message?.includes('AlreadyProcessed')) {
+                        alert('✅ Your account may have already been closed.\n\nThe page will reload to reflect the current state.');
+                        sessionStorage.clear();
+                        setTimeout(() => window.location.reload(), 1000);
+                      } else if (error.message?.includes('AccountNotFound') ||
+                                 error.message?.includes('not found')) {
+                        alert('✅ Account is already closed.\n\nThe page will reload.');
+                        sessionStorage.clear();
+                        setTimeout(() => window.location.reload(), 1000);
+                      } else {
+                        alert(`❌ Failed to close account:\n\n${error.message || 'Unknown error'}\n\nPlease try refreshing the page.`);
+                      }
+                    }
+                  }}
+                >
+                  ⚠️ Close Account & Reclaim Rent
+                </button>
+
+                <h3 style={{ marginTop: '1.5rem' }}>Option 2: Quick Reset (Session Only)</h3>
+                <p>Clear your local session and start fresh (account remains on-chain):</p>
+                <button
+                  className="btn-reset"
+                  onClick={() => {
+                    if (window.confirm('Clear local session and reload? Your on-chain data will remain intact.')) {
+                      // Clear session storage
+                      sessionStorage.clear();
+                      // Reload page
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  Clear Session & Reload
+                </button>
+              </div>
+
+              <div className="explorer-link">
+                <a
+                  href={`https://explorer.solana.com/address/${client?.masterLockboxPDA?.toString()}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-explorer"
+                >
+                  View on Solana Explorer ↗
+                </a>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowResetModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .password-manager {
@@ -1340,6 +1501,309 @@ export function PasswordManager() {
         .entry-date {
           font-size: 0.8rem;
           color: #95a5a6;
+        }
+
+        /* Danger Zone */
+        .danger-zone {
+          border-top: 2px solid #fee;
+          padding-top: 1rem;
+          margin-top: 1rem;
+        }
+
+        .danger-zone h3 {
+          color: #e74c3c;
+        }
+
+        .btn-danger {
+          width: 100%;
+          background: #fee;
+          color: #e74c3c;
+          border: 1px solid #fcc;
+          border-radius: 8px;
+          padding: 0.75rem;
+          font-size: 0.95rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-danger:hover {
+          background: #fcc;
+          border-color: #e74c3c;
+        }
+
+        /* Reset Modal */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 16px;
+          max-width: 700px;
+          width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .reset-modal .modal-header {
+          padding: 1.5rem;
+          border-bottom: 1px solid #e1e8ed;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .reset-modal .modal-header h2 {
+          margin: 0;
+          font-size: 1.5rem;
+          color: #e74c3c;
+        }
+
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 2rem;
+          color: #7f8c8d;
+          cursor: pointer;
+          padding: 0;
+          width: 2rem;
+          height: 2rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+          background: #f8f9fa;
+          color: #2c3e50;
+        }
+
+        .reset-modal .modal-body {
+          padding: 1.5rem;
+        }
+
+        .warning-box {
+          background: #fee;
+          border: 2px solid #e74c3c;
+          border-radius: 8px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .warning-box h3 {
+          margin: 0 0 0.5rem 0;
+          color: #c0392b;
+          font-size: 1.1rem;
+        }
+
+        .warning-box p {
+          margin: 0;
+          color: #e74c3c;
+          line-height: 1.6;
+        }
+
+        .account-info {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .account-info h3 {
+          margin: 0 0 0.75rem 0;
+          font-size: 1rem;
+          color: #2c3e50;
+        }
+
+        .pda-address-box {
+          display: flex;
+          gap: 0.5rem;
+          align-items: center;
+        }
+
+        .pda-address {
+          flex: 1;
+          background: white;
+          padding: 0.75rem;
+          border: 1px solid #e1e8ed;
+          border-radius: 6px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.85rem;
+          color: #2c3e50;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+
+        .btn-copy {
+          background: #667eea;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          padding: 0.75rem 1rem;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.2s;
+        }
+
+        .btn-copy:hover {
+          background: #5568d3;
+        }
+
+        .instructions-box {
+          margin-bottom: 1.5rem;
+        }
+
+        .instructions-box h3 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1rem;
+          color: #2c3e50;
+        }
+
+        .instructions-box p {
+          margin: 0.5rem 0;
+          color: #7f8c8d;
+          line-height: 1.6;
+        }
+
+        .code-block {
+          background: #2c3e50;
+          color: #ecf0f1;
+          padding: 1rem;
+          border-radius: 6px;
+          overflow-x: auto;
+          font-family: 'Courier New', monospace;
+          font-size: 0.85rem;
+          margin: 0.5rem 0;
+        }
+
+        .btn-danger-action {
+          background: #e74c3c;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 0.75rem 1.5rem;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-top: 0.5rem;
+          width: 100%;
+        }
+
+        .btn-danger-action:hover {
+          background: #c0392b;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn-reset {
+          background: #f39c12;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 0.75rem 1.5rem;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-top: 0.5rem;
+          width: 100%;
+        }
+
+        .btn-reset:hover {
+          background: #e67e22;
+        }
+
+        .explorer-link {
+          text-align: center;
+        }
+
+        .btn-explorer {
+          display: inline-block;
+          background: #667eea;
+          color: white;
+          text-decoration: none;
+          padding: 0.75rem 1.5rem;
+          border-radius: 8px;
+          font-weight: 600;
+          transition: all 0.2s;
+        }
+
+        .btn-explorer:hover {
+          background: #5568d3;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .reset-modal .modal-footer {
+          padding: 1rem 1.5rem;
+          border-top: 1px solid #e1e8ed;
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+        }
+
+        .btn-secondary {
+          background: #95a5a6;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 0.75rem 1.5rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+          background: #7f8c8d;
+        }
+
+        /* Mobile responsive for reset modal */
+        @media (max-width: 768px) {
+          .modal-overlay {
+            padding: 0;
+          }
+
+          .modal-content {
+            max-height: 100vh;
+            border-radius: 0;
+          }
+
+          .reset-modal .modal-header h2 {
+            font-size: 1.25rem;
+          }
+
+          .pda-address {
+            font-size: 0.75rem;
+          }
+
+          .code-block {
+            font-size: 0.75rem;
+          }
+
+          .reset-modal .modal-footer {
+            flex-direction: column;
+          }
+
+          .btn-secondary,
+          .btn-reset,
+          .btn-explorer {
+            width: 100%;
+          }
         }
       `}</style>
     </div>
