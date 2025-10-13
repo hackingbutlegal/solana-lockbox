@@ -260,6 +260,38 @@ export function PasswordManager() {
             color: #2c3e50;
             font-size: 1.1rem;
           }
+
+          /* Mobile responsive */
+          @media (max-width: 768px) {
+            .pm-header {
+              padding: 0.75rem;
+            }
+
+            .pm-header-content {
+              padding: 0;
+            }
+
+            .pm-header h1 {
+              font-size: 1.2rem;
+            }
+
+            .pm-connect-prompt {
+              padding: 1rem;
+            }
+
+            .connect-card {
+              padding: 2rem 1.5rem;
+              max-width: 100%;
+            }
+
+            .connect-card h2 {
+              font-size: 1.5rem;
+            }
+
+            .feature-list li {
+              font-size: 1rem;
+            }
+          }
         `}</style>
       </div>
     );
@@ -504,6 +536,47 @@ export function PasswordManager() {
             margin-bottom: 1rem;
             color: #c33;
           }
+
+          /* Mobile responsive */
+          @media (max-width: 768px) {
+            .pm-header {
+              padding: 0.75rem;
+            }
+
+            .pm-header-content {
+              padding: 0;
+            }
+
+            .pm-header h1 {
+              font-size: 1.2rem;
+            }
+
+            .pm-setup-prompt {
+              padding: 1rem;
+            }
+
+            .setup-card {
+              padding: 2rem 1.5rem;
+              max-width: 100%;
+            }
+
+            .setup-card h2 {
+              font-size: 1.3rem;
+            }
+
+            .btn-primary {
+              padding: 0.875rem 1.5rem;
+              font-size: 1rem;
+            }
+
+            .info-box {
+              padding: 1rem;
+            }
+
+            .info-box h3 {
+              font-size: 1rem;
+            }
+          }
         `}</style>
       </div>
     );
@@ -724,7 +797,10 @@ export function PasswordManager() {
         .pm-header {
           background: white;
           border-bottom: 1px solid #e1e8ed;
-          padding: 1rem 2rem;
+          padding: 1rem;
+          position: sticky;
+          top: 0;
+          z-index: 100;
         }
 
         .pm-header-content {
@@ -733,6 +809,7 @@ export function PasswordManager() {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          padding: 0 1rem;
         }
 
         .pm-header h1 {
@@ -760,6 +837,7 @@ export function PasswordManager() {
           padding: 0.25rem 0.75rem;
           border-radius: 12px;
           font-weight: 600;
+          font-size: 0.85rem;
         }
 
         .storage-used {
@@ -770,10 +848,68 @@ export function PasswordManager() {
           max-width: 1400px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: 250px 1fr;
+          grid-template-columns: 280px 1fr;
           gap: 2rem;
           padding: 2rem;
           min-height: calc(100vh - 80px);
+        }
+
+        /* Tablet and below */
+        @media (max-width: 1024px) {
+          .pm-container {
+            grid-template-columns: 1fr;
+            padding: 1rem;
+            gap: 1rem;
+          }
+
+          .pm-sidebar {
+            order: 2;
+            max-width: 100%;
+          }
+
+          .pm-main {
+            order: 1;
+          }
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+          .pm-header {
+            padding: 0.75rem;
+          }
+
+          .pm-header-content {
+            padding: 0;
+          }
+
+          .pm-header h1 {
+            font-size: 1.2rem;
+          }
+
+          .header-actions {
+            gap: 0.5rem;
+            flex-wrap: wrap;
+          }
+
+          .storage-info {
+            font-size: 0.75rem;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+          }
+
+          .pm-container {
+            padding: 0.75rem;
+          }
+
+          .pm-toolbar {
+            flex-direction: column;
+          }
+
+          .toolbar-actions {
+            width: 100%;
+            flex-wrap: wrap;
+          }
         }
 
         .pm-sidebar {
@@ -976,6 +1112,17 @@ export function PasswordManager() {
 
         .entry-grid {
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        }
+
+        /* Mobile grid view */
+        @media (max-width: 768px) {
+          .entry-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .view-toggle {
+            display: none; /* Hide grid/list toggle on mobile */
+          }
         }
 
         .entry-card {
