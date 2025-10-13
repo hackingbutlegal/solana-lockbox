@@ -166,6 +166,102 @@ pub mod lockbox {
         instructions::subscription::downgrade_subscription_handler(ctx)
     }
 
+    /// Expand an existing storage chunk (v2)
+    ///
+    /// Uses Solana's realloc to dynamically increase chunk capacity without
+    /// creating new accounts. More efficient for gradual storage growth.
+    ///
+    /// # Arguments
+    /// * `additional_size` - Bytes to add (max 10KB per call)
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful expansion
+    /// * `Err(LockboxError)` if expansion fails validation
+    pub fn expand_chunk(
+        ctx: Context<ExpandChunk>,
+        additional_size: u32,
+    ) -> Result<()> {
+        instructions::chunk_management::expand_chunk_handler(ctx, additional_size)
+    }
+
+    /// Initialize category registry (v2)
+    ///
+    /// Creates the category registry account for organizing password entries.
+    /// Requires Basic subscription tier or higher.
+    pub fn initialize_category_registry(
+        ctx: Context<InitializeCategoryRegistry>,
+    ) -> Result<()> {
+        instructions::category_management::initialize_category_registry_handler(ctx)
+    }
+
+    /// Create a new category (v2)
+    ///
+    /// Adds a user-defined category for organizing password entries.
+    /// Category names are encrypted client-side before storage.
+    ///
+    /// # Arguments
+    /// * `name_encrypted` - Encrypted category name (max 64 bytes)
+    /// * `icon` - Icon identifier (0-255)
+    /// * `color` - Color code (0-15)
+    /// * `parent_id` - Optional parent category for hierarchy
+    pub fn create_category(
+        ctx: Context<CreateCategory>,
+        name_encrypted: Vec<u8>,
+        icon: u8,
+        color: u8,
+        parent_id: Option<u8>,
+    ) -> Result<()> {
+        instructions::category_management::create_category_handler(
+            ctx,
+            name_encrypted,
+            icon,
+            color,
+            parent_id,
+        )
+    }
+
+    /// Update an existing category (v2)
+    ///
+    /// Modifies category metadata. All parameters are optional.
+    ///
+    /// # Arguments
+    /// * `category_id` - ID of category to update
+    /// * `name_encrypted` - New encrypted name (optional)
+    /// * `icon` - New icon (optional)
+    /// * `color` - New color (optional)
+    /// * `parent_id` - New parent category (optional)
+    pub fn update_category(
+        ctx: Context<UpdateCategory>,
+        category_id: u8,
+        name_encrypted: Option<Vec<u8>>,
+        icon: Option<u8>,
+        color: Option<u8>,
+        parent_id: Option<Option<u8>>,
+    ) -> Result<()> {
+        instructions::category_management::update_category_handler(
+            ctx,
+            category_id,
+            name_encrypted,
+            icon,
+            color,
+            parent_id,
+        )
+    }
+
+    /// Delete a category (v2)
+    ///
+    /// Removes a category from the registry. Category must be empty
+    /// (no password entries assigned to it).
+    ///
+    /// # Arguments
+    /// * `category_id` - ID of category to delete
+    pub fn delete_category(
+        ctx: Context<DeleteCategory>,
+        category_id: u8,
+    ) -> Result<()> {
+        instructions::category_management::delete_category_handler(ctx, category_id)
+    }
+
     // ============================================================================
     // V1 Instructions - Legacy (Backward Compatibility)
     // ============================================================================

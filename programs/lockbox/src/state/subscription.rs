@@ -51,6 +51,14 @@ impl SubscriptionTier {
             _ => false,
         }
     }
+
+    /// Check if this tier supports categories (Basic and above)
+    pub fn supports_categories(&self) -> bool {
+        matches!(
+            self,
+            SubscriptionTier::Basic | SubscriptionTier::Premium | SubscriptionTier::Enterprise
+        )
+    }
 }
 
 /// Storage chunk metadata stored in MasterLockbox

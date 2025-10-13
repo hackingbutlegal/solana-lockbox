@@ -73,4 +73,10 @@ pub enum LockboxError {
 
     #[msg("Rate limit exceeded: please wait before retrying")]
     RateLimitExceeded,
+
+    #[msg("Chunk expansion would exceed maximum chunk size")]
+    ChunkTooLarge,
+
+    #[msg("Realloc increment exceeds maximum (10KB per call)")]
+    ReallocTooLarge,
 }

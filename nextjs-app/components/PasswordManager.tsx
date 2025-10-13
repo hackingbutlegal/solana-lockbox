@@ -7,6 +7,11 @@ import { useLockboxV2 } from '../contexts/LockboxV2Context';
 import { PasswordEntry, PasswordEntryType, TIER_INFO } from '../sdk/src/types-v2';
 import { searchEntries, sortEntries, groupByCategory, checkPasswordStrength, analyzePasswordHealth } from '../sdk/src/utils';
 import { sanitizePasswordEntry } from '../lib/input-sanitization';
+import { PasswordGeneratorModal } from './PasswordGeneratorModal';
+import { PasswordEntryModal } from './PasswordEntryModal';
+import { TOTPManagerModal } from './TOTPManagerModal';
+import { HealthDashboardModal } from './HealthDashboardModal';
+import { CategoryManagerModal } from './CategoryManagerModal';
 
 /**
  * Password Manager Dashboard
@@ -53,6 +58,10 @@ export function PasswordManager() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<PasswordEntry | null>(null);
+  const [showTOTPModal, setShowTOTPModal] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
 
   // DON'T initialize session automatically - only when needed for encryption/decryption
   // The session key is only required for storing/retrieving passwords, not for viewing the lockbox
@@ -607,11 +616,38 @@ export function PasswordManager() {
         <aside className="pm-sidebar">
           <button
             className="btn-new-entry"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              setEntryModalMode('create');
+              setSelectedEntry(null);
+              setShowCreateModal(true);
+            }}
             disabled={loading}
           >
             + New Password
           </button>
+
+          <div className="sidebar-section">
+            <h3>Tools</h3>
+            <button
+              className="tool-btn"
+              onClick={() => setShowHealthModal(true)}
+            >
+              📊 Health Dashboard
+            </button>
+            <button
+              className="tool-btn"
+              onClick={() => setShowTOTPModal(true)}
+              disabled={entries.filter(e => e.totpSecret).length === 0}
+            >
+              🔐 2FA Codes ({entries.filter(e => e.totpSecret).length})
+            </button>
+            <button
+              className="tool-btn"
+              onClick={() => setShowCategoryModal(true)}
+            >
+              📂 Categories
+            </button>
+          </div>
 
           <div className="sidebar-section">
             <h3>Quick Filter</h3>
@@ -755,6 +791,7 @@ export function PasswordManager() {
                   className="entry-card"
                   onClick={() => {
                     setSelectedEntry(entry);
+                    setEntryModalMode('view');
                     setShowDetailsModal(true);
                   }}
                 >
@@ -786,7 +823,105 @@ export function PasswordManager() {
         </main>
       </div>
 
-      {/* Modals would go here - will implement in next step */}
+      {/* Password Entry Modal (Create/Edit/View) */}
+      {(showCreateModal || showEditModal || showDetailsModal) && selectedEntry === null && entryModalMode === 'create' && (
+        <PasswordEntryModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSave={handleCreateEntry}
+          mode="create"
+        />
+      )}
+
+      {showDetailsModal && selectedEntry && entryModalMode === 'view' && (
+        <PasswordEntryModal
+          isOpen={showDetailsModal}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedEntry(null);
+          }}
+          onSave={(entry) => {
+            // Switch to edit mode when user wants to edit
+            setEntryModalMode('edit');
+            setShowEditModal(true);
+            setShowDetailsModal(false);
+          }}
+          onDelete={() => handleDeleteEntry(selectedEntry)}
+          entry={selectedEntry}
+          mode="view"
+        />
+      )}
+
+      {showEditModal && selectedEntry && entryModalMode === 'edit' && (
+        <PasswordEntryModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedEntry(null);
+            setEntryModalMode('view');
+          }}
+          onSave={handleUpdateEntry}
+          entry={selectedEntry}
+          mode="edit"
+        />
+      )}
+
+      {/* TOTP Manager Modal */}
+      <TOTPManagerModal
+        isOpen={showTOTPModal}
+        onClose={() => setShowTOTPModal(false)}
+        entries={entries
+          .filter(e => e.totpSecret)
+          .map(e => ({
+            id: e.id || 0,
+            title: e.title,
+            secret: e.totpSecret || '',
+            accountName: e.username,
+            issuer: e.url ? new URL(e.url).hostname : undefined,
+          }))}
+      />
+
+      {/* Health Dashboard Modal */}
+      <HealthDashboardModal
+        isOpen={showHealthModal}
+        onClose={() => setShowHealthModal(false)}
+        entries={entries.map(e => ({
+          id: e.id || 0,
+          title: e.title,
+          password: e.password,
+          lastModified: typeof e.lastModified === 'number' ? e.lastModified : Math.floor(e.lastModified.getTime() / 1000),
+          url: e.url,
+          username: e.username,
+        }))}
+        onEditEntry={(entryId) => {
+          const entry = entries.find(e => e.id === entryId);
+          if (entry) {
+            setSelectedEntry(entry);
+            setEntryModalMode('edit');
+            setShowEditModal(true);
+            setShowHealthModal(false);
+          }
+        }}
+      />
+
+      {/* Category Manager Modal */}
+      <CategoryManagerModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        categories={[]} // TODO: Implement category storage
+        onCreateCategory={async (name, icon, color, parentId) => {
+          // TODO: Implement category creation
+          console.log('Create category:', { name, icon, color, parentId });
+        }}
+        onUpdateCategory={async (id, name, icon, color) => {
+          // TODO: Implement category update
+          console.log('Update category:', { id, name, icon, color });
+        }}
+        onDeleteCategory={async (id) => {
+          // TODO: Implement category deletion
+          console.log('Delete category:', id);
+        }}
+      />
 
       <style jsx>{`
         .password-manager {
@@ -976,6 +1111,32 @@ export function PasswordManager() {
         .filter-btn.active {
           background: #667eea;
           color: white;
+        }
+
+        .tool-btn {
+          width: 100%;
+          background: white;
+          border: 1px solid #e1e8ed;
+          text-align: left;
+          padding: 0.75rem;
+          border-radius: 8px;
+          cursor: pointer;
+          color: #2c3e50;
+          font-size: 0.95rem;
+          transition: all 0.2s;
+          margin-bottom: 0.5rem;
+          font-weight: 500;
+        }
+
+        .tool-btn:hover:not(:disabled) {
+          background: #f8f9fa;
+          border-color: #667eea;
+          transform: translateX(2px);
+        }
+
+        .tool-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .health-summary {
