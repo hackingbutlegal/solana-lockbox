@@ -132,7 +132,31 @@ export function PasswordManager() {
       }
     } catch (err) {
       console.error('[DEBUG] Failed to create entry:', err);
-      toast.showError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+      // Check if this is a storage limit error
+      // IMPORTANT: Storage limit validation happens in the SDK BEFORE creating any Solana transaction,
+      // which means users are NEVER charged transaction fees when storage limits are exceeded.
+      // The validation occurs at client-v2.ts:538-552, before any transaction is signed or sent.
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('STORAGE_LIMIT_EXCEEDED')) {
+        // Extract the tier info from error message
+        const match = errorMessage.match(/your (\w+) tier/);
+        const currentTier = match ? match[1] : 'Free';
+
+        toast.showWarning(
+          `Storage limit reached! Your ${currentTier} tier doesn't have enough space for this entry. ` +
+          `Please upgrade your subscription or delete some entries to free up space.`,
+          8000 // Show for 8 seconds
+        );
+      } else if (errorMessage.includes('AccountDidNotSerialize') || errorMessage.includes('0xbbc')) {
+        toast.showError(
+          `Program error: The master lockbox account needs more space to store chunk metadata. ` +
+          `This is a limitation of the current program deployment. Please contact support or reset your account.`,
+          10000
+        );
+      } else {
+        toast.showError(`Error: ${errorMessage}`);
+      }
     }
   };
 

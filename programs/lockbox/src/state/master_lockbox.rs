@@ -54,8 +54,18 @@ impl MasterLockbox {
     /// Seeds for PDA derivation
     pub const SEEDS_PREFIX: &'static [u8] = b"master_lockbox";
 
-    /// Initial space calculation for account creation
-    pub const INIT_SPACE: usize = 8 + // discriminator
+    /// Size of a single StorageChunkInfo entry
+    /// - chunk_address: 32 bytes (Pubkey)
+    /// - chunk_index: 2 bytes (u16)
+    /// - max_capacity: 4 bytes (u32)
+    /// - size_used: 4 bytes (u32)
+    /// - data_type: 1 byte (u8 enum)
+    /// - created_at: 8 bytes (i64)
+    /// - last_modified: 8 bytes (i64)
+    const STORAGE_CHUNK_INFO_SIZE: usize = 32 + 2 + 4 + 4 + 1 + 8 + 8;
+
+    /// Base space without any storage chunks
+    const BASE_SPACE: usize = 8 + // discriminator
         32 + // owner
         8 +  // total_entries
         2 +  // storage_chunks_count
@@ -64,12 +74,21 @@ impl MasterLockbox {
         8 +  // subscription_expires
         8 +  // total_capacity
         8 +  // storage_used
-        4 +  // storage_chunks vec length (starts at 0)
+        4 +  // storage_chunks vec length
         4 +  // encrypted_index vec length (starts at 0)
         8 +  // next_entry_id
         4 +  // categories_count
         8 +  // created_at
         1;   // bump
+
+    /// Initial space calculation for account creation (0 chunks)
+    pub const INIT_SPACE: usize = Self::BASE_SPACE;
+
+    /// Calculate space needed for a specific number of chunks
+    /// Used by realloc to dynamically grow the account
+    pub fn calculate_space(num_chunks: usize) -> usize {
+        Self::BASE_SPACE + (num_chunks * Self::STORAGE_CHUNK_INFO_SIZE)
+    }
 
     /// Initialize a new master lockbox
     pub fn initialize(

@@ -533,6 +533,24 @@ export class LockboxV2Client {
 
     // Get master lockbox to find appropriate chunk
     const master = await this.getMasterLockbox();
+    const tierInfo = TIER_INFO[master.subscriptionTier];
+
+    // IMPORTANT: Check if entry would exceed storage capacity BEFORE creating any transaction
+    // This validation happens client-side before any Solana transaction is constructed,
+    // ensuring that users are NEVER charged transaction fees when storage limits are exceeded.
+    // If this check fails, no transaction is signed, sent, or confirmed - therefore no fees are incurred.
+    const newTotalUsed = master.storageUsed + combined.length;
+    if (newTotalUsed > tierInfo.maxCapacity) {
+      const usedKB = (master.storageUsed / 1024).toFixed(2);
+      const maxKB = (tierInfo.maxCapacity / 1024).toFixed(2);
+      const entryKB = (combined.length / 1024).toFixed(2);
+
+      throw new Error(
+        `STORAGE_LIMIT_EXCEEDED: Entry size (${entryKB} KB) would exceed your ${tierInfo.name} tier limit. ` +
+        `Used: ${usedKB} KB / ${maxKB} KB. Please upgrade to a higher tier or delete some entries.`
+      );
+    }
+
     let chunkIndex = this.findChunkWithSpace(master, combined.length);
 
     if (chunkIndex === -1) {
@@ -896,7 +914,47 @@ export class LockboxV2Client {
       const storageChunksLen = data.readUInt32LE(offset);
       offset += 4;
       const storageChunks = [];
-      // Vec is empty for now, skip reading items
+
+      // Read each StorageChunkInfo (if any exist)
+      for (let i = 0; i < storageChunksLen; i++) {
+        // chunk_address (32 bytes)
+        const chunkAddress = new PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        // chunk_index (u16, 2 bytes)
+        const chunkIndex = data.readUInt16LE(offset);
+        offset += 2;
+
+        // max_capacity (u32, 4 bytes)
+        const maxCapacity = data.readUInt32LE(offset);
+        offset += 4;
+
+        // size_used (u32, 4 bytes)
+        const sizeUsed = data.readUInt32LE(offset);
+        offset += 4;
+
+        // data_type (u8, 1 byte)
+        const dataType = data.readUInt8(offset);
+        offset += 1;
+
+        // created_at (i64, 8 bytes)
+        const chunkCreatedAt = Number(data.readBigInt64LE(offset));
+        offset += 8;
+
+        // last_modified (i64, 8 bytes)
+        const lastModified = Number(data.readBigInt64LE(offset));
+        offset += 8;
+
+        storageChunks.push({
+          chunkAddress,
+          chunkIndex,
+          maxCapacity,
+          sizeUsed,
+          dataType,
+          createdAt: chunkCreatedAt,
+          lastModified,
+        });
+      }
 
       // Read encrypted_index vec (4-byte length + data)
       const encryptedIndexLen = data.readUInt32LE(offset);

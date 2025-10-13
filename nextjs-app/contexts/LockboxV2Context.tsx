@@ -322,7 +322,8 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create entry';
       setError(errorMsg);
-      return null;
+      // Re-throw error so calling component can handle it with UI feedback
+      throw err;
     } finally {
       setLoading(false);
     }

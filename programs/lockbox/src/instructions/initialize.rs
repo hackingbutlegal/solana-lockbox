@@ -37,11 +37,16 @@ pub fn handler(ctx: Context<InitializeMasterLockbox>) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(chunk_index: u16, initial_capacity: u32)]
 pub struct InitializeStorageChunk<'info> {
+    /// Master lockbox account that needs to expand to store chunk metadata
+    /// Uses realloc to dynamically grow the account as more chunks are added
     #[account(
         mut,
         seeds = [MasterLockbox::SEEDS_PREFIX, owner.key().as_ref()],
         bump = master_lockbox.bump,
-        constraint = master_lockbox.owner == owner.key() @ crate::errors::LockboxError::Unauthorized
+        constraint = master_lockbox.owner == owner.key() @ crate::errors::LockboxError::Unauthorized,
+        realloc = MasterLockbox::calculate_space(master_lockbox.storage_chunks.len() + 1),
+        realloc::payer = owner,
+        realloc::zero = false,
     )]
     pub master_lockbox: Account<'info, MasterLockbox>,
 
