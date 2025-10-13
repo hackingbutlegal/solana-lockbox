@@ -43,6 +43,9 @@ interface LockboxV2ContextType {
   updateEntry: (chunkIndex: number, entryId: number, entry: PasswordEntry) => Promise<boolean>;
   deleteEntry: (chunkIndex: number, entryId: number) => Promise<boolean>;
 
+  // Subscription Management
+  upgradeSubscription: (newTier: SubscriptionTier) => Promise<void>;
+
   // Loading States
   loading: boolean;
   error: string | null;
@@ -428,6 +431,41 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     }
   }, [client, getSessionKey, refreshEntries, initializeSession, isSessionTimedOut, clearSession, updateActivity]);
 
+  // Upgrade subscription tier
+  const upgradeSubscription = useCallback(async (newTier: SubscriptionTier): Promise<void> => {
+    if (!client) {
+      setError('Client not initialized');
+      throw new Error('Client not initialized');
+    }
+
+    // SECURITY FIX (C-3): Check for session timeout
+    if (getSessionKey() && isSessionTimedOut()) {
+      clearSession();
+      const errorMsg = 'Session expired. Please sign in again.';
+      setError(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // SECURITY FIX (C-3): Update activity timestamp
+    updateActivity();
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      await client.upgradeSubscription(newTier);
+
+      // Refresh master lockbox after upgrade to get updated tier info
+      await refreshMasterLockbox();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to upgrade subscription';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [client, getSessionKey, refreshMasterLockbox, isSessionTimedOut, clearSession, updateActivity]);
+
   // SECURITY FIX (C-3): Automatic session timeout checking
   // Poll every 30 seconds to check for timeout
   useEffect(() => {
@@ -481,6 +519,7 @@ export function LockboxV2Provider({ children, programId }: LockboxV2ProviderProp
     createEntry,
     updateEntry,
     deleteEntry,
+    upgradeSubscription,
     loading,
     error,
   };

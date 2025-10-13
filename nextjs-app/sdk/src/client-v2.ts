@@ -263,6 +263,7 @@ export class LockboxV2Client {
   readonly wallet: any;
   readonly feeReceiver: PublicKey;
   private sessionKey: Uint8Array | null = null;
+  private pendingTransactions: Set<string> = new Set();
 
   constructor(options: LockboxV2ClientOptions) {
     this.connection = options.connection;
@@ -414,52 +415,76 @@ export class LockboxV2Client {
   async initializeMasterLockbox(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    console.log('Initializing master lockbox at:', masterLockbox.toBase58());
-
-    // Build instruction manually
-    const instruction = new TransactionInstruction({
-      programId: PROGRAM_ID,
-      keys: [
-        { pubkey: masterLockbox, isSigner: false, isWritable: true },
-        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      data: INSTRUCTION_DISCRIMINATORS.initializeMasterLockbox,
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = this.wallet.publicKey;
-
-    // Get fresh blockhash to avoid transaction replay
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
-    transaction.recentBlockhash = blockhash;
-
-    console.log('Signing transaction...');
-    const signed = await this.wallet.signTransaction(transaction);
-
-    console.log('Sending transaction...');
-    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
-
-    console.log('Transaction sent:', signature);
-    console.log('Confirming transaction...');
-
-    // Wait for confirmation with block height
-    const confirmation = await this.connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, 'confirmed');
-
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    // Prevent duplicate initialization attempts
+    const operationKey = `init-${masterLockbox.toBase58()}`;
+    if (this.pendingTransactions.has(operationKey)) {
+      throw new Error('Initialization already in progress');
     }
 
-    console.log('✅ Master lockbox initialized successfully!');
+    try {
+      this.pendingTransactions.add(operationKey);
 
-    return signature;
+      console.log('Initializing master lockbox at:', masterLockbox.toBase58());
+
+      // Build instruction manually
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: INSTRUCTION_DISCRIMINATORS.initializeMasterLockbox,
+      });
+
+      const transaction = new Transaction().add(instruction);
+      transaction.feePayer = this.wallet.publicKey;
+
+      // Get fresh blockhash to avoid transaction replay
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+
+      console.log('Signing and sending transaction...');
+
+      // Use sendTransaction if available (preferred for wallet adapters)
+      // This prevents double-sending issues with wallets that auto-send after signing
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        // Fallback to manual signing + sending
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
+
+      console.log('Transaction sent:', signature);
+      console.log('Confirming transaction...');
+
+      // Wait for confirmation with block height
+      const confirmation = await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('✅ Master lockbox initialized successfully!');
+
+      return signature;
+    } finally {
+      this.pendingTransactions.delete(operationKey);
+    }
   }
 
   /**
@@ -619,14 +644,25 @@ export class LockboxV2Client {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
     transaction.recentBlockhash = blockhash;
 
-    console.log('[storePassword] Signing transaction...');
-    const signed = await this.wallet.signTransaction(transaction);
+    console.log('[storePassword] Signing and sending transaction...');
 
-    console.log('[storePassword] Sending transaction...');
-    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
+    // Use sendTransaction if available (preferred for wallet adapters)
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      // Fallback to manual signing + sending
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
 
     console.log('[storePassword] Transaction sent:', signature);
     console.log('[storePassword] Confirming transaction...');
@@ -1131,65 +1167,93 @@ export class LockboxV2Client {
   async closeMasterLockbox(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    // Check if account exists
-    const accountInfo = await this.connection.getAccountInfo(masterLockbox);
-    if (!accountInfo) {
-      throw new Error('Master lockbox does not exist');
+    // Create a unique key for this operation to prevent duplicate submissions
+    const operationKey = `close-${masterLockbox.toBase58()}`;
+
+    // Check if this operation is already in progress
+    if (this.pendingTransactions.has(operationKey)) {
+      throw new Error('Close operation already in progress');
     }
 
-    console.log('Closing master lockbox at:', masterLockbox.toBase58());
-    console.log('WARNING: This will permanently delete all data and cannot be undone!');
+    try {
+      // Mark operation as pending
+      this.pendingTransactions.add(operationKey);
 
-    // Build instruction manually
-    // closeMasterLockbox instruction has no arguments, just the discriminator
-    const instructionData = Buffer.from([
-      // SHA256("global:close_master_lockbox")[0..8]
-      0xf0, 0xa3, 0x38, 0xe7, 0x99, 0xf6, 0x1d, 0x95
-    ]);
+      // Check if account exists
+      const accountInfo = await this.connection.getAccountInfo(masterLockbox);
+      if (!accountInfo) {
+        throw new Error('Master lockbox does not exist');
+      }
 
-    const instruction = new TransactionInstruction({
-      programId: PROGRAM_ID,
-      keys: [
-        { pubkey: masterLockbox, isSigner: false, isWritable: true },
-        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-      ],
-      data: instructionData,
-    });
+      console.log('Closing master lockbox at:', masterLockbox.toBase58());
+      console.log('WARNING: This will permanently delete all data and cannot be undone!');
 
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = this.wallet.publicKey;
+      // Build instruction manually
+      // closeMasterLockbox instruction has no arguments, just the discriminator
+      const instructionData = Buffer.from([
+        // SHA256("global:close_master_lockbox")[0..8]
+        0xf0, 0xa3, 0x38, 0xe7, 0x99, 0xf6, 0x1d, 0x95
+      ]);
 
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
-    transaction.recentBlockhash = blockhash;
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        ],
+        data: instructionData,
+      });
 
-    console.log('Signing transaction...');
-    const signed = await this.wallet.signTransaction(transaction);
+      const transaction = new Transaction().add(instruction);
+      transaction.feePayer = this.wallet.publicKey;
 
-    console.log('Sending transaction...');
-    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
 
-    console.log('Transaction sent:', signature);
-    console.log('Confirming transaction...');
+      console.log('Signing and sending transaction...');
 
-    const confirmation = await this.connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, 'confirmed');
+      // Use sendTransaction if available (preferred for wallet adapters)
+      // This prevents double-sending issues with wallets that auto-send after signing
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        // Fallback to manual signing + sending
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
 
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      console.log('Transaction sent:', signature);
+      console.log('Confirming transaction...');
+
+      const confirmation = await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('✅ Master lockbox closed successfully! Rent reclaimed.');
+
+      // Clear session key since account no longer exists
+      this.clearSession();
+
+      return signature;
+    } finally {
+      // Always remove from pending, even if there's an error
+      this.pendingTransactions.delete(operationKey);
     }
-
-    console.log('✅ Master lockbox closed successfully! Rent reclaimed.');
-
-    // Clear session key since account no longer exists
-    this.clearSession();
-
-    return signature;
   }
 
   /**

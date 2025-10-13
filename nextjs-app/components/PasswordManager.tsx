@@ -12,6 +12,8 @@ import { PasswordEntryModal } from './PasswordEntryModal';
 import { TOTPManagerModal } from './TOTPManagerModal';
 import { HealthDashboardModal } from './HealthDashboardModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
+import { StorageUsageBar } from './StorageUsageBar';
+import { SubscriptionUpgradeModal } from './SubscriptionUpgradeModal';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
 
@@ -32,7 +34,7 @@ type SortOrder = 'asc' | 'desc';
 
 export function PasswordManager() {
   const toast = useToast();
-  const confirm = useConfirm();
+  const { confirm } = useConfirm();
   const { publicKey } = useWallet();
   const {
     client,
@@ -43,6 +45,7 @@ export function PasswordManager() {
     createEntry,
     updateEntry,
     deleteEntry,
+    upgradeSubscription,
     loading,
     error,
   } = useLockboxV2();
@@ -63,6 +66,7 @@ export function PasswordManager() {
   const [showTOTPModal, setShowTOTPModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
 
@@ -212,6 +216,19 @@ export function PasswordManager() {
     } catch (err) {
       console.error('Failed to delete entry:', err);
       toast.showError('Failed to delete password entry');
+    }
+  };
+
+  // Handle subscription upgrade
+  const handleUpgradeSubscription = async (newTier: number) => {
+    try {
+      await upgradeSubscription(newTier);
+      toast.showSuccess(`Successfully upgraded to ${TIER_INFO[newTier].name} tier!`);
+      setShowUpgradeModal(false);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to upgrade subscription';
+      console.error('Upgrade failed:', err);
+      toast.showError(`Upgrade failed: ${errorMsg}`);
     }
   };
 
@@ -783,6 +800,14 @@ export function PasswordManager() {
 
         {/* Main Content */}
         <main className="pm-main">
+          {/* Storage Usage Bar */}
+          <StorageUsageBar
+            used={masterLockbox.storageUsed}
+            total={tierInfo.maxCapacity}
+            tier={masterLockbox.subscriptionTier}
+            onUpgrade={() => setShowUpgradeModal(true)}
+          />
+
           {/* Toolbar */}
           <div className="pm-toolbar">
             <div className="search-bar">
@@ -992,6 +1017,16 @@ export function PasswordManager() {
           console.log('Delete category:', id);
         }}
       />
+
+      {/* Subscription Upgrade Modal */}
+      {masterLockbox && (
+        <SubscriptionUpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          currentTier={masterLockbox.subscriptionTier}
+          onUpgrade={handleUpgradeSubscription}
+        />
+      )}
 
       {/* Reset Account Modal */}
       {showResetModal && (

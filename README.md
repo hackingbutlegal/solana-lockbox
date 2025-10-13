@@ -1,13 +1,13 @@
 # 🔒 Solana Lockbox v2.0
 ## Decentralized Password Manager
 
-> **🚧 Pre-Production Development**  
-> This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.  
-> For the production v1.1 release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
+> **🚧 Active Development - Pre-Production**
+> This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.
+> For the previous v1.0 pre-production release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Status**: ✅ Live on Devnet with Dynamic Storage
+**Current Status**: ✅ Live on Devnet - Fully Functional
 **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
-**Last Deployed**: October 13, 2025 (Realloc Implementation)
+**Last Deployed**: October 13, 2025 (Phase 5: Subscription UI Complete)
 **Target Mainnet**: Q1 2026
 **Network**: Solana Devnet → Mainnet Beta
 
@@ -71,10 +71,11 @@ Master Lockbox Account
 
 ## Documentation
 
-📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** ⭐ NEW
+📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** ⭐ COMPLETE
 Complete v2 deployment guide including:
 - Current devnet deployment status
-- Recent critical fixes (discriminators, INIT_SPACE)
+- All critical fixes (discriminators, INIT_SPACE, transaction handling, realloc)
+- Phase 5 subscription UI implementation
 - Program instructions and discriminators
 - Testing procedures
 - Troubleshooting common issues
@@ -86,14 +87,7 @@ Complete technical specification for v2.0 architecture, including:
 - Encrypted search implementation
 - Secure sharing protocol
 - Subscription management system
-- 12-month implementation roadmap
-
-📖 **[MIGRATION_GUIDE_V2.md](./MIGRATION_GUIDE_V2.md)**
-Migration path from v1.1 to v2.0, including:
-- Backward compatibility strategy
-- Data migration procedures
-- Client-side migration helpers
-- Testing and rollback plans
+- Implementation roadmap and phases
 
 ---
 
@@ -133,42 +127,60 @@ Visit http://localhost:3000
 
 ## Development Roadmap
 
-### Phase 1: Foundation (Months 1-3) ✅ Partially Complete
+### Phase 1: Foundation (October 2025) ✅ Complete
 - [x] Multi-tier storage architecture (MasterLockbox + StorageChunks)
 - [x] Dynamic chunk allocation (realloc implementation)
 - [x] Storage chunks with automatic expansion
 - [x] Enhanced password entry schema (v2 with compression)
-- [ ] Subscription tier system (Basic/Premium/Enterprise UI pending)
+- [x] Transaction deduplication and wallet adapter fixes
+- [x] Fixed discriminators and INIT_SPACE calculations
+- [x] Client-side encryption (XChaCha20-Poly1305)
+- [x] Wallet-derived keys with HKDF
+- [x] Session management with 15-minute timeout
 
-### Phase 2: Search & Organization (Months 2-4)
+### Phase 5: Subscription System UI (October 2025) ✅ Complete
+- [x] Subscription tier display component (SubscriptionCard)
+- [x] Subscription upgrade modal with payment flow
+- [x] Storage usage visualization with tier limits
+- [x] Integration with on-chain upgradeSubscription instruction
+- [x] Real-time storage monitoring and warnings
+- [x] Responsive design for mobile/tablet/desktop
+- [x] Lazy signature prompts (single wallet signature)
+
+### Phase 2: Search & Organization (Q1 2026)
 - [ ] Blind index search system
 - [ ] Fuzzy search on client
 - [ ] Folder/tag organization
 - [ ] Batch operations
+- [ ] Import/export functionality
 
-### Phase 3: Security Enhancements (Months 3-5)
-- [ ] Secure sharing protocol
+### Phase 3: Security Enhancements (Q1 2026)
+- [ ] Secure sharing protocol (asymmetric encryption)
 - [ ] Permission management
 - [ ] Audit log infrastructure
 - [ ] 2FA/TOTP support
+- [ ] Password history tracking
 
-### Phase 4: Subscription System (Months 4-6)
-- [ ] Subscription management
-- [ ] Payment processing
+### Phase 4: Subscription Management (Q2 2026)
+- [ ] Subscription renewal flow
+- [ ] Payment history and invoices
 - [ ] Auto-renewal system
+- [ ] Downgrade handling
 - [ ] Revenue distribution
 
-### Phase 5: Advanced Features (Months 5-7)
-- [ ] Password generator
+### Phase 6: Advanced Features (Q2-Q3 2026)
+- [ ] Password generator with strength options
 - [ ] Password health analyzer
-- [ ] Breach monitoring
-- [ ] Browser extension
+- [ ] Breach monitoring integration
+- [ ] Browser extension (Chrome/Firefox)
+- [ ] Mobile applications
 
-### Phase 6: Enterprise Features (Months 6-12)
-- [ ] Team management
+### Phase 7: Enterprise Features (Q3-Q4 2026)
+- [ ] Team management and sharing
 - [ ] Advanced audit logging
-- [ ] Custom branding
-- [ ] API access
+- [ ] Custom branding options
+- [ ] API access for integrations
+- [ ] SSO support
 
 ---
 
@@ -184,22 +196,26 @@ solana-lockbox/
 ├── nextjs-app/                # Next.js 15 frontend
 │   ├── app/                  # App router pages
 │   ├── components/           # React components
+│   │   ├── PasswordManager.tsx
+│   │   ├── SubscriptionCard.tsx
+│   │   ├── SubscriptionUpgradeModal.tsx
+│   │   └── StorageUsageBar.tsx
 │   └── lib/                  # Crypto & utilities
 ├── sdk/                       # TypeScript SDK
 │   ├── src/
-│   │   ├── index.ts          # SDK client
-│   │   └── types.ts          # Type definitions
+│   │   ├── client-v2.ts      # SDK client
+│   │   └── types-v2.ts       # Type definitions
 ├── PASSWORD_MANAGER_EXPANSION.md  # Technical spec
-├── MIGRATION_GUIDE_V2.md         # Migration guide
+├── DEPLOYMENT_V2.md              # Deployment guide
 └── README.md                     # This file
 ```
 
 ---
 
-## Comparison with v1.1
+## Comparison with v1.0 Pre-Production
 
-| Feature | v1.1 (lockbox) | v2.0 (solana-lockbox) |
-|---------|---------------|---------------------|
+| Feature | v1.0 (pre-production) | v2.0 (current) |
+|---------|----------------------|----------------|
 | Storage | 1KB fixed | 1KB - 1MB+ dynamic |
 | Entries | 1 entry | Unlimited |
 | Organization | None | Categories, folders, tags |
@@ -207,6 +223,8 @@ solana-lockbox/
 | Sharing | None | Secure asymmetric sharing |
 | Subscriptions | Free only | Free + 3 paid tiers |
 | Features | Basic storage | Full password manager |
+| UI | Basic | Modern responsive design |
+| Session Mgmt | None | 15-min timeout with lazy init |
 
 ---
 
@@ -230,10 +248,10 @@ ISC
 
 ## Links
 
-- **v1.1 Production**: https://github.com/hackingbutlegal/lockbox
-- **v2.0 Development**: https://github.com/hackingbutlegal/solana-lockbox
+- **v1.0 Pre-Production**: https://github.com/hackingbutlegal/lockbox
+- **v2.0 Current Development**: https://github.com/hackingbutlegal/solana-lockbox
 - **Creator**: [@0xgraffito](https://x.com/0xgraffito)
-- **Documentation**: See PASSWORD_MANAGER_EXPANSION.md
+- **Documentation**: See DEPLOYMENT_V2.md and PASSWORD_MANAGER_EXPANSION.md
 
 ---
 

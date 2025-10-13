@@ -802,8 +802,287 @@ Each time a chunk is added:
 
 ---
 
+### Issue 7: Transaction Double-Submission (October 13, 2025)
+
+**Problem**: All transactions (initialize, store, close) were being processed twice, causing `SendTransactionError: This transaction has already been processed` errors. Users experienced duplicate transaction confirmations and failed operations.
+
+**Error Details**:
+```
+SendTransactionError: Simulation failed
+Message: This transaction has already been processed
+Location: initializeMasterLockbox, storePassword, closeMasterLockbox
+```
+
+**Root Cause**:
+The SDK was using `wallet.signTransaction()` followed by `connection.sendRawTransaction()`. However, modern Solana wallet adapters (Phantom, Solflare) have a `sendTransaction()` method that **automatically sends** the transaction after signing. This caused:
+1. User clicks button → wallet signs and auto-sends transaction
+2. SDK then calls `sendRawTransaction()` with signed transaction
+3. Result: Transaction sent twice to the network
+
+**The Fix - Wallet Adapter Compatibility**:
+
+1. **Added transaction deduplication** in `client-v2.ts` (line 266):
+```typescript
+export class LockboxV2Client {
+  // ... other properties
+  private pendingTransactions: Set<string> = new Set();
+```
+
+2. **Updated transaction sending pattern** (applied to all transaction methods):
+```typescript
+// Check for duplicate operations
+const operationKey = `init-${masterLockbox.toBase58()}`;
+if (this.pendingTransactions.has(operationKey)) {
+  throw new Error('Operation already in progress');
+}
+
+try {
+  this.pendingTransactions.add(operationKey);
+
+  // Build transaction...
+
+  // Use sendTransaction if available (preferred for wallet adapters)
+  let signature: string;
+  if (this.wallet.sendTransaction) {
+    signature = await this.wallet.sendTransaction(transaction, this.connection, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
+  } else {
+    // Fallback to manual signing + sending for older wallets
+    const signed = await this.wallet.signTransaction(transaction);
+    signature = await this.connection.sendRawTransaction(signed.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
+  }
+
+  // Confirmation logic...
+  return signature;
+} finally {
+  this.pendingTransactions.delete(operationKey);
+}
+```
+
+**Methods Updated**:
+- `initializeMasterLockbox()` (lines 415-477)
+- `storePassword()` (lines 647-674)
+- `closeMasterLockbox()` (lines 1202-1230)
+
+**Benefits**:
+- ✅ No more duplicate transactions
+- ✅ Compatible with modern wallet adapters
+- ✅ Fallback support for older wallets
+- ✅ Added retry logic (`maxRetries: 3`)
+- ✅ Prevents concurrent duplicate operations
+
+**Files Modified**:
+- `/Users/graffito/solana-lockbox/nextjs-app/sdk/src/client-v2.ts`
+
+---
+
+### Issue 8: useConfirm Hook Destructuring Error (October 13, 2025)
+
+**Problem**: "Close account and reclaim rent" functionality was broken with `TypeError: confirm is not a function` at `PasswordManager.tsx:1077:45`.
+
+**Root Cause**:
+The `useConfirm()` hook returns an object `{ confirm: function }`, but the code was treating it as if it returned the function directly.
+
+**The Bug**:
+```typescript
+// BEFORE (line 37):
+const confirm = useConfirm();
+
+// Later usage:
+await confirm({ title: '...', message: '...' }); // ❌ TypeError: confirm is not a function
+```
+
+**The Fix**:
+```typescript
+// AFTER (line 37):
+const { confirm } = useConfirm(); // ✅ Proper destructuring
+
+// Later usage:
+await confirm({ title: '...', message: '...' }); // ✅ Works correctly
+```
+
+**Hook Definition** (from `ConfirmDialog.tsx`):
+```typescript
+export const useConfirm = () => {
+  const context = useContext(ConfirmContext);
+  if (!context) {
+    throw new Error('useConfirm must be used within a ConfirmProvider');
+  }
+  return context; // Returns { confirm: function }, not the function directly
+};
+```
+
+**Files Modified**:
+- `/Users/graffito/solana-lockbox/nextjs-app/components/PasswordManager.tsx`
+
+---
+
+### Phase 5: Subscription System UI Complete (October 13, 2025)
+
+**Overview**: Implemented complete user interface for subscription management, allowing users to view, upgrade, and monitor their storage subscriptions directly from the password manager.
+
+**New Components Created**:
+
+1. **SubscriptionCard.tsx** - Display subscription tiers with pricing
+   - Shows all 4 tiers (Free, Basic, Premium, Enterprise)
+   - Visual indicators for current tier
+   - Pricing information (SOL/month)
+   - Storage capacity display
+   - Feature comparisons
+   - Upgrade call-to-action buttons
+
+2. **SubscriptionUpgradeModal.tsx** - Two-step upgrade flow
+   - **Step 1: Tier Selection**
+     - Compare tier features side-by-side
+     - Highlight storage increases
+     - Show pricing differences
+   - **Step 2: Payment Confirmation**
+     - Review upgrade details
+     - Display payment amount in SOL
+     - On-chain transaction via `upgradeSubscription` instruction
+     - Success/error feedback
+
+3. **StorageUsageBar.tsx** - Storage visualization and monitoring
+   - Real-time storage usage display (used/total)
+   - Visual progress bar with color-coded status:
+     - Green (< 80%): Storage Available
+     - Orange (80-95%): Storage Low
+     - Red (≥ 95%): Storage Nearly Full
+   - Current tier badge
+   - Automatic upgrade prompts when approaching limit
+   - Warning messages at capacity
+
+**Context Integration** (`LockboxV2Context.tsx`):
+```typescript
+// Added upgradeSubscription method
+const upgradeSubscription = useCallback(async (newTier: SubscriptionTier): Promise<void> => {
+  if (!client) {
+    throw new Error('Client not initialized');
+  }
+
+  // Check for session timeout (SECURITY FIX C-3)
+  if (getSessionKey() && isSessionTimedOut()) {
+    clearSession();
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  // Update activity timestamp
+  updateActivity();
+
+  try {
+    setLoading(true);
+    setError(null);
+
+    await client.upgradeSubscription(newTier);
+
+    // Refresh master lockbox after upgrade to get updated tier info
+    await refreshMasterLockbox();
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to upgrade subscription';
+    setError(errorMsg);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}, [client, getSessionKey, refreshMasterLockbox, isSessionTimedOut, clearSession, updateActivity]);
+```
+
+**Password Manager Integration**:
+- Storage usage bar displayed at top of vault
+- Upgrade modal triggered from storage warnings
+- Subscription cards accessible from account menu
+- Real-time updates after successful upgrade
+
+**On-Chain Integration**:
+- Uses `upgradeSubscription` instruction (discriminator: `0x55, 0xef, 0x7d, 0xeb, 0xc7, 0xe6, 0xa6, 0xf6`)
+- Transfers payment to fee receiver
+- Updates `subscription_tier` and `subscription_expires` in MasterLockbox
+- Increases `total_capacity` based on new tier
+
+**Subscription Tiers**:
+```typescript
+export const TIER_INFO: Record<SubscriptionTier, TierInfo> = {
+  [SubscriptionTier.Free]: {
+    name: 'Free',
+    price: 0,
+    maxCapacity: 1024,              // 1KB
+    maxChunks: 1,
+    maxEntriesPerChunk: 10,
+  },
+  [SubscriptionTier.Basic]: {
+    name: 'Basic',
+    price: 0.001,                   // 0.001 SOL/month
+    maxCapacity: 10240,             // 10KB
+    maxChunks: 2,
+    maxEntriesPerChunk: 100,
+  },
+  [SubscriptionTier.Premium]: {
+    name: 'Premium',
+    price: 0.01,                    // 0.01 SOL/month
+    maxCapacity: 102400,            // 100KB
+    maxChunks: 10,
+    maxEntriesPerChunk: 1000,
+  },
+  [SubscriptionTier.Enterprise]: {
+    name: 'Enterprise',
+    price: 0.1,                     // 0.1 SOL/month
+    maxCapacity: 1048576,           // 1MB
+    maxChunks: 100,
+    maxEntriesPerChunk: 10000,
+  },
+};
+```
+
+**Responsive Design**:
+- Mobile-first approach with touch targets
+- Breakpoints at 768px (mobile) and 1024px (tablet)
+- Stacked layouts on smaller screens
+- Full-width components on mobile
+
+**User Experience**:
+- Visual feedback during upgrade process
+- Clear pricing and capacity information
+- Automatic prompts when approaching storage limits
+- Success notifications after upgrade
+- Error handling with user-friendly messages
+
+**Files Created**:
+- `/Users/graffito/solana-lockbox/nextjs-app/components/SubscriptionCard.tsx`
+- `/Users/graffito/solana-lockbox/nextjs-app/components/SubscriptionUpgradeModal.tsx`
+- `/Users/graffito/solana-lockbox/nextjs-app/components/StorageUsageBar.tsx`
+
+**Files Modified**:
+- `/Users/graffito/solana-lockbox/nextjs-app/contexts/LockboxV2Context.tsx`
+- `/Users/graffito/solana-lockbox/nextjs-app/components/PasswordManager.tsx`
+
+**Testing Flow**:
+1. ✅ View current subscription and storage usage
+2. ✅ Click upgrade when approaching storage limit
+3. ✅ Compare tiers and select desired upgrade
+4. ✅ Review and confirm payment
+5. ✅ Transaction sent to blockchain
+6. ✅ UI updates to reflect new tier and capacity
+7. ✅ Storage usage bar reflects increased capacity
+
+**What This Enables**:
+- ✅ Complete subscription management UI
+- ✅ Self-service upgrades without admin intervention
+- ✅ Real-time storage monitoring
+- ✅ Automatic upgrade prompts
+- ✅ Foundation for subscription renewals (Phase 4)
+- 🔜 Payment history and invoice tracking (future)
+
+---
+
 **Last Updated**: October 13, 2025
-**Version**: v2.0.1-devnet (Realloc Implementation)
-**Status**: ✅ Live on Devnet with Dynamic Storage
+**Version**: v2.0.2-devnet (Phase 5: Subscription UI Complete)
+**Status**: ✅ Live on Devnet - Fully Functional
 
 Created with <3 by [GRAFFITO](https://x.com/0xgraffito)
