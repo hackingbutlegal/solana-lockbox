@@ -526,41 +526,112 @@ export class LockboxV2Client {
     combined.set(nonce);
     combined.set(ciphertext, nonce.length);
 
+    console.log(`[storePassword] Encrypted data size: ${combined.length} bytes`);
+
     // Generate blind index for title
     const titleHash = this.generateTitleHash(entry.title, sessionKey);
 
     // Get master lockbox to find appropriate chunk
     const master = await this.getMasterLockbox();
-    const chunkIndex = this.findChunkWithSpace(master, combined.length);
+    let chunkIndex = this.findChunkWithSpace(master, combined.length);
 
     if (chunkIndex === -1) {
       // Need to create a new chunk
+      console.log(`[storePassword] No chunk with space, creating chunk ${master.storageChunksCount}`);
       await this.initializeStorageChunk(master.storageChunksCount);
+      chunkIndex = master.storageChunksCount; // Use the newly created chunk
     }
 
     const [masterLockbox] = this.getMasterLockboxAddress();
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-    const tx = await (this.program.methods as any)
-      .storePasswordEntry(
-        chunkIndex,
-        Buffer.from(combined),
-        entry.type || PasswordEntryType.Login,
-        entry.category || 0,
-        titleHash
-      )
-      .accounts({
-        masterLockbox,
-        storageChunk,
-        owner: this.wallet.publicKey,
-      })
-      .rpc();
+    console.log(`[storePassword] Using chunk ${chunkIndex}`);
+    console.log(`[storePassword] Master lockbox: ${masterLockbox.toBase58()}`);
+    console.log(`[storePassword] Storage chunk: ${storageChunk.toBase58()}`);
+
+    // Build instruction data: discriminator + args
+    // Args: chunk_index (u16) + encrypted_data (vec<u8>) + entry_type (u8) + category (u32) + title_hash ([u8; 32])
+    const argsBuffer = Buffer.alloc(2 + 4 + combined.length + 1 + 4 + 32);
+    let offset = 0;
+
+    // chunk_index (u16)
+    argsBuffer.writeUInt16LE(chunkIndex, offset);
+    offset += 2;
+
+    // encrypted_data (vec<u8>) - length prefix + data
+    argsBuffer.writeUInt32LE(combined.length, offset);
+    offset += 4;
+    combined.forEach((byte, i) => {
+      argsBuffer[offset + i] = byte;
+    });
+    offset += combined.length;
+
+    // entry_type (u8)
+    argsBuffer.writeUInt8(entry.type || PasswordEntryType.Login, offset);
+    offset += 1;
+
+    // category (u32)
+    argsBuffer.writeUInt32LE(entry.category || 0, offset);
+    offset += 4;
+
+    // title_hash ([u8; 32])
+    titleHash.forEach((byte, i) => {
+      argsBuffer[offset + i] = byte;
+    });
+
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.storePasswordEntry,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: storageChunk, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    console.log('[storePassword] Signing transaction...');
+    const signed = await this.wallet.signTransaction(transaction);
+
+    console.log('[storePassword] Sending transaction...');
+    const signature = await this.connection.sendRawTransaction(signed.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+
+    console.log('[storePassword] Transaction sent:', signature);
+    console.log('[storePassword] Confirming transaction...');
+
+    const confirmation = await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+
+    console.log('✅ Password entry stored successfully!');
 
     // Fetch updated master to get entry ID
     const updatedMaster = await this.getMasterLockbox();
-    const entryId = updatedMaster.nextEntryId - 1;
+    const entryId = Number(updatedMaster.nextEntryId) - 1;
 
-    return { txSignature: tx, entryId };
+    console.log(`[storePassword] Entry ID: ${entryId}`);
+
+    return { txSignature: signature, entryId };
   }
 
   /**
