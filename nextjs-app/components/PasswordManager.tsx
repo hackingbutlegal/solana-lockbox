@@ -12,6 +12,8 @@ import { PasswordEntryModal } from './PasswordEntryModal';
 import { TOTPManagerModal } from './TOTPManagerModal';
 import { HealthDashboardModal } from './HealthDashboardModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
+import { useToast } from './Toast';
+import { useConfirm } from './ConfirmDialog';
 
 /**
  * Password Manager Dashboard
@@ -29,6 +31,8 @@ type SortOption = 'title' | 'lastModified' | 'accessCount';
 type SortOrder = 'asc' | 'desc';
 
 export function PasswordManager() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const { publicKey } = useWallet();
   const {
     client,
@@ -122,13 +126,13 @@ export function PasswordManager() {
 
       if (entryId) {
         setShowCreateModal(false);
-        alert(`✅ Password saved successfully! Entry ID: ${entryId}`);
+        toast.showSuccess(`Password saved successfully! Entry ID: ${entryId}`);
       } else {
-        alert('❌ Failed to create password entry. Check console for details.');
+        toast.showError('Failed to create password entry. Check console for details.');
       }
     } catch (err) {
       console.error('[DEBUG] Failed to create entry:', err);
-      alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.showError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -160,9 +164,13 @@ export function PasswordManager() {
   const handleDeleteEntry = async (entry: PasswordEntry) => {
     if (!entry.id) return;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${entry.title}"? This action cannot be undone.`
-    );
+    const confirmed = await confirm({
+      title: 'Delete Password',
+      message: `Are you sure you want to delete "${entry.title}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true
+    });
 
     if (!confirmed) return;
 
@@ -175,11 +183,11 @@ export function PasswordManager() {
       if (success) {
         setShowDetailsModal(false);
         setSelectedEntry(null);
-        // TODO: Show success notification
+        toast.showSuccess('Password deleted successfully');
       }
     } catch (err) {
       console.error('Failed to delete entry:', err);
-      // TODO: Show error notification
+      toast.showError('Failed to delete password entry');
     }
   };
 
@@ -383,6 +391,7 @@ export function PasswordManager() {
                         console.log('Creating password vault...');
                         await client.initializeMasterLockbox();
                         console.log('Vault created! Refreshing page...');
+                        toast.showSuccess('Password vault created! Refreshing page...');
                         // Refresh to show new lockbox
                         setTimeout(() => window.location.reload(), 1000);
                       } catch (err: any) {
@@ -391,10 +400,10 @@ export function PasswordManager() {
                         // Handle specific errors
                         if (err.message?.includes('already initialized') ||
                             err.message?.includes('already been processed')) {
-                          alert('Your password vault already exists! Refreshing page...');
+                          toast.showInfo('Your password vault already exists! Refreshing page...');
                           window.location.reload();
                         } else {
-                          alert(`Failed to create vault: ${err.message || 'Unknown error'}`);
+                          toast.showError(`Failed to create vault: ${err.message || 'Unknown error'}`);
                         }
                       }
                     }
@@ -989,7 +998,7 @@ export function PasswordManager() {
                     onClick={() => {
                       if (client?.masterLockboxPDA) {
                         navigator.clipboard.writeText(client.masterLockboxPDA.toString());
-                        alert('PDA address copied to clipboard!');
+                        toast.showSuccess('PDA address copied to clipboard!');
                       }
                     }}
                   >
@@ -1006,10 +1015,13 @@ export function PasswordManager() {
                   onClick={async () => {
                     if (!client) return;
 
-                    const confirmed = window.confirm(
-                      '⚠️ WARNING: This will permanently delete ALL passwords and cannot be undone!\n\n' +
-                      'Are you absolutely sure you want to close your account and reclaim rent?'
-                    );
+                    const confirmed = await confirm({
+                      title: 'Close Account',
+                      message: 'WARNING: This will permanently delete ALL passwords and cannot be undone!\n\nAre you absolutely sure you want to close your account and reclaim rent?',
+                      confirmText: 'Close Account',
+                      cancelText: 'Cancel',
+                      danger: true
+                    });
 
                     if (!confirmed) return;
 
@@ -1018,7 +1030,7 @@ export function PasswordManager() {
 
                       const signature = await client.closeMasterLockbox();
 
-                      alert(`✅ Account closed successfully!\n\nTransaction: ${signature}\n\nRent has been returned to your wallet.\n\nThe page will now reload.`);
+                      toast.showSuccess(`Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet. The page will now reload.`);
 
                       // Clear session and reload
                       sessionStorage.clear();
@@ -1029,16 +1041,16 @@ export function PasswordManager() {
                       // Check if error is due to already processed transaction
                       if (error.message?.includes('already been processed') ||
                           error.message?.includes('AlreadyProcessed')) {
-                        alert('✅ Your account may have already been closed.\n\nThe page will reload to reflect the current state.');
+                        toast.showInfo('Your account may have already been closed. The page will reload to reflect the current state.');
                         sessionStorage.clear();
                         setTimeout(() => window.location.reload(), 1000);
                       } else if (error.message?.includes('AccountNotFound') ||
                                  error.message?.includes('not found')) {
-                        alert('✅ Account is already closed.\n\nThe page will reload.');
+                        toast.showInfo('Account is already closed. The page will reload.');
                         sessionStorage.clear();
                         setTimeout(() => window.location.reload(), 1000);
                       } else {
-                        alert(`❌ Failed to close account:\n\n${error.message || 'Unknown error'}\n\nPlease try refreshing the page.`);
+                        toast.showError(`Failed to close account: ${error.message || 'Unknown error'}. Please try refreshing the page.`);
                       }
                     }
                   }}
@@ -1050,8 +1062,16 @@ export function PasswordManager() {
                 <p>Clear your local session and start fresh (account remains on-chain):</p>
                 <button
                   className="btn-reset"
-                  onClick={() => {
-                    if (window.confirm('Clear local session and reload? Your on-chain data will remain intact.')) {
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: 'Clear Session',
+                      message: 'Clear local session and reload? Your on-chain data will remain intact.',
+                      confirmText: 'Clear & Reload',
+                      cancelText: 'Cancel',
+                      danger: false
+                    });
+
+                    if (confirmed) {
                       // Clear session storage
                       sessionStorage.clear();
                       // Reload page

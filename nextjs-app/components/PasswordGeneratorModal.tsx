@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PasswordGenerator } from '../lib/password-generator';
+import { useToast } from './Toast';
 
 interface PasswordGeneratorModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface PasswordGeneratorModalProps {
 }
 
 export function PasswordGeneratorModal({ isOpen, onClose, onSelect }: PasswordGeneratorModalProps) {
+  const toast = useToast();
   const [password, setPassword] = useState('');
   const [strength, setStrength] = useState<any>(null);
   const [options, setOptions] = useState({
@@ -47,9 +49,10 @@ export function PasswordGeneratorModal({ isOpen, onClose, onSelect }: PasswordGe
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(password);
-      alert('Password copied to clipboard!');
+      toast.showSuccess('Password copied to clipboard!');
     } catch (error) {
       console.error('Failed to copy:', error);
+      toast.showError('Failed to copy to clipboard');
     }
   };
 

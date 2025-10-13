@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { PasswordEntry, PasswordEntryType } from '../sdk/src/types-v2';
 import { PasswordGeneratorModal } from './PasswordGeneratorModal';
 import { PasswordGenerator } from '../lib/password-generator';
+import { useToast } from './Toast';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export function PasswordEntryModal({
   entry,
   mode,
 }: PasswordEntryModalProps) {
+  const toast = useToast();
   const [formData, setFormData] = useState<Partial<PasswordEntry>>({
     title: '',
     username: '',
@@ -75,9 +77,51 @@ export function PasswordEntryModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.password) {
-      alert('Title and password are required');
+    // Validate title is always required
+    if (!formData.title || formData.title.trim() === '') {
+      toast.showError('Title is required');
       return;
+    }
+
+    // Type-specific validation
+    switch (formData.type) {
+      case PasswordEntryType.SecureNote:
+        // Secure notes require notes content
+        if (!formData.notes || formData.notes.trim() === '') {
+          toast.showError('Note content is required');
+          return;
+        }
+        break;
+
+      case PasswordEntryType.Login:
+      case PasswordEntryType.ApiKey:
+      case PasswordEntryType.SshKey:
+      case PasswordEntryType.CryptoWallet:
+        // These types require a password/key
+        if (!formData.password || formData.password.trim() === '') {
+          toast.showError('Password/Key is required for this entry type');
+          return;
+        }
+        break;
+
+      case PasswordEntryType.CreditCard:
+        // Credit cards require card number (stored in password field)
+        if (!formData.password || formData.password.trim() === '') {
+          toast.showError('Card number is required');
+          return;
+        }
+        break;
+
+      case PasswordEntryType.Identity:
+        // Identity requires full name (stored in username field)
+        if (!formData.username || formData.username.trim() === '') {
+          toast.showError('Full name is required');
+          return;
+        }
+        break;
+
+      default:
+        break;
     }
 
     onSave(formData as PasswordEntry);
@@ -86,9 +130,10 @@ export function PasswordEntryModal({
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label} copied to clipboard!`);
+      toast.showSuccess(`${label} copied to clipboard!`);
     } catch (error) {
       console.error('Failed to copy:', error);
+      toast.showError('Failed to copy to clipboard');
     }
   };
 

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { TOTPManager, BackupCodesGenerator } from '../lib/totp';
+import { useToast } from './Toast';
+import { useConfirm } from './ConfirmDialog';
 
 export interface TOTPEntry {
   id: number;
@@ -24,6 +26,8 @@ interface TOTPCode {
 }
 
 export function TOTPManagerModal({ isOpen, onClose, entries }: TOTPManagerModalProps) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [totpCodes, setTotpCodes] = useState<TOTPCode[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<TOTPEntry | null>(null);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
@@ -70,7 +74,7 @@ export function TOTPManagerModal({ isOpen, onClose, entries }: TOTPManagerModalP
       setTimeout(() => setCopiedId(null), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
-      alert('Failed to copy code');
+      toast.showError('Failed to copy code');
     }
   };
 
@@ -88,10 +92,10 @@ export function TOTPManagerModal({ isOpen, onClose, entries }: TOTPManagerModalP
   const copyAllBackupCodes = async () => {
     try {
       await navigator.clipboard.writeText(backupCodes.join('\n'));
-      alert('All backup codes copied to clipboard!');
+      toast.showSuccess('All backup codes copied to clipboard!');
     } catch (error) {
       console.error('Failed to copy:', error);
-      alert('Failed to copy backup codes');
+      toast.showError('Failed to copy backup codes');
     }
   };
 

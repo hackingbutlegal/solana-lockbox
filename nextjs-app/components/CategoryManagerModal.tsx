@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { CategoryManager } from '../lib/category-manager';
+import { useToast } from './Toast';
+import { useConfirm } from './ConfirmDialog';
 
 export interface Category {
   id: number;
@@ -46,6 +48,8 @@ export function CategoryManagerModal({
   onUpdateCategory,
   onDeleteCategory,
 }: CategoryManagerModalProps) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'categories' | 'templates'>('categories');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -64,32 +68,32 @@ export function CategoryManagerModal({
     if (!onCreateCategory) return;
     try {
       await onCreateCategory(template.name, template.icon, template.color, null);
-      alert(`Created category: ${template.name}`);
+      toast.showSuccess(`Created category: ${template.name}`);
     } catch (error) {
       console.error('Failed to create category:', error);
-      alert('Failed to create category');
+      toast.showError('Failed to create category');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      alert('Category name is required');
+      toast.showWarning('Category name is required');
       return;
     }
 
     try {
       if (editingCategory && onUpdateCategory) {
         await onUpdateCategory(editingCategory.id, formData.name, formData.icon, formData.color);
-        alert('Category updated successfully');
+        toast.showSuccess('Category updated successfully');
       } else if (isCreating && onCreateCategory) {
         await onCreateCategory(formData.name, formData.icon, formData.color, formData.parentId);
-        alert('Category created successfully');
+        toast.showSuccess('Category created successfully');
       }
       handleCancelEdit();
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert('Failed to save category');
+      toast.showError('Failed to save category');
     }
   };
 
@@ -106,20 +110,28 @@ export function CategoryManagerModal({
 
   const handleDelete = async (category: Category) => {
     if (category.entryCount > 0) {
-      alert(`Cannot delete category with ${category.entryCount} entries. Remove entries first.`);
+      toast.showWarning(`Cannot delete category with ${category.entryCount} entries. Remove entries first.`);
       return;
     }
 
-    if (!confirm(`Delete category "${category.name}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Category',
+      message: `Delete category "${category.name}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true
+    });
+
+    if (!confirmed) return;
 
     try {
       if (onDeleteCategory) {
         await onDeleteCategory(category.id);
-        alert('Category deleted successfully');
+        toast.showSuccess('Category deleted successfully');
       }
     } catch (error) {
       console.error('Failed to delete category:', error);
-      alert('Failed to delete category');
+      toast.showError('Failed to delete category');
     }
   };
 
