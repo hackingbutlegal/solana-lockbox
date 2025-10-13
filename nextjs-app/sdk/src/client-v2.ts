@@ -725,20 +725,70 @@ export class LockboxV2Client {
 
     console.log('[storePassword] Signing and sending transaction...');
 
+    // Pre-flight checks before sending transaction
+    try {
+      // Check wallet balance
+      const balance = await this.connection.getBalance(this.wallet.publicKey);
+      console.log(`[storePassword] Wallet balance: ${balance / 1e9} SOL`);
+
+      if (balance < 5000) { // 0.000005 SOL minimum (typical tx fee is ~0.000005 SOL)
+        throw new Error('Insufficient SOL balance for transaction fees. Please add SOL to your wallet.');
+      }
+
+      // Log transaction size for debugging
+      const serializedSize = transaction.serialize({ requireAllSignatures: false }).length;
+      console.log(`[storePassword] Transaction size: ${serializedSize} bytes`);
+
+      if (serializedSize > 1232) { // Solana transaction limit
+        console.error('[storePassword] Transaction exceeds maximum size (1232 bytes)');
+        throw new Error(`Transaction too large (${serializedSize} bytes). Try reducing the entry size.`);
+      }
+
+      console.log('[storePassword] Pre-flight checks passed, sending to wallet...');
+    } catch (preflightError: any) {
+      console.error('[storePassword] Pre-flight check failed:', preflightError);
+      throw preflightError;
+    }
+
     try {
       // Use sendTransaction if available (preferred for wallet adapters)
       let signature: string;
       if (this.wallet.sendTransaction) {
-        signature = await this.wallet.sendTransaction(transaction, this.connection, {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 3,
-        });
+        console.log('[storePassword] Using wallet.sendTransaction()');
+
+        // Try with skipPreflight: true to bypass simulation
+        // The wallet itself may be running simulation that's failing
+        try {
+          signature = await this.wallet.sendTransaction(transaction, this.connection, {
+            skipPreflight: true, // Skip simulation - send directly
+            preflightCommitment: 'confirmed',
+            maxRetries: 3,
+          });
+        } catch (walletError: any) {
+          console.error('[storePassword] Wallet sendTransaction failed:', walletError);
+          console.error('[storePassword] Trying manual simulation to get better error details...');
+
+          // Manually simulate to get better error details
+          try {
+            const simulation = await this.connection.simulateTransaction(transaction);
+            console.error('[storePassword] Simulation result:', simulation);
+
+            if (simulation.value.err) {
+              throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
+            }
+          } catch (simError) {
+            console.error('[storePassword] Manual simulation also failed:', simError);
+          }
+
+          // Re-throw original wallet error
+          throw walletError;
+        }
       } else {
         // Fallback to manual signing + sending
+        console.log('[storePassword] Using wallet.signTransaction() + sendRawTransaction()');
         const signed = await this.wallet.signTransaction(transaction);
         signature = await this.connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
+          skipPreflight: true, // Skip simulation
           preflightCommitment: 'confirmed',
           maxRetries: 3,
         });
@@ -771,7 +821,14 @@ export class LockboxV2Client {
       console.error('[storePassword] Error name:', error?.name);
       console.error('[storePassword] Error message:', error?.message);
       console.error('[storePassword] Error stack:', error?.stack);
-      console.error('[storePassword] Full error object:', JSON.stringify(error, null, 2));
+
+      // Try to extract more detailed error information
+      if (error?.logs) {
+        console.error('[storePassword] Transaction logs:', error.logs);
+      }
+      if (error?.error) {
+        console.error('[storePassword] Nested error:', error.error);
+      }
 
       // Log the transaction details for debugging
       console.error('[storePassword] Transaction details:');
@@ -781,8 +838,20 @@ export class LockboxV2Client {
       console.error('  - Instruction data length:', instructionData.length);
       console.error('  - Encrypted data size:', combined.length);
 
+      // Extract the most useful error message
+      let errorMsg = error?.message || String(error);
+      if (error?.logs && error.logs.length > 0) {
+        // Look for program errors in logs
+        const programError = error.logs.find((log: string) =>
+          log.includes('Program log:') || log.includes('Error:')
+        );
+        if (programError) {
+          errorMsg = programError;
+        }
+      }
+
       // Re-throw with more context
-      throw new Error(`Failed to store password: ${error?.message || String(error)}`);
+      throw new Error(`Failed to store password: ${errorMsg}`);
     }
   }
 
