@@ -2,10 +2,25 @@
 const crypto = require('crypto')
 const { TextEncoder, TextDecoder } = require('util')
 
-global.crypto = {
-  subtle: crypto.webcrypto.subtle,
-  getRandomValues: (arr) => crypto.randomBytes(arr.length),
+// Ensure crypto.webcrypto is available (Node.js 15+)
+if (!crypto.webcrypto || !crypto.webcrypto.subtle) {
+  throw new Error('crypto.webcrypto.subtle not available - requires Node.js 15+')
 }
+
+// Set up Web Crypto API for tests
+// Use Object.defineProperty to prevent accidental overwriting
+Object.defineProperty(global, 'crypto', {
+  value: {
+    subtle: crypto.webcrypto.subtle,
+    getRandomValues: (arr) => {
+      const bytes = crypto.randomBytes(arr.length)
+      arr.set(bytes)
+      return arr
+    },
+  },
+  writable: false,
+  configurable: false,
+})
 
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder

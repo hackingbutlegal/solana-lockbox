@@ -429,6 +429,7 @@ export function importFromLockboxJSON(jsonText: string): ImportResult {
       line: 0,
       error: error instanceof Error ? error.message : 'Invalid JSON',
     });
+    result.failed++;
   }
 
   return result;

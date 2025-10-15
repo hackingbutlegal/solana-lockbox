@@ -363,9 +363,13 @@ describe('Validation Schemas', () => {
     });
 
     it('should accept minimal entry (title only)', () => {
+      // Login type (0) requires username and password fields
       const entry = {
         title: 'Minimal Entry',
         type: 0,
+        username: 'user',
+        password: 'pass',
+        url: 'example.com',
       };
 
       const result = validate(passwordEntrySchema, entry);
@@ -384,9 +388,11 @@ describe('Validation Schemas', () => {
     });
 
     it('should normalize nested fields', () => {
+      // Login entry requires username, password, and url
       const entry = {
         title: '  My Entry  ',
-        email: 'USER@EXAMPLE.COM',
+        username: 'USER@EXAMPLE.COM',
+        password: 'testpass',
         url: 'microsoft.com',
         tags: ['Work', 'FINANCE'],
         type: 0,
@@ -396,8 +402,8 @@ describe('Validation Schemas', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.title).toBe('My Entry'); // Trimmed
-        expect(result.data.email).toBe('user@example.com'); // Lowercase
-        expect(result.data.url).toBe('https://microsoft.com'); // Normalized (Zod doesn't add trailing slash)
+        expect(result.data.username).toBe('USER@EXAMPLE.COM'); // Username preserved as-is
+        expect(result.data.url).toBe('https://microsoft.com'); // Normalized
         expect(result.data.tags).toEqual(['work', 'finance']); // Lowercase & deduplicated
       }
     });

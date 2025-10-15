@@ -18,39 +18,48 @@ import {
 } from '../crypto';
 
 describe('Cryptographic Operations', () => {
-  // Test wallet public key (deterministic for testing)
-  const testPublicKey = new PublicKey('11111111111111111111111111111111');
-  
+  // Test wallet public keys (valid base58-encoded Solana addresses)
+  const testPublicKey = new PublicKey('11111111111111111111111111111112'); // Valid system program-like address
+
   // Mock signature (64 bytes)
   const mockSignature = new Uint8Array(64).fill(42);
 
   describe('generateChallenge', () => {
     it('should generate a challenge message with wallet address', () => {
       const challenge = generateChallenge(testPublicKey);
-      
-      expect(challenge).toBeInstanceOf(Uint8Array);
+
+      // Check it's a Uint8Array-like object (instanceof can fail across Jest contexts)
+      expect(challenge instanceof Uint8Array || challenge.constructor.name === 'Uint8Array').toBe(true);
       expect(challenge.length).toBeGreaterThan(0);
-      
+
       const decoded = new TextDecoder().decode(challenge);
       expect(decoded).toContain(testPublicKey.toBase58());
       expect(decoded).toContain('Lockbox');
     });
 
     it('should generate unique challenges for different wallets', () => {
-      const wallet1 = new PublicKey('11111111111111111111111111111111');
-      const wallet2 = new PublicKey('22222222222222222222222222222222');
-      
+      // Valid base58-encoded Solana addresses
+      const wallet1 = new PublicKey('11111111111111111111111111111112');
+      const wallet2 = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
       const challenge1 = generateChallenge(wallet1);
       const challenge2 = generateChallenge(wallet2);
-      
+
       expect(challenge1).not.toEqual(challenge2);
     });
 
-    it('should generate deterministic challenges for same wallet', () => {
+    it('should generate non-deterministic challenges (includes random nonce)', () => {
       const challenge1 = generateChallenge(testPublicKey);
       const challenge2 = generateChallenge(testPublicKey);
-      
-      expect(challenge1).toEqual(challenge2);
+
+      // Challenges should be different due to random nonce (replay attack protection)
+      expect(challenge1).not.toEqual(challenge2);
+
+      // But both should contain the same public key
+      const decoded1 = new TextDecoder().decode(challenge1);
+      const decoded2 = new TextDecoder().decode(challenge2);
+      expect(decoded1).toContain(testPublicKey.toBase58());
+      expect(decoded2).toContain(testPublicKey.toBase58());
     });
   });
 
@@ -89,9 +98,10 @@ describe('Cryptographic Operations', () => {
     });
 
     it('should derive different keys for different public keys', async () => {
-      const wallet1 = new PublicKey('11111111111111111111111111111111');
-      const wallet2 = new PublicKey('22222222222222222222222222222222');
-      
+      // Valid base58-encoded Solana addresses
+      const wallet1 = new PublicKey('11111111111111111111111111111112');
+      const wallet2 = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
       const result1 = await createSessionKeyFromSignature(wallet1, mockSignature);
       const result2 = await createSessionKeyFromSignature(wallet2, mockSignature);
       

@@ -54,11 +54,13 @@ describe('Password Health Analyzer', () => {
       });
 
       it('should rate fair passwords correctly', () => {
-        const entry = createLoginEntry('Test', 'Password1');
-        const passwordMap = new Map([['Password1', ['Test']]]);
-        
+        // "Password1" contains "password" which gets penalized heavily (-2)
+        // Use a better password for testing fair strength
+        const entry = createLoginEntry('Test', 'MyAccount2024');
+        const passwordMap = new Map([['MyAccount2024', ['Test']]]);
+
         const health = analyzePasswordHealth(entry, passwordMap);
-        
+
         expect(health.strength).toBeGreaterThanOrEqual(PasswordStrength.Weak);
       });
 

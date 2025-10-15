@@ -641,9 +641,20 @@ export function clientSideSearch(
       score += 60;
       matchedFields.push('title');
     } else {
-      const similarity = calculateTrigramSimilarity(entry.title, query);
-      if (similarity > 0.5) {
-        score += Math.floor(30 + similarity * 30);
+      // Try fuzzy matching on whole title
+      let bestSimilarity = calculateTrigramSimilarity(entry.title, query);
+
+      // Also try fuzzy matching on individual words
+      const words = entry.title.split(/\s+/);
+      for (const word of words) {
+        if (word.length >= 3) {
+          const wordSimilarity = calculateTrigramSimilarity(word, query);
+          bestSimilarity = Math.max(bestSimilarity, wordSimilarity);
+        }
+      }
+
+      if (bestSimilarity > 0.3) {
+        score += Math.floor(30 + bestSimilarity * 30);
         matchedFields.push('title (fuzzy)');
       }
     }
