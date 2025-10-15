@@ -12,8 +12,11 @@ System architecture, design principles, and technical specifications.
 
 ### `/deployment`
 Deployment guides for various environments.
-- `DEPLOYMENT.md` - Comprehensive deployment guide (local, devnet, mainnet, Vercel)
-- Environment-specific configurations
+- `DEPLOYMENT.md` - Comprehensive v2 deployment guide (1,760 lines) - **PRIMARY GUIDE**
+- `DEPLOYMENT_V1.md` - Legacy v1 deployment guide (archived)
+- Local development setup
+- Devnet deployment procedures
+- Vercel deployment configuration
 - Troubleshooting deployment issues
 
 ### `/security`
@@ -28,14 +31,19 @@ Technical deep-dives, specific fixes, and implementation details.
 - `ORPHANED-CHUNK-FIX-SUMMARY.md` - Prevention and recovery for orphaned storage chunks
 - `CLOSE-CHUNK-FIX.md` - Account ordering fix for chunk closure
 - `MULTI-WALLET-RECOVERY-GUIDE.md` - Multi-wallet orphan recovery procedures
-- Rust optimization recommendations
-- Implementation notes
+- `ORPHANED-CHUNK-RECOVERY-GUIDE.md` - User-facing recovery guide
+- `VALIDATION_MIGRATION.md` - Migration to Zod validation schemas
+- `ORPHANED_CHUNKS_PREVENTION.md` - Prevention strategies for orphaned chunks
+- `RUST_OPTIMIZATION_RECOMMENDATIONS.md` - Future Rust program optimizations
+- `TOOLCHAIN.md` - Development toolchain documentation
+- `TECHNICAL_FIXES_OCT_2025.md` - Technical fixes log
 
 ### `/releases`
 Release notes and version history.
-- Historical release notes
-- Schema migration guides
-- Breaking changes documentation
+- `RELEASE_NOTES_v1.2.0.md` - v1.2.0 release notes
+- `RELEASE_SUMMARY.md` - Overall release summary
+- `SCHEMA_V2_RELEASE_NOTES.md` - Schema v2 migration
+- `PHASE-10-VALIDATION-REPORT.md` - Phase 10 validation results
 
 ### `/docs` (This Directory)
 Project-wide documentation and refactor summaries.
@@ -47,15 +55,16 @@ Project-wide documentation and refactor summaries.
 
 The following documents remain in the project root for easy access:
 
-- **README.md** - Project overview and quick start
-- **API.md** - API reference
+- **README.md** - Project overview and quick start guide
+- **ROADMAP.md** ⭐ - Detailed development roadmap with phases, timelines, and success criteria
+- **PASSWORD_MANAGER_EXPANSION.md** - Detailed v2.0 technical specification
+- **API.md** - SDK API reference
 - **DEVELOPER_GUIDE.md** - Development setup and workflow
-- **QUICKSTART.md** - Quick start guide
-- **TESTING.md** - Testing procedures
+- **QUICKSTART.md** - Quick start guide for new developers
+- **TESTING.md** - Testing procedures and guidelines
 - **TROUBLESHOOTING.md** - Common issues and solutions
 - **CHANGELOG.md** - Version history (semantic versioning)
 - **LICENSE** - ISC license
-- **PASSWORD_MANAGER_EXPANSION.md** - V2.0 expansion plan
 
 ## Finding Documentation
 
@@ -100,5 +109,8 @@ When updating documentation:
 
 ---
 
-**Last Updated**: October 2025 (Post-Category System Implementation)
+---
+
+**Last Updated**: October 15, 2025 (Post-Documentation Refactor)
 **Maintained By**: GRAFFITO (@0xgraffito)
+**Version**: v2.0 (Phase 3 Complete)

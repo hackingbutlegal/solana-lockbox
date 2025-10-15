@@ -11,7 +11,7 @@
 **Target Mainnet**: Q1 2026
 **Network**: Solana Devnet → Mainnet Beta
 
-📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** - Complete v2 deployment guide with recent fixes
+📖 **[docs/deployment/DEPLOYMENT.md](./docs/deployment/DEPLOYMENT.md)** - Comprehensive deployment guide with all fixes
 
 ---
 
@@ -146,9 +146,8 @@ Comprehensive refactor documentation covering all improvements:
 - Files created/modified/deleted metrics
 - Migration guides and lessons learned
 
-📖 **Legacy Documentation**
-- **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**: Original v2.0 technical specification
-- **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)**: Original deployment guide (superseded by docs/deployment/DEPLOYMENT.md)
+📖 **Technical Specifications**
+- **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**: Detailed technical specification for v2.0 features and architecture
 
 ---
 
@@ -184,9 +183,18 @@ npm run dev
 
 Visit http://localhost:3000
 
+📖 **[ROADMAP.md](./ROADMAP.md)** ⭐ **DETAILED ROADMAP**
+Complete development roadmap with:
+- Phase-by-phase implementation plan
+- Success criteria for each phase
+- Timeline estimates and priorities
+- Mainnet launch criteria
+
 ---
 
 ## Development Roadmap
+
+**See [ROADMAP.md](./ROADMAP.md) for the complete roadmap.**
 
 ### Phase 1-3: Foundation & Core Features (October 2025) ✅ COMPLETE
 
@@ -429,7 +437,7 @@ ISC
 - **v1.0 Pre-Production**: https://github.com/hackingbutlegal/lockbox
 - **v2.0 Current Development**: https://github.com/hackingbutlegal/solana-lockbox
 - **Creator**: [@0xgraffito](https://x.com/0xgraffito)
-- **Documentation**: See DEPLOYMENT_V2.md and PASSWORD_MANAGER_EXPANSION.md
+- **Documentation**: See docs/ directory and ROADMAP.md
 
 ---
 
