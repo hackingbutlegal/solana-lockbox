@@ -27,5 +27,9 @@ export type { SubscriptionContextType } from './SubscriptionContext';
 export { CategoryProvider, useCategory } from './CategoryContext';
 export type { CategoryContextType } from './CategoryContext';
 
+// Search Context (Phase 4)
+export { SearchProvider, useSearch } from './SearchContext';
+export type { SearchContextType } from './SearchContext';
+
 // Legacy context (kept for backward compatibility during migration)
 export { LockboxV2Provider, useLockboxV2 } from './LockboxV2Context';
