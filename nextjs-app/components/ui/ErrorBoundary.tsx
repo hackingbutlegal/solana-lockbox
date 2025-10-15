@@ -24,6 +24,8 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
+  errorCount: number;
+  lastErrorTime: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -33,6 +35,8 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      errorCount: 0,
+      lastErrorTime: 0,
     };
   }
 
@@ -47,10 +51,22 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
+    const now = Date.now();
+    const timeSinceLastError = now - this.state.lastErrorTime;
+
+    // Detect crash loop: 3+ errors within 10 seconds
+    const isCrashLoop = timeSinceLastError < 10000 && this.state.errorCount >= 2;
+
     // Update state with error details
-    this.setState({
+    this.setState(prevState => ({
       errorInfo,
-    });
+      errorCount: prevState.errorCount + 1,
+      lastErrorTime: now,
+    }));
+
+    if (isCrashLoop) {
+      console.error('⚠️ CRASH LOOP DETECTED - Preventing infinite recovery attempts');
+    }
 
     // Call custom error handler if provided
     if (this.props.onError) {
@@ -66,7 +82,20 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      // Keep errorCount and lastErrorTime to detect crash loops
     });
+  };
+
+  handleClearSession = () => {
+    // Clear session storage
+    sessionStorage.clear();
+
+    // Clear specific localStorage items (keep user preferences)
+    const keysToRemove = ['pendingChanges', 'lastSync', 'sessionKey'];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // Reload page
+    window.location.reload();
   };
 
   render() {
@@ -76,12 +105,20 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      // Check for crash loop
+      const now = Date.now();
+      const timeSinceLastError = now - this.state.lastErrorTime;
+      const isCrashLoop = timeSinceLastError < 10000 && this.state.errorCount >= 3;
+
       // Default fallback UI
       return (
         <DefaultErrorFallback
           error={this.state.error}
           errorInfo={this.state.errorInfo}
           onReset={this.handleReset}
+          onClearSession={this.handleClearSession}
+          isCrashLoop={isCrashLoop}
+          errorCount={this.state.errorCount}
         />
       );
     }
@@ -97,19 +134,41 @@ interface FallbackProps {
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
   onReset: () => void;
+  onClearSession: () => void;
+  isCrashLoop: boolean;
+  errorCount: number;
 }
 
-function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
+function DefaultErrorFallback({
+  error,
+  errorInfo,
+  onReset,
+  onClearSession,
+  isCrashLoop,
+  errorCount
+}: FallbackProps) {
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   return (
     <div className="error-fallback">
       <div className="error-fallback-content">
         <div className="error-icon">⚠️</div>
-        <h1>Something went wrong</h1>
+        <h1>{isCrashLoop ? 'Critical Error Detected' : 'Something went wrong'}</h1>
         <p className="error-message">
-          An unexpected error occurred. Please try refreshing the page.
+          {isCrashLoop
+            ? `Multiple errors detected (${errorCount} in 10 seconds). The app may be in an unstable state.`
+            : 'An unexpected error occurred. Please try refreshing the page.'}
         </p>
+
+        {isCrashLoop && (
+          <div className="crash-loop-warning">
+            <strong>⚠️ Crash Loop Detected</strong>
+            <p>
+              To prevent infinite recovery attempts, automatic retry has been disabled.
+              Please clear your session or contact support if the issue persists.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="error-details">
@@ -125,15 +184,25 @@ function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
         )}
 
         <div className="error-actions">
-          <button onClick={onReset} className="btn-retry">
-            Try Again
-          </button>
+          {!isCrashLoop && (
+            <button onClick={onReset} className="btn-retry">
+              Try Again
+            </button>
+          )}
           <button
             onClick={() => window.location.reload()}
             className="btn-reload"
           >
             Reload Page
           </button>
+          {(isCrashLoop || errorCount >= 2) && (
+            <button
+              onClick={onClearSession}
+              className="btn-clear-session"
+            >
+              Clear Session & Reload
+            </button>
+          )}
         </div>
       </div>
 
@@ -172,6 +241,27 @@ function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
           color: #7f8c8d;
           font-size: 1.1rem;
           margin-bottom: 1.5rem;
+        }
+
+        .crash-loop-warning {
+          background: #fee;
+          border: 2px solid #e74c3c;
+          border-radius: 8px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+          text-align: left;
+        }
+
+        .crash-loop-warning strong {
+          display: block;
+          margin-bottom: 0.5rem;
+          color: #c0392b;
+        }
+
+        .crash-loop-warning p {
+          margin: 0;
+          color: #e74c3c;
+          line-height: 1.6;
         }
 
         .error-details {
@@ -220,10 +310,12 @@ function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
           display: flex;
           gap: 1rem;
           justify-content: center;
+          flex-wrap: wrap;
         }
 
         .btn-retry,
-        .btn-reload {
+        .btn-reload,
+        .btn-clear-session {
           padding: 0.875rem 1.5rem;
           border: none;
           border-radius: 8px;
@@ -254,6 +346,17 @@ function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
           transform: translateY(-2px);
         }
 
+        .btn-clear-session {
+          background: #f39c12;
+          color: white;
+        }
+
+        .btn-clear-session:hover {
+          background: #e67e22;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+        }
+
         @media (max-width: 768px) {
           .error-fallback {
             padding: 1rem;
@@ -276,7 +379,8 @@ function DefaultErrorFallback({ error, errorInfo, onReset }: FallbackProps) {
           }
 
           .btn-retry,
-          .btn-reload {
+          .btn-reload,
+          .btn-clear-session {
             width: 100%;
           }
         }
