@@ -5,10 +5,11 @@
 > This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.
 > For the previous v1.0 pre-production release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Status**: ✅ Live on Devnet - Fully Functional
+**Current Status**: ✅ Live on Devnet - Phase 4 Core Utilities Complete
 **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
-**Last Deployed**: October 13, 2025 (Phase 5: Subscription UI Complete)
-**Target Mainnet**: Q1 2026
+**Last Deployed**: October 13, 2025 (Phase 3: Subscription UI Complete)
+**Phase 4 Progress**: 70% Complete - Search, Health Analysis, Import/Export (October 15, 2025)
+**Target Mainnet**: Q2 2026
 **Network**: Solana Devnet → Mainnet Beta
 
 📖 **[docs/deployment/DEPLOYMENT.md](./docs/deployment/DEPLOYMENT.md)** - Comprehensive deployment guide with all fixes
@@ -238,15 +239,21 @@ Complete development roadmap with:
 
 ---
 
-### Phase 4: Search & Intelligence (Q1 2026) 🔍 NEXT - 6-8 weeks - HIGH priority
-- [ ] Blind index search system with HMAC-based keyword hashing
-- [ ] Fuzzy search on client side with trigram matching
-- [ ] Advanced filtering and sorting
-- [ ] Favorites and recently accessed entries
-- [ ] Import/export functionality (1Password, Bitwarden, LastPass formats)
-- [ ] Batch operations (import/update/delete multiple entries)
+### Phase 4: Search & Intelligence (Q1 2026) 🏗️ IN PROGRESS - 70% Complete - HIGH priority
+- [x] Blind index search system with HMAC-based keyword hashing (ready for on-chain integration)
+- [x] Client-side fuzzy search with trigram matching (functional)
+- [x] Advanced filtering and sorting (by type, category, favorites, weak/old passwords)
+- [x] Favorites and recently accessed entries (helper functions)
+- [x] Import/export functionality (1Password, Bitwarden, LastPass, Lockbox JSON, generic CSV)
+- [x] Password health analyzer (entropy, patterns, reuse, age detection)
+- [x] Overall vault security score (0-100 with actionable recommendations)
+- [ ] Batch operations UI (multi-select, bulk actions) - deferred
+- [ ] Search UI components - remaining
+- [ ] Health dashboard UI - remaining
 
-**Why**: Essential for usability at scale. Users need to find passwords quickly.
+**Completed** (October 15, 2025): All core utilities implemented. Search, filtering, health analysis, and import/export ready for UI integration.
+
+**Why**: Essential for usability at scale. Users need to find passwords quickly and understand their security posture.
 
 ---
 
