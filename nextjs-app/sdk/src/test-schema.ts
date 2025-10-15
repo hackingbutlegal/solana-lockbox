@@ -49,7 +49,7 @@ try {
   console.log(`✓ Deserialized successfully`);
   console.log(`✓ Title matches: ${deserialized.title === smallEntry.title}`);
   console.log(`✓ Password matches: ${deserialized.password === smallEntry.password}`);
-  console.log(`✓ Date preserved: ${deserialized.createdAt?.toISOString() === smallEntry.createdAt.toISOString()}`);
+  console.log(`✓ Date preserved: ${deserialized.createdAt?.toISOString() === smallEntry.createdAt?.toISOString()}`);
   console.log('✅ Test 1 PASSED\n');
 } catch (error) {
   console.error('❌ Test 1 FAILED:', error);

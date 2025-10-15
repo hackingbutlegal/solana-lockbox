@@ -1,0 +1,269 @@
+'use client';
+
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
+import { LockboxV2Client } from '../sdk/src/client-v2';
+import { generateChallenge, createSessionKeyFromSignature, wipeSensitiveData } from '../lib/crypto';
+
+/**
+ * Auth Context - Session Management
+ *
+ * Provides secure session key management with timeout tracking:
+ * - Session key storage (WeakMap for security)
+ * - Session initialization from wallet signature
+ * - Session timeout tracking (15 min absolute, 5 min inactivity)
+ * - Activity tracking
+ * - Session clearing/cleanup
+ * - Client instance creation
+ */
+
+export interface AuthContextType {
+  // Client
+  client: LockboxV2Client | null;
+
+  // Session State
+  isSessionActive: boolean;
+  sessionTimeRemaining: number | null; // seconds remaining until timeout
+
+  // Session Management
+  initializeSession: () => Promise<boolean>;
+  clearSession: () => void;
+  updateActivity: () => void;
+
+  // Loading/Error
+  loading: boolean;
+  error: string | null;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+  programId: string;
+}
+
+export function AuthProvider({ children, programId }: AuthProviderProps) {
+  const wallet = useWallet();
+  const { publicKey, signMessage, signTransaction } = wallet;
+  const { connection } = useConnection();
+
+  // SECURITY FIX (C-2): Use secure session key storage
+  // WeakMap prevents session key from being exposed in React DevTools
+  // and provides better memory isolation from browser extensions
+  const sessionKeyStorage = useMemo(() => new WeakMap<symbol, Uint8Array>(), []);
+  const [sessionKeyRef] = useState(() => Symbol('sessionKey'));
+
+  // Helper to get session key from secure storage
+  const getSessionKey = useCallback((): Uint8Array | null => {
+    return sessionKeyStorage.get(sessionKeyRef) || null;
+  }, [sessionKeyStorage, sessionKeyRef]);
+
+  // Helper to set session key in secure storage
+  const setSessionKey = useCallback((key: Uint8Array | null) => {
+    if (key === null) {
+      sessionKeyStorage.delete(sessionKeyRef);
+    } else {
+      sessionKeyStorage.set(sessionKeyRef, key);
+    }
+  }, [sessionKeyStorage, sessionKeyRef]);
+
+  // State
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // SECURITY FIX (C-3): Session timeout management
+  // Track session creation time and last activity for timeout enforcement
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [lastActivityTime, setLastActivityTime] = useState<number | null>(null);
+
+  // SECURITY FIX (C-3): Session timeout constants
+  const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity
+
+  // SECURITY FIX (C-3): Check if session has timed out
+  const isSessionTimedOut = useCallback((): boolean => {
+    if (!sessionStartTime || !lastActivityTime) {
+      return false; // No session active
+    }
+
+    const now = Date.now();
+    const sessionAge = now - sessionStartTime;
+    const inactivityTime = now - lastActivityTime;
+
+    // Check absolute timeout (15 minutes from session start)
+    if (sessionAge > SESSION_TIMEOUT_MS) {
+      return true;
+    }
+
+    // Check inactivity timeout (5 minutes since last activity)
+    if (inactivityTime > INACTIVITY_TIMEOUT_MS) {
+      return true;
+    }
+
+    return false;
+  }, [sessionStartTime, lastActivityTime]);
+
+  // Calculate time remaining until session timeout
+  const sessionTimeRemaining = useMemo((): number | null => {
+    if (!sessionStartTime || !lastActivityTime) {
+      return null;
+    }
+
+    const now = Date.now();
+    const sessionAge = now - sessionStartTime;
+    const inactivityTime = now - lastActivityTime;
+
+    // Time until absolute timeout
+    const absoluteTimeRemaining = Math.max(0, SESSION_TIMEOUT_MS - sessionAge);
+
+    // Time until inactivity timeout
+    const inactivityTimeRemaining = Math.max(0, INACTIVITY_TIMEOUT_MS - inactivityTime);
+
+    // Return the smaller of the two (whichever will happen first)
+    const remainingMs = Math.min(absoluteTimeRemaining, inactivityTimeRemaining);
+
+    return Math.floor(remainingMs / 1000); // Convert to seconds
+  }, [sessionStartTime, lastActivityTime]);
+
+  // SECURITY FIX (C-3): Update last activity timestamp
+  const updateActivity = useCallback(() => {
+    setLastActivityTime(Date.now());
+  }, []);
+
+  // Create client instance (memoized)
+  const client = useMemo(() => {
+    if (!publicKey || !connection || !signTransaction) return null;
+
+    try {
+      // Use the actual wallet from useWallet hook
+      return new LockboxV2Client({
+        connection,
+        wallet: wallet as any,
+        programId: new PublicKey(programId),
+      });
+    } catch (err) {
+      console.error('Failed to create LockboxV2Client:', err);
+      return null;
+    }
+  }, [publicKey, connection, signTransaction, wallet, programId]);
+
+  // Initialize session key from wallet signature
+  const initializeSession = useCallback(async (): Promise<boolean> => {
+    if (!publicKey || !signMessage) {
+      setError('Wallet not connected');
+      return false;
+    }
+
+    // SECURITY FIX (C-2): Use secure storage accessor
+    if (getSessionKey()) {
+      return true; // Already initialized
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Generate challenge and get signature
+      const challenge = generateChallenge(publicKey);
+      const signature = await signMessage(challenge);
+
+      // Derive session key
+      const { sessionKey: derivedKey } = await createSessionKeyFromSignature(
+        publicKey,
+        signature
+      );
+
+      // SECURITY FIX (C-2): Store in secure WeakMap storage
+      setSessionKey(derivedKey);
+      setIsSessionActive(true);
+
+      // SECURITY FIX (C-3): Set session timestamps
+      const now = Date.now();
+      setSessionStartTime(now);
+      setLastActivityTime(now);
+
+      return true;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to initialize session';
+      setError(errorMsg);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, signMessage, getSessionKey, setSessionKey]);
+
+  // Clear session and wipe sensitive data
+  const clearSession = useCallback(() => {
+    // SECURITY FIX (C-2): Use secure storage accessor
+    const key = getSessionKey();
+    if (key) {
+      wipeSensitiveData(key);
+    }
+    setSessionKey(null);
+    setIsSessionActive(false);
+
+    // SECURITY FIX (C-3): Clear session timestamps
+    setSessionStartTime(null);
+    setLastActivityTime(null);
+  }, [getSessionKey, setSessionKey]);
+
+  // SECURITY FIX (C-3): Automatic session timeout checking
+  // Poll every 30 seconds to check for timeout
+  useEffect(() => {
+    if (!isSessionActive) return;
+
+    const intervalId = setInterval(() => {
+      if (isSessionTimedOut()) {
+        clearSession();
+        setError('Session expired due to inactivity. Please sign in again.');
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [isSessionActive, isSessionTimedOut, clearSession]);
+
+  // Clear session when wallet disconnects
+  useEffect(() => {
+    if (!publicKey) {
+      clearSession();
+    }
+  }, [publicKey, clearSession]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // SECURITY FIX (C-2): Use secure storage accessor
+      const key = getSessionKey();
+      if (key) {
+        wipeSensitiveData(key);
+      }
+    };
+  }, [getSessionKey]);
+
+  const contextValue: AuthContextType = {
+    client,
+    isSessionActive,
+    sessionTimeRemaining,
+    initializeSession,
+    clearSession,
+    updateActivity,
+    loading,
+    error,
+  };
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+}

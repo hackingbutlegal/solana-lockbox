@@ -7,7 +7,7 @@
  * - Clears automatically on page refresh/reload
  */
 
-import { StoredItem } from '../components/StorageHistory';
+import { StoredItem } from '../components/features/StorageHistory';
 
 const STORAGE_KEY_PREFIX = 'lockbox_';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes

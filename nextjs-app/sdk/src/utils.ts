@@ -104,7 +104,8 @@ export function analyzePasswordHealth(entries: PasswordEntry[]): PasswordHealth 
 
   // Analyze each password
   for (const entry of entries) {
-    if (!entry.password || !entry.id) continue;
+    // Only analyze entries that have a password field (LoginEntry, etc.)
+    if (!('password' in entry) || !entry.password || !entry.id) continue;
 
     // Check weakness
     const strength = checkPasswordStrength(entry.password);
@@ -155,9 +156,9 @@ export function searchEntries(entries: PasswordEntry[], query: string): Password
   return entries.filter(entry => {
     return (
       entry.title?.toLowerCase().includes(lowerQuery) ||
-      entry.username?.toLowerCase().includes(lowerQuery) ||
-      entry.url?.toLowerCase().includes(lowerQuery) ||
-      entry.notes?.toLowerCase().includes(lowerQuery) ||
+      ('username' in entry && entry.username?.toLowerCase().includes(lowerQuery)) ||
+      ('url' in entry && entry.url?.toLowerCase().includes(lowerQuery)) ||
+      ('notes' in entry && entry.notes?.toLowerCase().includes(lowerQuery)) ||
       entry.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
     );
   });

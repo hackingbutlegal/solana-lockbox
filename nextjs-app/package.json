@@ -33,6 +33,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/pako": "^2.0.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -105,15 +105,12 @@ export interface StorageChunk {
 }
 
 /**
- * Password entry data (client-side)
+ * Base fields common to all password entries
  */
-export interface PasswordEntry {
+export interface BasePasswordEntry {
   id?: number;
   type: PasswordEntryType;
   title: string;
-  username?: string;
-  password?: string;
-  url?: string;
   notes?: string;
   category?: number;
   tags?: string[];
@@ -122,29 +119,132 @@ export interface PasswordEntry {
   createdAt?: Date;
   lastModified?: Date;
   accessCount?: number;
+}
 
-  // Type-specific fields
-  cardNumber?: string;
-  cardExpiry?: string;
-  cardCvv?: string;
-  cardHolder?: string;
+/**
+ * Login/Website password entry
+ */
+export interface LoginEntry extends BasePasswordEntry {
+  type: PasswordEntryType.Login;
+  username: string;
+  password: string;
+  url?: string;
+  totpSecret?: string; // For 2FA
+}
 
-  // Identity fields
-  fullName?: string;
+/**
+ * Credit card entry
+ */
+export interface CreditCardEntry extends BasePasswordEntry {
+  type: PasswordEntryType.CreditCard;
+  cardNumber: string;
+  cardHolder: string;
+  cardExpiry: string; // MM/YY format
+  cardCvv: string;
+  billingAddress?: string;
+  zipCode?: string;
+}
+
+/**
+ * Secure note entry
+ */
+export interface SecureNoteEntry extends BasePasswordEntry {
+  type: PasswordEntryType.SecureNote;
+  content: string;
+}
+
+/**
+ * Identity entry (personal information)
+ */
+export interface IdentityEntry extends BasePasswordEntry {
+  type: PasswordEntryType.Identity;
+  fullName: string;
   email?: string;
   phone?: string;
   address?: string;
+  dateOfBirth?: string;
+  ssn?: string; // Encrypted, obviously
+  passportNumber?: string;
+  driversLicense?: string;
+}
 
-  // API/SSH key fields
-  apiKey?: string;
+/**
+ * API key entry
+ */
+export interface ApiKeyEntry extends BasePasswordEntry {
+  type: PasswordEntryType.ApiKey;
+  apiKey: string;
   apiSecret?: string;
-  sshPublicKey?: string;
-  sshPrivateKey?: string;
+  apiEndpoint?: string;
+  documentation?: string;
+}
 
-  // Crypto wallet fields
-  walletAddress?: string;
+/**
+ * SSH key entry
+ */
+export interface SshKeyEntry extends BasePasswordEntry {
+  type: PasswordEntryType.SshKey;
+  username: string;
+  hostname: string;
+  port?: number;
+  sshPublicKey?: string;
+  sshPrivateKey: string;
+  passphrase?: string;
+}
+
+/**
+ * Cryptocurrency wallet entry
+ */
+export interface CryptoWalletEntry extends BasePasswordEntry {
+  type: PasswordEntryType.CryptoWallet;
+  walletName: string;
+  walletAddress: string;
   privateKey?: string;
   seedPhrase?: string;
+  network?: string; // e.g., "Ethereum", "Bitcoin", "Solana"
+}
+
+/**
+ * Discriminated union of all password entry types
+ */
+export type PasswordEntry =
+  | LoginEntry
+  | CreditCardEntry
+  | SecureNoteEntry
+  | IdentityEntry
+  | ApiKeyEntry
+  | SshKeyEntry
+  | CryptoWalletEntry;
+
+/**
+ * Type guard functions for runtime type checking
+ */
+export function isLoginEntry(entry: PasswordEntry): entry is LoginEntry {
+  return entry.type === PasswordEntryType.Login;
+}
+
+export function isCreditCardEntry(entry: PasswordEntry): entry is CreditCardEntry {
+  return entry.type === PasswordEntryType.CreditCard;
+}
+
+export function isSecureNoteEntry(entry: PasswordEntry): entry is SecureNoteEntry {
+  return entry.type === PasswordEntryType.SecureNote;
+}
+
+export function isIdentityEntry(entry: PasswordEntry): entry is IdentityEntry {
+  return entry.type === PasswordEntryType.Identity;
+}
+
+export function isApiKeyEntry(entry: PasswordEntry): entry is ApiKeyEntry {
+  return entry.type === PasswordEntryType.ApiKey;
+}
+
+export function isSshKeyEntry(entry: PasswordEntry): entry is SshKeyEntry {
+  return entry.type === PasswordEntryType.SshKey;
+}
+
+export function isCryptoWalletEntry(entry: PasswordEntry): entry is CryptoWalletEntry {
+  return entry.type === PasswordEntryType.CryptoWallet;
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import { Program, AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
-import { Connection, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, Keypair, TransactionInstruction, Transaction } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
 import * as util from 'tweetnacl-util';
 import crypto from 'crypto';
@@ -24,9 +24,14 @@ import {
   LockboxV2ClientOptions,
   DataEntryHeader,
 } from './types-v2';
+import {
+  PROGRAM_ID,
+  SIGNATURE_MESSAGE,
+  AEAD,
+  INSTRUCTION_DISCRIMINATORS,
+} from './constants';
 import IDL from '../idl/lockbox-v2.json';
 
-export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
 export const FEE_RECEIVER = PROGRAM_ID;
 
 /**
@@ -37,7 +42,10 @@ export class LockboxV2Client {
   readonly connection: Connection;
   readonly wallet: any;
   readonly feeReceiver: PublicKey;
-  private sessionKey: Uint8Array | null = null;
+
+  // Static WeakMap for secure session storage
+  private static sessionKeys = new WeakMap<object, Uint8Array>();
+  private sessionKeyRef = {}; // Unique object reference for this client instance
 
   constructor(options: LockboxV2ClientOptions) {
     this.connection = options.connection;
@@ -51,27 +59,41 @@ export class LockboxV2Client {
     );
 
     // Initialize program with IDL
-    // Note: Using a minimal placeholder until full IDL is available
-    // The program binary is deployed and functional, but automated IDL generation
-    // is blocked by toolchain issues (proc-macro2/anchor-syn incompatibility)
     try {
-      // Try to create program with IDL, but gracefully fallback
-      // Note: Cast to unknown first to bypass TypeScript's type checking
-      // The IDL is manually created and structurally correct for the program
       this.program = new Program(IDL as unknown as Idl, provider);
-      console.log('Program initialized successfully with IDL');
-      console.log('Program methods available:', Object.keys((this.program as any).methods || {}));
     } catch (error) {
-      console.error('IDL initialization failed:', error);
-      console.error('Error details:', error instanceof Error ? error.message : String(error));
-      // Fallback: Create a minimal program interface
-      this.program = {
-        programId: PROGRAM_ID,
-        provider,
-        methods: {},
-        account: {},
-      } as any as Program;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to initialize Lockbox v2 program. ` +
+        `This may indicate an IDL version mismatch or corrupted IDL file. ` +
+        `Error: ${errorMsg}`
+      );
     }
+  }
+
+  // ============================================================================
+  // Session Key Management
+  // ============================================================================
+
+  /**
+   * Get stored session key from WeakMap
+   */
+  private getStoredSessionKey(): Uint8Array | null {
+    return LockboxV2Client.sessionKeys.get(this.sessionKeyRef) || null;
+  }
+
+  /**
+   * Store session key in WeakMap
+   */
+  private setStoredSessionKey(key: Uint8Array): void {
+    LockboxV2Client.sessionKeys.set(this.sessionKeyRef, key);
+  }
+
+  /**
+   * Clear stored session key from WeakMap
+   */
+  private clearStoredSessionKey(): void {
+    LockboxV2Client.sessionKeys.delete(this.sessionKeyRef);
   }
 
   // ============================================================================
@@ -110,18 +132,21 @@ export class LockboxV2Client {
    * Request wallet signature for session key derivation
    */
   private async getSessionKey(): Promise<Uint8Array> {
-    if (this.sessionKey) {
-      return this.sessionKey;
+    const storedKey = this.getStoredSessionKey();
+    if (storedKey) {
+      return storedKey;
     }
 
-    const message = util.decodeUTF8('Sign to access your Lockbox Password Manager');
+    const message = util.decodeUTF8(SIGNATURE_MESSAGE);
     const signature = await this.wallet.signMessage(message);
 
     // Derive session key from signature
     const hash = nacl.hash(signature);
-    this.sessionKey = hash.slice(0, 32);
+    const sessionKey = hash.slice(0, 32);
 
-    return this.sessionKey;
+    this.setStoredSessionKey(sessionKey);
+
+    return sessionKey;
   }
 
   /**
@@ -171,7 +196,22 @@ export class LockboxV2Client {
   // ============================================================================
 
   /**
-   * Initialize master lockbox for the user
+   * Initialize a new master lockbox for the user
+   *
+   * Creates the main account that coordinates all storage chunks and manages
+   * subscription tier, capacity limits, and metadata. This is the first step
+   * required before storing any passwords.
+   *
+   * @returns Transaction signature
+   * @throws {Error} If master lockbox already exists
+   * @throws {Error} If wallet has insufficient balance for rent
+   * @throws {Error} If RPC call fails
+   *
+   * @example
+   * ```typescript
+   * const signature = await client.initializeMasterLockbox();
+   * console.log('Master lockbox created:', signature);
+   * ```
    */
   async initializeMasterLockbox(): Promise<string> {
     const [masterLockbox, bump] = this.getMasterLockboxAddress();
@@ -222,6 +262,30 @@ export class LockboxV2Client {
 
   /**
    * Store a new password entry
+   *
+   * Encrypts the password entry using XChaCha20-Poly1305 AEAD with a session key
+   * derived from the user's wallet signature. The encrypted data is stored on-chain
+   * in the appropriate storage chunk based on available capacity.
+   *
+   * @param entry - Password entry to store (title, username, password, url, notes)
+   * @returns Object containing transaction signature and assigned entry ID
+   * @throws {Error} If entry data exceeds maximum size
+   * @throws {Error} If user has reached subscription tier storage limit
+   * @throws {Error} If encryption or RPC call fails
+   *
+   * @example
+   * ```typescript
+   * const result = await client.storePassword({
+   *   title: 'GitHub',
+   *   username: 'myuser',
+   *   password: 'secret123',
+   *   url: 'https://github.com',
+   *   notes: 'Work account',
+   *   type: PasswordEntryType.Login,
+   *   category: 0
+   * });
+   * console.log('Entry stored with ID:', result.entryId);
+   * ```
    */
   async storePassword(entry: PasswordEntry): Promise<{ txSignature: string; entryId: number }> {
     const sessionKey = await this.getSessionKey();
@@ -272,7 +336,25 @@ export class LockboxV2Client {
   }
 
   /**
-   * Retrieve a password entry by ID
+   * Retrieve and decrypt a password entry by ID
+   *
+   * Fetches the encrypted entry from on-chain storage and decrypts it using the
+   * session key derived from the user's wallet signature. The entry's access count
+   * is incremented on-chain.
+   *
+   * @param chunkIndex - Storage chunk index containing the entry
+   * @param entryId - Unique entry identifier
+   * @returns Decrypted password entry or null if decryption fails
+   * @throws {Error} If entry does not exist
+   * @throws {Error} If RPC call fails
+   *
+   * @example
+   * ```typescript
+   * const entry = await client.retrievePassword(0, 42);
+   * if (entry) {
+   *   console.log('Password:', entry.password);
+   * }
+   * ```
    */
   async retrievePassword(chunkIndex: number, entryId: number): Promise<PasswordEntry | null> {
     const sessionKey = await this.getSessionKey();
@@ -339,31 +421,54 @@ export class LockboxV2Client {
 
   /**
    * List all password entries
+   *
+   * Retrieves and decrypts all password entries from all storage chunks.
+   * Returns both successfully retrieved entries and any errors encountered.
+   *
+   * @returns Object containing entries array and errors array
+   *
+   * @example
+   * ```typescript
+   * const { entries, errors } = await client.listPasswords();
+   * console.log(`Retrieved ${entries.length} entries`);
+   * if (errors.length > 0) {
+   *   console.error(`Failed to retrieve ${errors.length} entries:`, errors);
+   * }
+   * ```
    */
-  async listPasswords(): Promise<PasswordEntry[]> {
+  async listPasswords(): Promise<{ entries: PasswordEntry[]; errors: Error[] }> {
     const master = await this.getMasterLockbox();
     const entries: PasswordEntry[] = [];
+    const errors: Error[] = [];
 
     for (const chunkInfo of master.storageChunks) {
-      const chunk = await this.getStorageChunk(chunkInfo.chunkIndex);
+      try {
+        const chunk = await this.getStorageChunk(chunkInfo.chunkIndex);
 
-      for (const header of chunk.entryHeaders) {
-        try {
-          const entry = await this.retrievePassword(chunkInfo.chunkIndex, header.entryId);
-          if (entry) {
-            entry.id = header.entryId;
-            entry.createdAt = new Date(header.createdAt * 1000);
-            entry.lastModified = new Date(header.lastModified * 1000);
-            entry.accessCount = header.accessCount;
-            entries.push(entry);
+        for (const header of chunk.entryHeaders) {
+          try {
+            const entry = await this.retrievePassword(chunkInfo.chunkIndex, header.entryId);
+            if (entry) {
+              entry.id = header.entryId;
+              entry.createdAt = new Date(header.createdAt * 1000);
+              entry.lastModified = new Date(header.lastModified * 1000);
+              entry.accessCount = header.accessCount;
+              entries.push(entry);
+            }
+          } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            error.message = `Failed to retrieve entry ${header.entryId}: ${error.message}`;
+            errors.push(error);
           }
-        } catch (e) {
-          console.error(`Failed to retrieve entry ${header.entryId}:`, e);
         }
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        error.message = `Failed to access chunk ${chunkInfo.chunkIndex}: ${error.message}`;
+        errors.push(error);
       }
     }
 
-    return entries;
+    return { entries, errors };
   }
 
   // ============================================================================
@@ -372,21 +477,78 @@ export class LockboxV2Client {
 
   /**
    * Upgrade subscription tier
+   *
+   * Upgrades the user's subscription to a higher tier, increasing storage capacity
+   * and feature limits. Payment is made via SOL transfer to the fee receiver.
+   * The subscription expires after 30 days and must be renewed.
+   *
+   * @param newTier - Target subscription tier (Basic, Premium, or Enterprise)
+   * @returns Transaction signature
+   * @throws {Error} If attempting to downgrade (use downgradeSubscription instead)
+   * @throws {Error} If wallet has insufficient SOL balance for payment
+   * @throws {Error} If RPC call fails
+   *
+   * @example
+   * ```typescript
+   * import { SubscriptionTier } from './types-v2';
+   * const signature = await client.upgradeSubscription(SubscriptionTier.Premium);
+   * console.log('Upgraded to Premium tier:', signature);
+   * ```
    */
   async upgradeSubscription(newTier: SubscriptionTier): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .upgradeSubscription(newTier)
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-        feeReceiver: this.feeReceiver,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Build instruction data: discriminator + new_tier (u8)
+    const argsBuffer = Buffer.alloc(1);
+    argsBuffer.writeUInt8(newTier, 0);
 
-    return tx;
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.upgradeSubscription,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`✅ Subscription upgraded to tier ${newTier}`);
+
+    return signature;
   }
 
   /**
@@ -395,17 +557,51 @@ export class LockboxV2Client {
   async renewSubscription(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .renewSubscription()
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-        feeReceiver: this.feeReceiver,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Build instruction data: discriminator only (no args)
+    const instructionData = INSTRUCTION_DISCRIMINATORS.renewSubscription;
 
-    return tx;
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log('✅ Subscription renewed successfully');
+
+    return signature;
   }
 
   /**
@@ -414,15 +610,49 @@ export class LockboxV2Client {
   async downgradeSubscription(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .downgradeSubscription()
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-      })
-      .rpc();
+    // Build instruction data: discriminator only (no args)
+    const instructionData = INSTRUCTION_DISCRIMINATORS.downgradeSubscription;
 
-    return tx;
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log('✅ Subscription downgraded to Free tier');
+
+    return signature;
   }
 
   // ============================================================================
@@ -528,10 +758,69 @@ export class LockboxV2Client {
   }
 
   /**
+   * Retry an RPC call with exponential backoff
+   *
+   * Automatically retries failed RPC calls with exponentially increasing delays.
+   * Useful for handling transient network errors and rate limiting.
+   *
+   * @param fn - Async function to retry
+   * @param maxRetries - Maximum number of retry attempts (default: 3)
+   * @param backoffMs - Base backoff delay in milliseconds (default: 1000)
+   * @returns Result from successful function call
+   * @throws {Error} Last error if all retries fail
+   *
+   * @example
+   * ```typescript
+   * const account = await this.retryRpcCall(
+   *   () => this.connection.getAccountInfo(address),
+   *   3,
+   *   1000
+   * );
+   * ```
+   */
+  private async retryRpcCall<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    backoffMs: number = 1000
+  ): Promise<T> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff: 1s, 2s, 4s
+          await new Promise(resolve => setTimeout(resolve, backoffMs * Math.pow(2, attempt)));
+        }
+      }
+    }
+
+    throw lastError || new Error('RPC call failed after retries');
+  }
+
+  /**
    * Clear session key (logout)
+   *
+   * Removes the cached session key, requiring a new wallet signature on the next
+   * encrypted operation. This is important for security when switching accounts
+   * or ending a session.
+   *
+   * WARNING: After calling this method, you will need to sign a message with your
+   * wallet again to derive a new session key. Any pending operations using the old
+   * session key will fail.
+   *
+   * @example
+   * ```typescript
+   * // Clear session when user logs out
+   * client.clearSession();
+   * console.log('Session cleared - wallet signature required for next operation');
+   * ```
    */
   clearSession(): void {
-    this.sessionKey = null;
+    this.clearStoredSessionKey();
   }
 }
 

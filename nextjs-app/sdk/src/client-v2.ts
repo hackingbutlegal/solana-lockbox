@@ -1100,16 +1100,72 @@ export class LockboxV2Client {
       const [masterLockbox] = this.getMasterLockboxAddress();
       const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-      const tx = await (this.program.methods as any)
-        .updatePasswordEntry(chunkIndex, new BN(entryId), Buffer.from(combined))
-        .accounts({
-          masterLockbox,
-          storageChunk,
-          owner: this.wallet.publicKey,
-        })
-        .rpc();
+      // Build instruction data: discriminator + args
+      // Args: chunk_index (u16) + entry_id (u64) + new_encrypted_data (vec<u8>)
+      const argsBuffer = Buffer.alloc(2 + 8 + 4 + combined.length);
+      let offset = 0;
 
-      return tx;
+      // chunk_index (u16)
+      argsBuffer.writeUInt16LE(chunkIndex, offset);
+      offset += 2;
+
+      // entry_id (u64)
+      argsBuffer.writeBigUInt64LE(BigInt(entryId), offset);
+      offset += 8;
+
+      // new_encrypted_data (vec<u8>) - length prefix + data
+      argsBuffer.writeUInt32LE(combined.length, offset);
+      offset += 4;
+      combined.forEach((byte, i) => {
+        argsBuffer[offset + i] = byte;
+      });
+
+      const instructionData = Buffer.concat([
+        INSTRUCTION_DISCRIMINATORS.updatePasswordEntry,
+        argsBuffer,
+      ]);
+
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: storageChunk, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        ],
+        data: instructionData,
+      });
+
+      const transaction = new Transaction().add(instruction);
+      transaction.feePayer = this.wallet.publicKey;
+
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
+
+      await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      console.log(`✅ Password entry ${entryId} updated successfully`);
+
+      return signature;
     } finally {
       this.pendingTransactions.delete(operationKey);
     }
@@ -1132,16 +1188,58 @@ export class LockboxV2Client {
       const [masterLockbox] = this.getMasterLockboxAddress();
       const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-      const tx = await (this.program.methods as any)
-        .deletePasswordEntry(chunkIndex, new BN(entryId))
-        .accounts({
-          masterLockbox,
-          storageChunk,
-          owner: this.wallet.publicKey,
-        })
-        .rpc();
+      // Build instruction data: discriminator + args
+      // Args: chunk_index (u16) + entry_id (u64)
+      const argsBuffer = Buffer.alloc(2 + 8);
+      argsBuffer.writeUInt16LE(chunkIndex, 0);
+      argsBuffer.writeBigUInt64LE(BigInt(entryId), 2);
 
-      return tx;
+      const instructionData = Buffer.concat([
+        INSTRUCTION_DISCRIMINATORS.deletePasswordEntry,
+        argsBuffer,
+      ]);
+
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: storageChunk, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        ],
+        data: instructionData,
+      });
+
+      const transaction = new Transaction().add(instruction);
+      transaction.feePayer = this.wallet.publicKey;
+
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
+
+      await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
+
+      console.log(`✅ Password entry ${entryId} deleted successfully`);
+
+      return signature;
     } finally {
       this.pendingTransactions.delete(operationKey);
     }
@@ -1237,17 +1335,57 @@ export class LockboxV2Client {
   async upgradeSubscription(newTier: SubscriptionTier): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .upgradeSubscription(newTier)
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-        feeReceiver: this.feeReceiver,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Build instruction data: discriminator + new_tier (u8)
+    const argsBuffer = Buffer.alloc(1);
+    argsBuffer.writeUInt8(newTier, 0);
 
-    return tx;
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.upgradeSubscription,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`✅ Subscription upgraded to tier ${newTier}`);
+
+    return signature;
   }
 
   /**
@@ -1256,17 +1394,51 @@ export class LockboxV2Client {
   async renewSubscription(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .renewSubscription()
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-        feeReceiver: this.feeReceiver,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Build instruction data: discriminator only (no args)
+    const instructionData = INSTRUCTION_DISCRIMINATORS.renewSubscription;
 
-    return tx;
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log('✅ Subscription renewed successfully');
+
+    return signature;
   }
 
   /**
@@ -1275,15 +1447,49 @@ export class LockboxV2Client {
   async downgradeSubscription(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
 
-    const tx = await (this.program.methods as any)
-      .downgradeSubscription()
-      .accounts({
-        masterLockbox,
-        owner: this.wallet.publicKey,
-      })
-      .rpc();
+    // Build instruction data: discriminator only (no args)
+    const instructionData = INSTRUCTION_DISCRIMINATORS.downgradeSubscription;
 
-    return tx;
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log('✅ Subscription downgraded to Free tier');
+
+    return signature;
   }
 
   // ============================================================================

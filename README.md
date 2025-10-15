@@ -72,27 +72,69 @@ Master Lockbox Account
 3. **Search Index**: Blind indexes for encrypted search
 4. **Shared Vaults**: Secure password sharing between users
 
+### Refactored Architecture (October 2025)
+
+The codebase has undergone a comprehensive refactor to improve maintainability, type safety, and user experience:
+
+**SDK Improvements**:
+- V2 as default export, V1 namespaced as legacy
+- Discriminated union types for type-safe password entries
+- Centralized constants (no magic values)
+- Retry utility with exponential backoff for network failures
+- User-friendly error formatting with actionable suggestions
+- WeakMap-based session storage for enhanced security
+
+**Frontend Organization**:
+- Components organized by purpose: `modals/`, `ui/`, `features/`, `layout/`
+- Context architecture split into 4 focused providers:
+  - `AuthContext`: Session management & client creation
+  - `LockboxContext`: Master lockbox metadata
+  - `PasswordContext`: Password CRUD operations
+  - `SubscriptionContext`: Subscription tier management
+- Error boundaries at multiple layers for graceful failure handling
+- Enhanced toast system with loading states, actions, and progress bars
+- Consistent loading states across all async operations
+- Barrel exports for clean imports
+
+**Developer Experience**:
+- Type-safe password entry types (LoginEntry, CreditCardEntry, etc.)
+- Zod validation matching TypeScript types
+- Comprehensive JSDoc documentation
+- Better error messages with suggested fixes
+- Automatic retry for transient failures
+
 ---
 
 ## Documentation
 
-📖 **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)** ⭐ COMPLETE
-Complete v2 deployment guide including:
-- Current devnet deployment status
-- All critical fixes (discriminators, INIT_SPACE, transaction handling, realloc)
-- Phase 5 subscription UI implementation
-- Program instructions and discriminators
-- Testing procedures
-- Troubleshooting common issues
+📖 **[docs/deployment/DEPLOYMENT.md](./docs/deployment/DEPLOYMENT.md)** ⭐ COMPREHENSIVE
+Consolidated deployment guide (1,760 lines) including:
+- Current devnet deployment status & program ID
+- All critical fixes and their resolutions
+- Complete deployment procedures (devnet & Vercel)
+- Testing procedures and troubleshooting
+- Production readiness checklist
+- 8 major issue resolutions documented
 
-📖 **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**
-Complete technical specification for v2.0 architecture, including:
-- Multi-tier storage design
-- Enhanced password entry structure
-- Encrypted search implementation
-- Secure sharing protocol
-- Subscription management system
-- Implementation roadmap and phases
+📖 **[docs/technical/RUST_OPTIMIZATION_RECOMMENDATIONS.md](./docs/technical/RUST_OPTIMIZATION_RECOMMENDATIONS.md)**
+Future optimization recommendations for the Rust program:
+- Batch operations design
+- Chunk defragmentation strategies
+- Performance optimizations
+- Compute unit analysis
+- Migration strategies
+
+📖 **[docs/README.md](./docs/README.md)**
+Documentation navigation hub with organized sections:
+- Architecture & design documents
+- Deployment guides
+- Security documentation
+- Technical specifications
+- Release notes
+
+📖 **Legacy Documentation**
+- **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**: Original v2.0 technical specification
+- **[DEPLOYMENT_V2.md](./DEPLOYMENT_V2.md)**: Original deployment guide (superseded by docs/deployment/DEPLOYMENT.md)
 
 ---
 
@@ -267,25 +309,56 @@ These features have been removed from the roadmap as they don't align with our c
 
 ```
 solana-lockbox/
-├── programs/lockbox/          # Anchor Solana program
+├── programs/lockbox/              # Anchor Solana program
 │   ├── src/
-│   │   ├── lib.rs            # Main program logic
-│   │   ├── state.rs          # Account structures
-│   │   └── instructions/     # Program instructions
-├── nextjs-app/                # Next.js 15 frontend
-│   ├── app/                  # App router pages
-│   ├── components/           # React components
-│   │   ├── PasswordManager.tsx
-│   │   ├── SubscriptionCard.tsx
-│   │   ├── SubscriptionUpgradeModal.tsx
-│   │   └── StorageUsageBar.tsx
-│   └── lib/                  # Crypto & utilities
-├── sdk/                       # TypeScript SDK
+│   │   ├── lib.rs                # Main program logic
+│   │   ├── state/                # Account structures
+│   │   │   ├── master_lockbox.rs
+│   │   │   ├── storage_chunk.rs
+│   │   │   └── subscription.rs
+│   │   ├── instructions/         # Program instructions
+│   │   │   ├── initialize.rs
+│   │   │   ├── password_entry.rs
+│   │   │   ├── subscription.rs
+│   │   │   └── chunk_management.rs
+│   │   └── errors.rs             # Custom error types
+├── nextjs-app/                    # Next.js 15 frontend
+│   ├── app/                      # App router pages
+│   ├── components/               # Organized React components
+│   │   ├── modals/              # Modal dialogs
+│   │   │   ├── PasswordEntryModal.tsx
+│   │   │   ├── SubscriptionUpgradeModal.tsx
+│   │   │   ├── HealthDashboardModal.tsx
+│   │   │   └── TOTPManagerModal.tsx
+│   │   ├── ui/                  # UI primitives
+│   │   │   ├── Toast.tsx        # Enhanced toast system
+│   │   │   ├── ErrorBoundary.tsx
+│   │   │   ├── LoadingState.tsx
+│   │   │   └── StorageUsageBar.tsx
+│   │   ├── features/            # Feature components
+│   │   │   ├── PasswordManager.tsx
+│   │   │   └── SubscriptionCard.tsx
+│   │   └── layout/              # Layout components
+│   ├── contexts/                # React contexts (split architecture)
+│   │   ├── AuthContext.tsx      # Session management
+│   │   ├── LockboxContext.tsx   # Lockbox metadata
+│   │   ├── PasswordContext.tsx  # Password operations
+│   │   └── SubscriptionContext.tsx
+│   └── lib/                     # Crypto & utilities
+├── sdk/                          # TypeScript SDK (v2 default)
 │   ├── src/
-│   │   ├── client-v2.ts      # SDK client
-│   │   └── types-v2.ts       # Type definitions
-├── PASSWORD_MANAGER_EXPANSION.md  # Technical spec
-├── DEPLOYMENT_V2.md              # Deployment guide
+│   │   ├── client-v2.ts         # V2 SDK client (default)
+│   │   ├── client-v1.ts         # V1 client (legacy)
+│   │   ├── types-v2.ts          # Discriminated union types
+│   │   ├── constants.ts         # Centralized constants
+│   │   ├── retry.ts             # Retry utility with backoff
+│   │   ├── error-formatter.ts   # User-friendly errors
+│   │   └── utils.ts             # Helper functions
+├── docs/                         # Organized documentation
+│   ├── deployment/              # Deployment guides
+│   ├── security/                # Security documentation
+│   ├── technical/               # Technical specifications
+│   └── releases/                # Release notes
 └── README.md                     # This file
 ```
 

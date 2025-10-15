@@ -281,15 +281,16 @@ export class TOTPManager {
    * @returns HMAC-SHA1 result
    */
   private static async hmacSHA1(key: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
+    // Use type assertion to work around ArrayBuffer type mismatch
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
-      key,
+      key as BufferSource,
       { name: 'HMAC', hash: 'SHA-1' },
       false,
       ['sign']
     );
 
-    const signature = await crypto.subtle.sign('HMAC', cryptoKey, message);
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, message as BufferSource);
     return new Uint8Array(signature);
   }
 

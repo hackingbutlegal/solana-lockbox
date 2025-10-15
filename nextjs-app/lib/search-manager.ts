@@ -30,7 +30,8 @@
  * @module search-manager
  */
 
-import { hkdf } from './crypto';
+// TODO: Re-enable when hkdf is implemented in crypto.ts
+// import { hkdf } from './crypto';
 
 /**
  * Search result with relevance scoring
@@ -104,8 +105,15 @@ export class SearchManager {
   private static async deriveSearchKey(
     walletSignature: Uint8Array
   ): Promise<Uint8Array> {
+    // TODO: Implement proper HKDF-based key derivation
+    // For now, use SHA-256 as a temporary solution
     const info = new TextEncoder().encode('lockbox-search-key-v1');
-    return await hkdf(walletSignature, info, 32);
+    const combined = new Uint8Array(walletSignature.length + info.length);
+    combined.set(walletSignature);
+    combined.set(info, walletSignature.length);
+
+    const hash = await crypto.subtle.digest('SHA-256', combined);
+    return new Uint8Array(hash);
   }
 
   /**
@@ -416,15 +424,16 @@ export class SearchManager {
    */
   private async hashToken(token: string): Promise<string> {
     const encoder = new TextEncoder();
+    // Use type assertion to work around ArrayBuffer type mismatch
     const key = await crypto.subtle.importKey(
       'raw',
-      this.searchKey,
+      this.searchKey as BufferSource,
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']
     );
 
-    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(token));
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(token) as BufferSource);
 
     // Convert to hex string
     return Array.from(new Uint8Array(signature))

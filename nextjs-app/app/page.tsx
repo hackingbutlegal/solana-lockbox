@@ -8,14 +8,15 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
-import { LockboxV2Provider } from '../contexts/LockboxV2Context';
+import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider } from '../contexts';
+import { ErrorBoundary, ContextErrorBoundary } from '../components/ui';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 // Dynamically import PasswordManager with no SSR
 const PasswordManager = dynamic(
-  () => import('../components/PasswordManager').then(mod => ({ default: mod.PasswordManager })),
+  () => import('../components/features/PasswordManager').then(mod => ({ default: mod.PasswordManager })),
   {
     ssr: false,
     loading: () => (
@@ -49,14 +50,28 @@ export default function Home() {
   );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <LockboxV2Provider programId={PROGRAM_ID}>
-            <PasswordManager />
-          </LockboxV2Provider>
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <ErrorBoundary>
+      <ConnectionProvider endpoint={endpoint}>
+        <WalletProvider wallets={wallets} autoConnect>
+          <WalletModalProvider>
+            <ContextErrorBoundary onError={(error, errorInfo) => {
+              console.error('Context initialization error:', error, errorInfo);
+            }}>
+              <AuthProvider programId={PROGRAM_ID}>
+                <LockboxProvider>
+                  <PasswordProvider>
+                    <SubscriptionProvider>
+                      <ErrorBoundary>
+                        <PasswordManager />
+                      </ErrorBoundary>
+                    </SubscriptionProvider>
+                  </PasswordProvider>
+                </LockboxProvider>
+              </AuthProvider>
+            </ContextErrorBoundary>
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </ErrorBoundary>
   );
 }

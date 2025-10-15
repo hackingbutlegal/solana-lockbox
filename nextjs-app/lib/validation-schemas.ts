@@ -324,63 +324,138 @@ export const categorySchema = z
  * Hex string schema with optional length validation
  */
 export function hexStringSchema(expectedLength?: number) {
-  let schema = z
+  const baseSchema = z
     .string()
     .transform((val) => val.replace(/[^0-9a-fA-F]/g, '').toLowerCase())
     .pipe(z.string().regex(/^[0-9a-f]*$/, 'Must be a valid hex string'));
 
   if (expectedLength) {
-    schema = schema.pipe(
+    return baseSchema.pipe(
       z.string().length(expectedLength * 2, `Expected ${expectedLength} bytes (${expectedLength * 2} hex characters)`)
-    );
+    ) as any;
   }
 
-  return schema;
+  return baseSchema;
 }
 
 /**
  * ============================================================================
- * COMPOSITE SCHEMAS
+ * COMPOSITE SCHEMAS - DISCRIMINATED UNION
  * ============================================================================
  */
 
 /**
- * Password entry schema - full validation for password entries
+ * Base schema for common fields
  */
-export const passwordEntrySchema = z.object({
+const basePasswordEntrySchema = z.object({
+  id: z.number().optional(),
   title: titleSchema,
-  username: usernameSchema,
-  password: passwordSchema,
-  url: urlSchema,
   notes: notesSchema,
-  email: emailSchema,
-  phone: phoneSchema,
   category: categorySchema,
   tags: tagsSchema,
-  type: z.number().int().min(0).max(10), // PasswordEntryType enum
-  // Additional fields
-  totpSecret: z.string().optional(),
+  favorite: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  createdAt: z.date().optional(),
+  lastModified: z.date().optional(),
+  accessCount: z.number().optional(),
 });
 
 /**
  * Login entry schema - specific to login credentials
  */
-export const loginEntrySchema = passwordEntrySchema.extend({
+export const loginEntrySchema = basePasswordEntrySchema.extend({
   type: z.literal(0), // PasswordEntryType.Login
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
   url: urlSchema,
+  totpSecret: z.string().optional(),
 });
 
 /**
  * Credit card entry schema - specific to credit cards
+ * FIXED: No longer reusing fields - proper semantic fields
  */
-export const creditCardEntrySchema = passwordEntrySchema.extend({
+export const creditCardEntrySchema = basePasswordEntrySchema.extend({
   type: z.literal(1), // PasswordEntryType.CreditCard
-  password: creditCardRequiredSchema, // Card number stored in password field (required)
-  username: z.string().min(1, 'Cardholder name is required'), // Name
-  totpSecret: cvvSchema, // CVV stored in totpSecret field
-  email: expirationDateSchema, // Expiration stored in email field
+  cardNumber: creditCardRequiredSchema,
+  cardHolder: z.string().min(1, 'Cardholder name is required'),
+  cardExpiry: expirationDateBaseSchema,
+  cardCvv: cvvBaseSchema,
+  billingAddress: z.string().optional(),
+  zipCode: z.string().optional(),
 });
+
+/**
+ * Secure note entry schema
+ */
+export const secureNoteEntrySchema = basePasswordEntrySchema.extend({
+  type: z.literal(2), // PasswordEntryType.SecureNote
+  content: z.string().min(1, 'Note content is required'),
+});
+
+/**
+ * Identity entry schema - personal information
+ */
+export const identityEntrySchema = basePasswordEntrySchema.extend({
+  type: z.literal(3), // PasswordEntryType.Identity
+  fullName: z.string().min(1, 'Full name is required'),
+  email: emailSchema,
+  phone: phoneSchema,
+  address: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  ssn: z.string().optional(),
+  passportNumber: z.string().optional(),
+  driversLicense: z.string().optional(),
+});
+
+/**
+ * API key entry schema
+ */
+export const apiKeyEntrySchema = basePasswordEntrySchema.extend({
+  type: z.literal(4), // PasswordEntryType.ApiKey
+  apiKey: z.string().min(1, 'API key is required'),
+  apiSecret: z.string().optional(),
+  apiEndpoint: urlSchema,
+  documentation: z.string().optional(),
+});
+
+/**
+ * SSH key entry schema
+ */
+export const sshKeyEntrySchema = basePasswordEntrySchema.extend({
+  type: z.literal(5), // PasswordEntryType.SshKey
+  username: z.string().min(1, 'Username is required'),
+  hostname: z.string().min(1, 'Hostname is required'),
+  port: z.number().int().min(1).max(65535).optional(),
+  sshPublicKey: z.string().optional(),
+  sshPrivateKey: z.string().min(1, 'Private key is required'),
+  passphrase: z.string().optional(),
+});
+
+/**
+ * Crypto wallet entry schema
+ */
+export const cryptoWalletEntrySchema = basePasswordEntrySchema.extend({
+  type: z.literal(6), // PasswordEntryType.CryptoWallet
+  walletName: z.string().min(1, 'Wallet name is required'),
+  walletAddress: z.string().min(1, 'Wallet address is required'),
+  privateKey: z.string().optional(),
+  seedPhrase: z.string().optional(),
+  network: z.string().optional(),
+});
+
+/**
+ * Discriminated union validator for all password entry types
+ */
+export const passwordEntrySchema = z.discriminatedUnion('type', [
+  loginEntrySchema,
+  creditCardEntrySchema,
+  secureNoteEntrySchema,
+  identityEntrySchema,
+  apiKeyEntrySchema,
+  sshKeyEntrySchema,
+  cryptoWalletEntrySchema,
+]);
 
 /**
  * ============================================================================

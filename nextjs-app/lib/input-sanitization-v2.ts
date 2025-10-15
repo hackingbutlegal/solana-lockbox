@@ -164,7 +164,7 @@ export function sanitizeTags(tags: string[]): string[] {
   if (!result.success) {
     return []; // Return empty array on validation failure
   }
-  return result.data;
+  return result.data || [];
 }
 
 /**
@@ -175,7 +175,7 @@ export function validateCategory(category: number | undefined): number {
   if (!result.success) {
     return 0; // Return default category on validation failure
   }
-  return result.data;
+  return result.data ?? 0;
 }
 
 /**
@@ -187,7 +187,7 @@ export function sanitizeHexString(hex: string, expectedLength?: number): string 
   if (!result.success) {
     throw new Error(result.error);
   }
-  return result.data;
+  return result.data as string;
 }
 
 /**
@@ -220,7 +220,12 @@ export function sanitizePasswordEntry(entry: any): SanitizedPasswordEntry {
     throw new Error(result.error);
   }
 
-  return result.data;
+  // Ensure required fields have defaults
+  return {
+    ...result.data!,
+    category: result.data!.category ?? 0,
+    tags: result.data!.tags ?? [],
+  };
 }
 
 /**
