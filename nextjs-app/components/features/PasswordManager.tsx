@@ -64,17 +64,8 @@ export function PasswordManager() {
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
 
-  // DON'T initialize session automatically - only when needed for encryption/decryption
-  // The session key is only required for storing/retrieving passwords, not for viewing the lockbox
-
-  // Refresh entries when master lockbox is loaded (but only if session exists)
-  // Note: PasswordContext already handles this, so we can remove this useEffect
-  // Keeping it here for safety during migration
-  useEffect(() => {
-    if (masterLockbox && isSessionActive) {
-      refreshEntries();
-    }
-  }, [masterLockbox, isSessionActive, refreshEntries]);
+  // PasswordContext automatically triggers refreshEntries when masterLockbox loads
+  // and handles session initialization as needed, so no manual trigger required here
 
   // Filtered and sorted entries
   const filteredEntries = useMemo(() => {
@@ -712,7 +703,10 @@ export function PasswordManager() {
             <h3>Tools</h3>
             <button
               className="tool-btn"
-              onClick={() => setShowHealthModal(true)}
+              onClick={() => {
+                console.log('[DEBUG] Health Dashboard button clicked, entries.length:', entries.length);
+                setShowHealthModal(true);
+              }}
             >
               📊 Health Dashboard
             </button>
@@ -725,7 +719,10 @@ export function PasswordManager() {
             </button>
             <button
               className="tool-btn"
-              onClick={() => setShowCategoryModal(true)}
+              onClick={() => {
+                console.log('[DEBUG] Categories button clicked');
+                setShowCategoryModal(true);
+              }}
             >
               📂 Categories
             </button>
@@ -1013,9 +1010,16 @@ export function PasswordManager() {
       />
 
       {/* Health Dashboard Modal */}
+      {(() => {
+        console.log('[DEBUG] Health Dashboard Modal render - isOpen:', showHealthModal, 'entries.length:', entries.length);
+        return null;
+      })()}
       <HealthDashboardModal
         isOpen={showHealthModal}
-        onClose={() => setShowHealthModal(false)}
+        onClose={() => {
+          console.log('[DEBUG] Closing Health Dashboard modal');
+          setShowHealthModal(false);
+        }}
         entries={entries
           .filter((e): e is LoginEntry => e.type === PasswordEntryType.Login)
           .map(e => ({
@@ -1039,9 +1043,16 @@ export function PasswordManager() {
       />
 
       {/* Category Manager Modal */}
+      {(() => {
+        console.log('[DEBUG] Category Manager Modal render - isOpen:', showCategoryModal);
+        return null;
+      })()}
       <CategoryManagerModal
         isOpen={showCategoryModal}
-        onClose={() => setShowCategoryModal(false)}
+        onClose={() => {
+          console.log('[DEBUG] Closing Categories modal');
+          setShowCategoryModal(false);
+        }}
         categories={[]} // TODO: Implement category storage
         onCreateCategory={async (name, icon, color, parentId) => {
           // TODO: Implement category creation

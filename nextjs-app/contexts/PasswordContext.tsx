@@ -67,7 +67,22 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
 
   // Refresh password entries
   const refreshEntries = useCallback(async () => {
-    if (!client || !isSessionActive) return;
+    if (!client) {
+      console.log('[PasswordContext] Cannot refresh: client not initialized');
+      return;
+    }
+
+    // If session is not active, try to initialize it first
+    if (!isSessionActive) {
+      console.log('[PasswordContext] Session not active, attempting to initialize...');
+      const initialized = await initializeSession();
+      if (!initialized) {
+        console.log('[PasswordContext] Session initialization failed');
+        setError('Please sign the message to decrypt your passwords');
+        return;
+      }
+      console.log('[PasswordContext] Session initialized successfully');
+    }
 
     try {
       setLoading(true);
@@ -96,7 +111,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, isSessionActive]);
+  }, [client, isSessionActive, initializeSession]);
 
   // Create new password entry
   const createEntry = useCallback(async (entry: PasswordEntry): Promise<number | null> => {
@@ -211,12 +226,14 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     }
   }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
 
-  // Refresh entries when master lockbox is loaded and session is active
+  // Refresh entries when master lockbox is loaded
+  // Session will be initialized automatically if needed by refreshEntries
   useEffect(() => {
-    if (masterLockbox && isSessionActive) {
+    if (masterLockbox) {
+      console.log('[PasswordContext] Master lockbox loaded, refreshing entries...');
       refreshEntries();
     }
-  }, [masterLockbox, isSessionActive, refreshEntries]);
+  }, [masterLockbox, refreshEntries]);
 
   const contextValue: PasswordContextType = {
     entries,
