@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { useLockbox } from './LockboxContext';
 import { PasswordEntry } from '../sdk/src/types-v2';
@@ -53,6 +53,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Track if we've already initialized to prevent multiple calls
+  const hasInitialized = useRef(false);
+
   // Helper to check session timeout
   const checkSessionTimeout = useCallback(async (): Promise<boolean> => {
     if (!isSessionActive) {
@@ -68,20 +71,16 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
   // Refresh password entries
   const refreshEntries = useCallback(async () => {
     if (!client) {
-      console.log('[PasswordContext] Cannot refresh: client not initialized');
       return;
     }
 
     // If session is not active, try to initialize it first
     if (!isSessionActive) {
-      console.log('[PasswordContext] Session not active, attempting to initialize...');
       const initialized = await initializeSession();
       if (!initialized) {
-        console.log('[PasswordContext] Session initialization failed');
         setError('Please sign the message to decrypt your passwords');
         return;
       }
-      console.log('[PasswordContext] Session initialized successfully');
     }
 
     try {
@@ -226,14 +225,15 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     }
   }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
 
-  // Refresh entries when master lockbox is loaded
+  // Refresh entries when master lockbox is loaded (only once)
   // Session will be initialized automatically if needed by refreshEntries
   useEffect(() => {
-    if (masterLockbox) {
-      console.log('[PasswordContext] Master lockbox loaded, refreshing entries...');
+    if (masterLockbox && !hasInitialized.current) {
+      hasInitialized.current = true;
       refreshEntries();
     }
-  }, [masterLockbox, refreshEntries]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [masterLockbox]); // Only depend on masterLockbox, not refreshEntries
 
   const contextValue: PasswordContextType = {
     entries,

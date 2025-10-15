@@ -165,7 +165,8 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
     }
 
     // SECURITY FIX (C-2): Use secure storage accessor
-    if (getSessionKey()) {
+    const existingKey = getSessionKey();
+    if (existingKey) {
       return true; // Already initialized
     }
 
