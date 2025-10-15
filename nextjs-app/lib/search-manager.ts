@@ -520,3 +520,228 @@ export class SearchManager {
     };
   }
 }
+
+/**
+ * Client-Side Search Helpers
+ *
+ * These functions provide immediate client-side search functionality
+ * while blind index search is being integrated with on-chain storage.
+ *
+ * Phase 4: Search & Intelligence
+ */
+
+import type { PasswordEntry, PasswordEntryType } from '../sdk/src/types-v2';
+import { isLoginEntry } from '../sdk/src/types-v2';
+
+/**
+ * Client-side search filter options
+ */
+export interface ClientSearchFilters {
+  entryTypes?: PasswordEntryType[];
+  categories?: number[];
+  favorites?: boolean;
+  archived?: boolean;
+  weakPasswords?: boolean;
+  oldPasswords?: boolean;
+}
+
+/**
+ * Client-side search result
+ */
+export interface ClientSearchResult {
+  entry: PasswordEntry;
+  score: number;
+  matchedFields: string[];
+}
+
+/**
+ * Calculate trigram similarity for fuzzy matching
+ */
+function calculateTrigramSimilarity(str1: string, str2: string): number {
+  const generateTrigrams = (text: string): Set<string> => {
+    const trigrams = new Set<string>();
+    const normalized = text.toLowerCase().trim();
+    if (normalized.length < 3) {
+      trigrams.add(normalized);
+      return trigrams;
+    }
+    for (let i = 0; i <= normalized.length - 3; i++) {
+      trigrams.add(normalized.substring(i, i + 3));
+    }
+    return trigrams;
+  };
+
+  const trigrams1 = generateTrigrams(str1);
+  const trigrams2 = generateTrigrams(str2);
+
+  if (trigrams1.size === 0 && trigrams2.size === 0) return 1.0;
+  if (trigrams1.size === 0 || trigrams2.size === 0) return 0.0;
+
+  let matches = 0;
+  for (const trigram of trigrams1) {
+    if (trigrams2.has(trigram)) matches++;
+  }
+
+  const union = trigrams1.size + trigrams2.size - matches;
+  return matches / union;
+}
+
+/**
+ * Client-side search through decrypted password entries
+ *
+ * Performs fuzzy search with relevance scoring. Use this for immediate
+ * search functionality while blind index integration is in progress.
+ *
+ * @param entries - Decrypted password entries
+ * @param query - Search query
+ * @param filters - Optional filters
+ * @returns Ranked search results
+ */
+export function clientSideSearch(
+  entries: PasswordEntry[],
+  query: string,
+  filters: ClientSearchFilters = {}
+): ClientSearchResult[] {
+  const queryLower = query.toLowerCase().trim();
+  const results: ClientSearchResult[] = [];
+
+  if (queryLower.length === 0) {
+    return [];
+  }
+
+  for (const entry of entries) {
+    // Apply filters
+    if (filters.entryTypes && !filters.entryTypes.includes(entry.type)) {
+      continue;
+    }
+    if (filters.categories && entry.category && !filters.categories.includes(entry.category)) {
+      continue;
+    }
+    if (filters.favorites !== undefined && entry.favorite !== filters.favorites) {
+      continue;
+    }
+    if (filters.archived !== undefined && entry.archived !== filters.archived) {
+      continue;
+    }
+    if (filters.oldPasswords === true && entry.lastModified) {
+      const daysSinceModified = (Date.now() - entry.lastModified.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceModified <= 90) continue;
+    }
+
+    // Calculate relevance score
+    let score = 0;
+    const matchedFields: string[] = [];
+
+    // Title matching
+    const titleLower = entry.title.toLowerCase();
+    if (titleLower === queryLower) {
+      score += 100;
+      matchedFields.push('title (exact)');
+    } else if (titleLower.includes(queryLower)) {
+      score += 60;
+      matchedFields.push('title');
+    } else {
+      const similarity = calculateTrigramSimilarity(entry.title, query);
+      if (similarity > 0.5) {
+        score += Math.floor(30 + similarity * 30);
+        matchedFields.push('title (fuzzy)');
+      }
+    }
+
+    // Login-specific fields
+    if (isLoginEntry(entry)) {
+      // Username
+      if (entry.username.toLowerCase().includes(queryLower)) {
+        score += 40;
+        matchedFields.push('username');
+      }
+
+      // URL
+      if (entry.url && entry.url.toLowerCase().includes(queryLower)) {
+        score += 40;
+        matchedFields.push('url');
+      }
+    }
+
+    // Notes
+    if (entry.notes && entry.notes.toLowerCase().includes(queryLower)) {
+      score += 20;
+      matchedFields.push('notes');
+    }
+
+    // Tags
+    if (entry.tags) {
+      for (const tag of entry.tags) {
+        if (tag.toLowerCase().includes(queryLower)) {
+          score += 30;
+          matchedFields.push('tag');
+          break;
+        }
+      }
+    }
+
+    if (score > 0) {
+      results.push({ entry, score, matchedFields });
+    }
+  }
+
+  // Sort by score (descending)
+  results.sort((a, b) => b.score - a.score);
+
+  return results;
+}
+
+/**
+ * Filter entries by type
+ */
+export function filterByType(entries: PasswordEntry[], types: PasswordEntryType[]): PasswordEntry[] {
+  return entries.filter((entry) => types.includes(entry.type));
+}
+
+/**
+ * Filter entries by category
+ */
+export function filterByCategory(entries: PasswordEntry[], categoryIds: number[]): PasswordEntry[] {
+  return entries.filter((entry) => entry.category && categoryIds.includes(entry.category));
+}
+
+/**
+ * Get favorite entries
+ */
+export function getFavorites(entries: PasswordEntry[]): PasswordEntry[] {
+  return entries.filter((entry) => entry.favorite === true);
+}
+
+/**
+ * Get recently accessed entries (sorted by access count and last modified)
+ */
+export function getRecentlyAccessed(entries: PasswordEntry[], limit: number = 10): PasswordEntry[] {
+  const sorted = [...entries].sort((a, b) => {
+    const accessDiff = (b.accessCount || 0) - (a.accessCount || 0);
+    if (accessDiff !== 0) return accessDiff;
+
+    const aTime = a.lastModified?.getTime() || 0;
+    const bTime = b.lastModified?.getTime() || 0;
+    return bTime - aTime;
+  });
+
+  return sorted.slice(0, limit);
+}
+
+/**
+ * Get old passwords (>90 days since last modified)
+ */
+export function getOldPasswords(entries: PasswordEntry[]): PasswordEntry[] {
+  const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  return entries.filter((entry) => {
+    if (!entry.lastModified) return false;
+    return entry.lastModified.getTime() < ninetyDaysAgo;
+  });
+}
+
+/**
+ * Get archived entries
+ */
+export function getArchived(entries: PasswordEntry[]): PasswordEntry[] {
+  return entries.filter((entry) => entry.archived === true);
+}
