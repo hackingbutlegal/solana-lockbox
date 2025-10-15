@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PasswordHealth, PasswordStrength } from '../../lib/password-health-analyzer';
+import { PasswordHealthDetails, PasswordStrength } from '../../lib/password-health-analyzer';
 
 /**
  * PasswordHealthCard Component
@@ -16,7 +16,7 @@ import { PasswordHealth, PasswordStrength } from '../../lib/password-health-anal
 
 export interface PasswordHealthCardProps {
   title: string;
-  health: PasswordHealth;
+  health: PasswordHealthDetails;
   onClick?: () => void;
   className?: string;
   compact?: boolean;
@@ -26,6 +26,7 @@ const STRENGTH_LABELS: Record<PasswordStrength, string> = {
   [PasswordStrength.VeryWeak]: 'Very Weak',
   [PasswordStrength.Weak]: 'Weak',
   [PasswordStrength.Fair]: 'Fair',
+  [PasswordStrength.Good]: 'Good',
   [PasswordStrength.Strong]: 'Strong',
   [PasswordStrength.VeryStrong]: 'Very Strong',
 };
@@ -34,6 +35,7 @@ const STRENGTH_COLORS: Record<PasswordStrength, { bg: string; text: string; bar:
   [PasswordStrength.VeryWeak]: { bg: '#fef2f2', text: '#991b1b', bar: '#dc2626' },
   [PasswordStrength.Weak]: { bg: '#fef3c7', text: '#92400e', bar: '#f59e0b' },
   [PasswordStrength.Fair]: { bg: '#dbeafe', text: '#1e40af', bar: '#3b82f6' },
+  [PasswordStrength.Good]: { bg: '#d1fae5', text: '#065f46', bar: '#34d399' },
   [PasswordStrength.Strong]: { bg: '#d1fae5', text: '#065f46', bar: '#10b981' },
   [PasswordStrength.VeryStrong]: { bg: '#d1fae5', text: '#065f46', bar: '#059669' },
 };
@@ -49,7 +51,7 @@ export function PasswordHealthCard({
   const strengthLabel = STRENGTH_LABELS[health.strength];
 
   // Calculate percentage for progress bar (0-5 scale to 0-100)
-  const strengthPercentage = (health.strength / 4) * 100;
+  const strengthPercentage = (health.strength / 5) * 100;
 
   // Priority issues (show max 3 in compact mode)
   const displayedRecommendations = compact
@@ -97,10 +99,10 @@ export function PasswordHealthCard({
             <span className="metric-label">Entropy</span>
             <span className="metric-value">{health.entropy.toFixed(1)} bits</span>
           </div>
-          {health.age !== undefined && (
+          {health.daysSinceChange !== undefined && (
             <div className="metric">
               <span className="metric-label">Age</span>
-              <span className="metric-value">{health.age} days</span>
+              <span className="metric-value">{health.daysSinceChange} days</span>
             </div>
           )}
         </div>

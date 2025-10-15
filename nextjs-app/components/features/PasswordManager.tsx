@@ -18,6 +18,10 @@ import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { SearchBar } from './SearchBar';
+import { FilterPanel } from './FilterPanel';
+import { VirtualizedPasswordList } from './VirtualizedPasswordList';
+import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 
 /**
  * Password Manager Dashboard
@@ -54,6 +58,17 @@ export function PasswordManager() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedType, setSelectedType] = useState<PasswordEntryType | null>(null);
 
+  // Filter state for FilterPanel
+  const [selectedTypes, setSelectedTypes] = useState<PasswordEntryType[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [showFavorites, setShowFavorites] = useState<boolean | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [showOldPasswords, setShowOldPasswords] = useState(false);
+
+  // Batch operations state
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
+  const [isVirtualizedView, setIsVirtualizedView] = useState(false);
+
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -78,21 +93,46 @@ export function PasswordManager() {
       result = searchEntries(result, searchQuery);
     }
 
-    // Category filter
+    // Legacy single category/type filters (for sidebar compatibility)
     if (selectedCategory !== null) {
       result = result.filter(e => e.category === selectedCategory);
     }
-
-    // Type filter
     if (selectedType !== null) {
       result = result.filter(e => e.type === selectedType);
+    }
+
+    // New FilterPanel multi-select filters
+    if (selectedTypes.length > 0) {
+      result = result.filter(e => selectedTypes.includes(e.type));
+    }
+    if (selectedCategories.length > 0) {
+      result = result.filter(e => e.category !== undefined && selectedCategories.includes(e.category));
+    }
+
+    // Favorites filter
+    if (showFavorites !== null) {
+      result = result.filter(e => e.favorite === showFavorites);
+    }
+
+    // Archived filter
+    if (!showArchived) {
+      result = result.filter(e => !e.archived);
+    }
+
+    // Old passwords filter (>90 days)
+    if (showOldPasswords) {
+      const ninetyDaysAgo = Date.now() / 1000 - (90 * 24 * 60 * 60);
+      result = result.filter(e => {
+        const lastMod = typeof e.lastModified === 'number' ? e.lastModified : (e.lastModified?.getTime() || 0) / 1000;
+        return lastMod < ninetyDaysAgo;
+      });
     }
 
     // Sort
     result = sortEntries(result, sortBy, sortOrder);
 
     return result;
-  }, [entries, searchQuery, selectedCategory, selectedType, sortBy, sortOrder]);
+  }, [entries, searchQuery, selectedCategory, selectedType, selectedTypes, selectedCategories, showFavorites, showArchived, showOldPasswords, sortBy, sortOrder]);
 
   // Category groups (for sidebar)
   const categoryGroups = useMemo(() => {
@@ -216,6 +256,93 @@ export function PasswordManager() {
       console.error('Upgrade failed:', err);
       toast.showError(`Upgrade failed: ${errorMsg}`);
     }
+  };
+
+  // Batch operation handlers
+  const selectedEntries = useMemo(() => {
+    return filteredEntries.filter(e => e.id && selectedEntryIds.has(e.id));
+  }, [filteredEntries, selectedEntryIds]);
+
+  const handleSelectAll = () => {
+    const allIds = new Set(filteredEntries.filter(e => e.id).map(e => e.id!));
+    setSelectedEntryIds(allIds);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedEntryIds(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    const confirmed = await confirm({
+      title: 'Delete Multiple Passwords',
+      message: `Are you sure you want to delete ${selectedEntries.length} password(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      danger: true
+    });
+
+    if (!confirmed) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const entry of selectedEntries) {
+      if (!entry.id) continue;
+      try {
+        const chunkIndex = 0; // TODO: Get from metadata
+        await deleteEntry(chunkIndex, entry.id);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to delete entry ${entry.id}:`, err);
+        failCount++;
+      }
+    }
+
+    setSelectedEntryIds(new Set());
+
+    if (failCount === 0) {
+      toast.showSuccess(`Successfully deleted ${successCount} password(s)`);
+    } else {
+      toast.showWarning(`Deleted ${successCount} password(s), but ${failCount} failed`);
+    }
+  };
+
+  const handleArchiveSelected = async () => {
+    // TODO: Implement batch archive when SDK supports archive flag
+    toast.showInfo('Batch archive coming soon!');
+  };
+
+  const handleUnarchiveSelected = async () => {
+    // TODO: Implement batch unarchive when SDK supports archive flag
+    toast.showInfo('Batch unarchive coming soon!');
+  };
+
+  const handleFavoriteSelected = async () => {
+    // TODO: Implement batch favorite when SDK supports favorite flag
+    toast.showInfo('Batch favorite coming soon!');
+  };
+
+  const handleUnfavoriteSelected = async () => {
+    // TODO: Implement batch unfavorite when SDK supports favorite flag
+    toast.showInfo('Batch unfavorite coming soon!');
+  };
+
+  const handleAssignCategory = async (categoryId: number) => {
+    // TODO: Implement batch category assignment
+    toast.showInfo(`Batch category assignment to category ${categoryId} coming soon!`);
+  };
+
+  const handleExportSelected = () => {
+    // TODO: Implement export for selected entries
+    toast.showInfo('Export selected entries coming soon!');
+  };
+
+  const handleClearAllFilters = () => {
+    setSelectedTypes([]);
+    setSelectedCategories([]);
+    setShowFavorites(null);
+    setShowArchived(false);
+    setShowOldPasswords(false);
   };
 
   // If wallet not connected
@@ -828,17 +955,41 @@ export function PasswordManager() {
             }}
           />
 
+          {/* Enhanced Search Bar */}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+            placeholder="Search passwords..."
+            debounceMs={300}
+            showFuzzyIndicator={true}
+            disabled={loading}
+            className="pm-search"
+          />
+
+          {/* Advanced Filter Panel */}
+          <FilterPanel
+            selectedTypes={selectedTypes}
+            onTypesChange={setSelectedTypes}
+            selectedCategories={selectedCategories}
+            onCategoriesChange={setSelectedCategories}
+            categories={categories.map(cat => ({
+              id: cat.id,
+              name: cat.name,
+              count: entries.filter(e => e.category === cat.id).length
+            }))}
+            showFavorites={showFavorites}
+            onShowFavoritesChange={setShowFavorites}
+            showArchived={showArchived}
+            onShowArchivedChange={setShowArchived}
+            showOldPasswords={showOldPasswords}
+            onShowOldPasswordsChange={setShowOldPasswords}
+            onClearAll={handleClearAllFilters}
+            className="pm-filters"
+          />
+
           {/* Toolbar */}
           <div className="pm-toolbar">
-            <div className="search-bar">
-              <input
-                type="text"
-                placeholder="Search passwords..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
             <div className="toolbar-actions">
               <select
                 value={sortBy}
@@ -859,16 +1010,34 @@ export function PasswordManager() {
               <div className="view-toggle">
                 <button
                   className={viewMode === 'list' ? 'active' : ''}
-                  onClick={() => setViewMode('list')}
+                  onClick={() => {
+                    setViewMode('list');
+                    setIsVirtualizedView(false);
+                  }}
                 >
                   List
                 </button>
                 <button
                   className={viewMode === 'grid' ? 'active' : ''}
-                  onClick={() => setViewMode('grid')}
+                  onClick={() => {
+                    setViewMode('grid');
+                    setIsVirtualizedView(false);
+                  }}
                 >
                   Grid
                 </button>
+                {filteredEntries.length > 100 && (
+                  <button
+                    className={isVirtualizedView ? 'active' : ''}
+                    onClick={() => {
+                      setIsVirtualizedView(true);
+                      setViewMode('list');
+                    }}
+                    title="High-performance view for large lists"
+                  >
+                    Virtual
+                  </button>
+                )}
               </div>
 
               <button onClick={refreshEntries} disabled={loading} className="btn-refresh">
@@ -891,6 +1060,31 @@ export function PasswordManager() {
                   : 'Click "New Password" to add your first password'}
               </p>
             </div>
+          ) : isVirtualizedView ? (
+            <VirtualizedPasswordList
+              entries={filteredEntries}
+              onEntryClick={(entry) => {
+                setSelectedEntry(entry);
+                setEntryModalMode('view');
+                setShowDetailsModal(true);
+              }}
+              onEntrySelect={(entry) => {
+                const id = entry.id;
+                if (!id) return;
+                setSelectedEntryIds(prev => {
+                  const next = new Set(prev);
+                  if (next.has(id)) {
+                    next.delete(id);
+                  } else {
+                    next.add(id);
+                  }
+                  return next;
+                });
+              }}
+              selectedEntryIds={selectedEntryIds}
+              height="calc(100vh - 400px)"
+              className="virtualized-list"
+            />
           ) : (
             <div className={`entry-${viewMode}`}>
               {filteredEntries.map((entry) => (
@@ -954,6 +1148,22 @@ export function PasswordManager() {
               ))}
             </div>
           )}
+
+          {/* Batch Operations Toolbar */}
+          <BatchOperationsToolbar
+            selectedEntries={selectedEntries}
+            totalEntries={filteredEntries.length}
+            onSelectAll={handleSelectAll}
+            onDeselectAll={handleDeselectAll}
+            onDeleteSelected={handleDeleteSelected}
+            onArchiveSelected={handleArchiveSelected}
+            onUnarchiveSelected={handleUnarchiveSelected}
+            onFavoriteSelected={handleFavoriteSelected}
+            onUnfavoriteSelected={handleUnfavoriteSelected}
+            onAssignCategory={handleAssignCategory}
+            onExportSelected={handleExportSelected}
+            categories={categories.map(cat => ({ id: cat.id, name: cat.name }))}
+          />
         </main>
       </div>
 
@@ -1450,22 +1660,18 @@ export function PasswordManager() {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
+        .pm-search {
+          margin-bottom: 1rem;
+        }
+
+        .pm-filters {
+          margin-bottom: 1rem;
+        }
+
         .pm-toolbar {
           display: flex;
           gap: 1rem;
           margin-bottom: 1.5rem;
-        }
-
-        .search-bar {
-          flex: 1;
-        }
-
-        .search-bar input {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #e1e8ed;
-          border-radius: 8px;
-          font-size: 1rem;
         }
 
         .toolbar-actions {
@@ -1548,6 +1754,13 @@ export function PasswordManager() {
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         }
 
+        .virtualized-list {
+          margin-top: 1rem;
+          border: 1px solid #e1e8ed;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
         /* Mobile grid view */
         @media (max-width: 768px) {
           .entry-grid {
@@ -1556,6 +1769,10 @@ export function PasswordManager() {
 
           .view-toggle {
             display: none; /* Hide grid/list toggle on mobile */
+          }
+
+          .virtualized-list {
+            height: calc(100vh - 500px) !important;
           }
         }
 
