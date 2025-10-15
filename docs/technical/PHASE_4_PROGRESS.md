@@ -1,7 +1,7 @@
 # Phase 4: Search & Intelligence - Progress Report
 
-**Status**: 🏗️ **CORE UTILITIES COMPLETE** (70% Complete)
-**Date**: October 15, 2025
+**Status**: 🏗️ **STATE MANAGEMENT COMPLETE** (85% Complete)
+**Date**: October 15, 2025 (Updated)
 **Timeline**: 6-8 weeks (started October 15, 2025)
 **Priority**: 🔥 HIGH - Essential for usability at scale
 
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Phase 4 core utilities are complete and ready for UI integration. All search, filtering, health analysis, and import/export functionality has been implemented and tested. The remaining 30% consists of UI components and user-facing integration work.
+Phase 4 state management and core utilities are complete. All search, filtering, health analysis, import/export, batch operations, and state management infrastructure has been implemented. The remaining 15% consists of UI components (modals, search bar, dashboard visualizations).
 
 **Key Achievements**:
 - ✅ Client-side fuzzy search with trigram matching (instant results)
@@ -17,6 +17,9 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
 - ✅ Comprehensive password health analyzer (entropy, patterns, reuse detection)
 - ✅ Import/export support for 5 formats (1Password, Bitwarden, LastPass, generic CSV, Lockbox JSON)
 - ✅ Advanced filtering (type, category, favorites, weak/old passwords)
+- ✅ Batch operations utility with undo support (NEW)
+- ✅ SearchContext provider for state management (NEW)
+- ✅ Multi-select manager with O(1) selection tracking (NEW)
 
 ---
 
@@ -134,6 +137,121 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
 - Replay protection maintained
 - Consistent with existing cryptographic patterns
 
+### 5. Batch Operations Utility ✅
+
+**File**: `nextjs-app/lib/batch-operations.ts` (630 lines)
+
+**MultiSelectManager Class**:
+- **Selection Tracking**: Set-based storage for O(1) lookups
+- **Operations**: select(), deselect(), toggle(), selectAll(), deselectAll()
+- **Conditional Selection**: selectWhere() with predicate function
+- **State Queries**: isSelected(), getSelectedCount(), getSelectedIds(), getSelectedEntries()
+- **Selection State**: isAllSelected(), isSomeSelected()
+- **Auto-Cleanup**: Removes invalid entry IDs when entries list updates
+
+**Batch Operation Functions**:
+- **batchUpdateCategory()**: Update category for multiple entries
+  - Stores undo data (previous category values)
+  - Progress callback support
+  - Per-entry error tracking
+- **batchToggleFavorite()**: Toggle favorite status
+  - Reversible with undo support
+  - Batch timestamp updates
+- **batchToggleArchive()**: Toggle archive status
+  - Undo support for accidental archiving
+- **batchDelete()**: Destructive deletion
+  - Requires explicit confirmation (safety check)
+  - No undo support (permanent)
+  - Warns about favorite entries
+
+**Undo System**:
+- **undoBatchOperation()**: Restore previous state
+- Stores: operation type, entry IDs, previous values, timestamp
+- Works for: category updates, favorite/archive toggles
+- Not available for: delete operations (permanent)
+
+**Helper Functions**:
+- **getSelectionStats()**: Statistics for selected entries
+  - Count by entry type
+  - Favorites count
+  - Archived count
+  - Category distribution
+- **validateBatchOperation()**: Pre-flight validation
+  - Checks for empty selection
+  - Warns about large deletions (>100 entries)
+  - Warns about deleting favorites
+
+**Safety Features**:
+- Confirmation required for destructive operations
+- Undo support for reversible operations
+- Progress callbacks for long operations
+- Detailed error tracking per entry
+- Transaction batching support (configurable)
+
+### 6. SearchContext Provider ✅
+
+**File**: `nextjs-app/contexts/SearchContext.tsx` (270 lines)
+
+**State Management**:
+- **Search State**:
+  - query: Current search query string
+  - searchResults: ClientSearchResult[] with scores
+  - isSearchActive: Boolean flag for active search
+- **Filter State**:
+  - filters: ClientSearchFilters object
+  - Quick filters: favorites, recently accessed, old passwords, archived
+- **Multi-Select State**:
+  - multiSelectManager: MultiSelectManager instance
+  - isMultiSelectMode: Boolean flag
+  - selectedCount: Reactive count of selected entries
+- **Search History**:
+  - Last 10 queries (client-side only)
+  - Deduplicated list
+  - Not persisted (session-only)
+
+**Core Functions**:
+- **performSearch(entries)**: Execute search with filters
+  - Updates multi-select manager with current entries
+  - Applies quick filters first (favorites, recently accessed, etc.)
+  - Excludes archived by default (unless showArchived is true)
+  - Performs fuzzy search if query is active
+  - Converts results to ClientSearchResult format
+- **setQuery() / setFilters()**: Update search parameters
+- **updateFilter(key, value)**: Update individual filter fields
+- **clearFilters()**: Reset all filters to defaults
+- **setMultiSelectMode()**: Toggle multi-select with auto-cleanup
+
+**Quick Filter Shortcuts**:
+- **showFavoritesOnly**: Filter to favorite entries only
+- **showRecentlyAccessed**: Show top 20 recently used entries
+- **showOldPasswords**: Show passwords >90 days old
+- **showArchived**: Show/hide archived entries
+
+**Search History Management**:
+- **addToSearchHistory(query)**: Add query to history
+  - Deduplicates existing queries
+  - Maintains last 10 queries
+  - Adds to front of list
+- **clearSearchHistory()**: Clear all history
+
+**Integration Points**:
+- Works with PasswordEntry[] from PasswordContext
+- Uses clientSideSearch() from search-manager.ts
+- Uses filter helpers (getFavorites, getRecentlyAccessed, etc.)
+- Integrates MultiSelectManager for batch operations
+- Wraps manager methods for reactive count updates
+
+**Memoization & Performance**:
+- Memoized filteredEntries to prevent unnecessary re-renders
+- Wrapped multi-select methods update count reactively
+- useMemo for computed properties
+- useCallback for stable function references
+
+**Context Barrel Export**:
+- Added to `nextjs-app/contexts/index.ts`
+- Follows established export pattern
+- Type-safe with TypeScript
+
 ---
 
 ## Performance Metrics
@@ -166,16 +284,10 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
 
 ---
 
-## Remaining Work (UI Integration - 30%)
+## Remaining Work (UI Components Only - 15%)
 
 ### High Priority (Next Sprint)
-1. **SearchContext Provider** (estimated: 4-6 hours)
-   - State management for search queries
-   - Filter state (type, category, favorites, etc.)
-   - Search result caching
-   - Recent searches (client-side history)
-
-2. **Search UI Components** (estimated: 8-12 hours)
+1. **Search UI Components** (estimated: 8-12 hours)
    - Search bar with autocomplete
    - Filter controls (dropdowns, checkboxes)
    - Search result list with highlighting
@@ -192,7 +304,7 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
    - Expandable password details
 
 ### Medium Priority
-4. **Import/Export UI** (estimated: 6-8 hours)
+2. **Import/Export UI** (estimated: 6-8 hours)
    - File upload modal
    - Format selection dropdown
    - Import preview table
@@ -201,7 +313,7 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
    - Export format selection
    - Export filter controls
 
-5. **Batch Operations UI** (estimated: 6-8 hours)
+3. **Batch Operations UI** (estimated: 6-8 hours)
    - Multi-select checkboxes on password list
    - Bulk action toolbar (appears when items selected)
    - Bulk category assignment
@@ -210,11 +322,11 @@ Phase 4 core utilities are complete and ready for UI integration. All search, fi
    - Progress indicators for bulk operations
 
 ### Low Priority (Future Enhancement)
-6. **Search Result Highlighting**
+4. **Search Result Highlighting**
    - Highlight matched text in results
    - Expand matched notes/tags
 
-7. **Breach Monitoring Integration**
+5. **Breach Monitoring Integration**
    - HaveIBeenPwned API integration
    - Periodic breach checks
    - Compromised password flagging
@@ -230,10 +342,12 @@ nextjs-app/lib/
 ├── search-manager.ts           (748 lines) - Blind index + client-side search
 ├── password-health-analyzer.ts (571 lines) - Health analysis + scoring
 ├── import-export.ts            (650 lines) - Import/export utilities
-└── crypto.ts                   (333 lines) - Added deriveSearchKey()
+├── batch-operations.ts         (630 lines) - Batch ops + multi-select ✅ NEW
+└── crypto.ts                   (371 lines) - Added deriveSearchKey()
 
-nextjs-app/contexts/            (Future)
-└── SearchContext.tsx           (To be created)
+nextjs-app/contexts/
+├── SearchContext.tsx           (270 lines) - Search state management ✅ NEW
+└── index.ts                    (Updated with SearchContext export)
 
 nextjs-app/components/modals/   (Future)
 ├── ImportPasswordsModal.tsx    (To be created)
@@ -379,12 +493,17 @@ nextjs-app/components/ui/       (Future)
 
 ## Conclusion
 
-Phase 4 core utilities represent a major milestone in Lockbox v2.0 development. All essential search, filtering, health analysis, and import/export functionality is complete and ready for integration. The remaining work focuses on user-facing components and polish.
+Phase 4 state management and core utilities are complete. All essential search, filtering, health analysis, import/export, batch operations, and state management infrastructure is implemented and ready for UI integration.
 
-**Phase 4 is 70% complete** with all success criteria met or exceeded. UI integration work will complete the remaining 30% over the next 2-4 weeks.
+**Phase 4 is 85% complete** with all success criteria met or exceeded. Only UI components remain (15%), which will complete over the next 1-2 weeks.
+
+**Total Lines of Code Added**: ~3,800+ lines
+- Core utilities: ~2,600 lines
+- State management: ~900 lines
+- Documentation: ~300 lines
 
 ---
 
-**Report Generated**: October 15, 2025
+**Report Generated**: October 15, 2025 (Updated after batch ops and SearchContext)
 **Next Review**: October 22, 2025 (Post-UI Integration)
 **Maintained By**: GRAFFITO (@0xgraffito)
