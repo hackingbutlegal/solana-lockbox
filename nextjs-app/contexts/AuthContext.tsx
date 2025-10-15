@@ -159,6 +159,18 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
     setLastActivityTime(Date.now());
   }, []);
 
+  // Clear session and wipe sensitive data
+  // NOTE: Must be defined before checkSessionTimeout to avoid circular dependency
+  const clearSession = useCallback(() => {
+    // SECURITY FIX (C-2): Use secure storage with automatic cleanup
+    sessionKeyStore.clear();
+    setIsSessionActive(false);
+
+    // SECURITY FIX (C-3): Clear session timestamps
+    setSessionStartTime(null);
+    setLastActivityTime(null);
+  }, [sessionKeyStore]);
+
   // SECURITY: Immediate session timeout check for sensitive operations
   // This prevents race conditions where operations could proceed after timeout
   // but before the 30-second polling interval detects it
@@ -231,17 +243,6 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
       setLoading(false);
     }
   }, [publicKey, signMessage, getSessionKey, setSessionKey]);
-
-  // Clear session and wipe sensitive data
-  const clearSession = useCallback(() => {
-    // SECURITY FIX (C-2): Use secure storage with automatic cleanup
-    sessionKeyStore.clear();
-    setIsSessionActive(false);
-
-    // SECURITY FIX (C-3): Clear session timestamps
-    setSessionStartTime(null);
-    setLastActivityTime(null);
-  }, [sessionKeyStore]);
 
   // SECURITY FIX (C-3): Automatic session timeout checking
   // Poll every 30 seconds to check for timeout
