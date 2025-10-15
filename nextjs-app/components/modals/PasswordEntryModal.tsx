@@ -403,7 +403,7 @@ export function PasswordEntryModal({
                 <label>Title *</label>
                 <input
                   type="text"
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., GitHub Account"
                   disabled={!isEditing}
@@ -522,7 +522,7 @@ export function PasswordEntryModal({
                     <label>Email</label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={formData.email || ''}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="email@example.com"
                       disabled={!isEditing}
@@ -533,7 +533,7 @@ export function PasswordEntryModal({
                     <label>2FA Secret (TOTP)</label>
                     <input
                       type="text"
-                      value={formData.totpSecret}
+                      value={formData.totpSecret || ''}
                       onChange={(e) => setFormData({ ...formData, totpSecret: e.target.value })}
                       placeholder="Base32-encoded secret"
                       disabled={!isEditing}
@@ -1029,7 +1029,7 @@ export function PasswordEntryModal({
                 <div className="form-group">
                   <label>Notes</label>
                   <textarea
-                    value={formData.notes}
+                    value={formData.notes || ''}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
                     rows={4}
