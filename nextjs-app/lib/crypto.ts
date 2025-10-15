@@ -269,6 +269,70 @@ export async function createSessionKeyFromSignature(
 }
 
 /**
+ * Derive search key from wallet signature
+ *
+ * Creates a separate key for search operations, isolated from encryption keys.
+ * Uses HKDF with a different info string to ensure key domain separation.
+ *
+ * Phase 4: Search & Intelligence
+ *
+ * @param publicKey - User's wallet public key
+ * @param signature - Ed25519 signature from wallet.signMessage()
+ * @returns Promise resolving to 32-byte search key
+ *
+ * @example
+ * ```typescript
+ * const challenge = generateChallenge(publicKey);
+ * const signature = await wallet.signMessage(challenge);
+ * const searchKey = await deriveSearchKey(publicKey, signature);
+ * ```
+ */
+export async function deriveSearchKey(
+  publicKey: PublicKey,
+  signature: Uint8Array
+): Promise<Uint8Array> {
+  // Derive deterministic salt (same as session key for consistency)
+  const saltInput = new Uint8Array([
+    ...publicKey.toBytes(),
+    ...new TextEncoder().encode('lockbox-salt-v1'),
+  ]);
+
+  const saltBuffer = await crypto.subtle.digest('SHA-256', saltInput);
+  const salt = new Uint8Array(saltBuffer);
+
+  // Concatenate inputs for key derivation
+  const ikm = new Uint8Array([
+    ...publicKey.toBytes(),
+    ...signature,
+    ...salt,
+  ]);
+
+  // Use SubtleCrypto for HKDF with DIFFERENT info string for domain separation
+  const key = await crypto.subtle.importKey(
+    'raw',
+    ikm,
+    { name: 'HKDF' },
+    false,
+    ['deriveBits']
+  );
+
+  const infoBytes = new TextEncoder().encode('lockbox-search-key-v1');
+  // @ts-expect-error - TextEncoder.encode() returns Uint8Array but TS infers broader type
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: salt,
+      info: infoBytes,
+    },
+    key,
+    256 // 32 bytes
+  );
+
+  return new Uint8Array(derivedBits);
+}
+
+/**
  * Wipe sensitive data from memory (multiple passes with random data)
  *
  * SECURITY: JavaScript garbage collection may leave copies in memory.
