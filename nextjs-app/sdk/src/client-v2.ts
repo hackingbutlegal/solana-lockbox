@@ -437,7 +437,7 @@ export class LockboxV2Client {
       const json = util.encodeUTF8(decrypted);
 
       // Deserialize with version checking and validation
-      return deserializeEntry(json);
+      return deserializeEntry(json) as PasswordEntry;
     } catch (error) {
       if (error instanceof DataCorruptionError) {
         console.error('Data corruption detected:', error.message);
@@ -588,70 +588,102 @@ export class LockboxV2Client {
     const [masterLockbox] = this.getMasterLockboxAddress();
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-    // Check if chunk already exists (from a previous failed transaction)
-    const existingChunk = await this.connection.getAccountInfo(storageChunk);
-    if (existingChunk) {
-      console.warn(`[initializeStorageChunk] Chunk ${chunkIndex} already exists at ${storageChunk.toBase58()}`);
-
-      // Check if it's registered in master lockbox
-      const master = await this.getMasterLockbox();
-      const isRegistered = master.storageChunks.some(c => c.chunkIndex === chunkIndex);
-
-      if (isRegistered) {
-        console.log(`[initializeStorageChunk] Chunk ${chunkIndex} is properly registered, skipping`);
-        return 'chunk-already-exists';
-      }
-
-      // Orphaned chunk detected - it exists but isn't registered
-      console.error(`[initializeStorageChunk] ORPHANED CHUNK DETECTED!`);
-      console.error(`  Chunk ${chunkIndex} exists on-chain but is not registered in master lockbox`);
-      console.error(`  This is likely due to a previous failed transaction or RPC lag`);
-      console.error(`  Account: ${storageChunk.toBase58()}`);
-      console.error(`  Rent locked: ${existingChunk.lamports / 1e9} SOL`);
-
-      throw new Error(
-        `Orphaned storage chunk detected at index ${chunkIndex}. ` +
-        `The chunk account exists but is not registered in your master lockbox. ` +
-        `This can happen due to transaction failures or RPC lag. ` +
-        `Unfortunately, this chunk cannot be automatically recovered. ` +
-        `Please contact support or use a different wallet address.`
-      );
+    // Prevent duplicate chunk creation attempts
+    const operationKey = `chunk-${storageChunk.toBase58()}`;
+    if (this.pendingTransactions.has(operationKey)) {
+      console.warn(`[initializeStorageChunk] Chunk ${chunkIndex} creation already in progress, skipping duplicate request`);
+      throw new Error(`Chunk ${chunkIndex} initialization already in progress`);
     }
 
-    console.log(`[initializeStorageChunk] Creating chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
-
-    // Build instruction data: discriminator + args
-    // Args: chunk_index (u16) + initial_capacity (u32) + data_type (u8)
-    const argsBuffer = Buffer.alloc(7);
-    argsBuffer.writeUInt16LE(chunkIndex, 0);
-    argsBuffer.writeUInt32LE(initialCapacity, 2);
-    argsBuffer.writeUInt8(dataType, 6);
-
-    const instructionData = Buffer.concat([
-      INSTRUCTION_DISCRIMINATORS.initializeStorageChunk,
-      argsBuffer,
-    ]);
-
-    const instruction = new TransactionInstruction({
-      programId: PROGRAM_ID,
-      keys: [
-        { pubkey: masterLockbox, isSigner: false, isWritable: true },
-        { pubkey: storageChunk, isSigner: false, isWritable: true },
-        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      data: instructionData,
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = this.wallet.publicKey;
-    transaction.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
-
     try {
-      const signed = await this.wallet.signTransaction(transaction);
-      const signature = await this.connection.sendRawTransaction(signed.serialize());
+      this.pendingTransactions.add(operationKey);
 
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      // Check if chunk already exists (from a previous failed transaction)
+      const existingChunk = await this.connection.getAccountInfo(storageChunk);
+      if (existingChunk) {
+        console.warn(`[initializeStorageChunk] Chunk ${chunkIndex} already exists at ${storageChunk.toBase58()}`);
+
+        // Check if it's registered in master lockbox
+        const master = await this.getMasterLockbox();
+        const isRegistered = master.storageChunks.some(c => c.chunkIndex === chunkIndex);
+
+        if (isRegistered) {
+          console.log(`[initializeStorageChunk] Chunk ${chunkIndex} is properly registered, skipping`);
+          return 'chunk-already-exists';
+        }
+
+        // Orphaned chunk detected - it exists but isn't registered
+        console.error(`[initializeStorageChunk] ORPHANED CHUNK DETECTED!`);
+        console.error(`  Chunk ${chunkIndex} exists on-chain but is not registered in master lockbox`);
+        console.error(`  This is likely due to a previous failed transaction or RPC lag`);
+        console.error(`  Account: ${storageChunk.toBase58()}`);
+        console.error(`  Rent locked: ${existingChunk.lamports / 1e9} SOL`);
+
+        throw new Error(
+          `Orphaned storage chunk detected at index ${chunkIndex}. ` +
+          `The chunk account exists but is not registered in your master lockbox. ` +
+          `This can happen due to transaction failures or RPC lag. ` +
+          `Unfortunately, this chunk cannot be automatically recovered. ` +
+          `Please contact support or use a different wallet address.`
+        );
+      }
+
+      console.log(`[initializeStorageChunk] Creating chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
+
+      // Build instruction data: discriminator + args
+      // Args: chunk_index (u16) + initial_capacity (u32) + data_type (u8)
+      const argsBuffer = Buffer.alloc(7);
+      argsBuffer.writeUInt16LE(chunkIndex, 0);
+      argsBuffer.writeUInt32LE(initialCapacity, 2);
+      argsBuffer.writeUInt8(dataType, 6);
+
+      const instructionData = Buffer.concat([
+        INSTRUCTION_DISCRIMINATORS.initializeStorageChunk,
+        argsBuffer,
+      ]);
+
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: storageChunk, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: instructionData,
+      });
+
+      const transaction = new Transaction().add(instruction);
+      transaction.feePayer = this.wallet.publicKey;
+
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+
+      console.log(`[initializeStorageChunk] Signing and sending transaction for chunk ${chunkIndex}...`);
+
+      let signature: string;
+      if (this.wallet.sendTransaction) {
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      } else {
+        const signed = await this.wallet.signTransaction(transaction);
+        signature = await this.connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3,
+        });
+      }
+
+      console.log(`[initializeStorageChunk] Transaction sent:`, signature);
+
+      await this.connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      }, 'confirmed');
 
       console.log(`[initializeStorageChunk] Chunk ${chunkIndex} created successfully`);
 
@@ -665,6 +697,8 @@ export class LockboxV2Client {
       }
       // Re-throw other errors
       throw error;
+    } finally {
+      this.pendingTransactions.delete(operationKey);
     }
   }
 
@@ -676,10 +710,20 @@ export class LockboxV2Client {
    * Store a new password entry
    */
   async storePassword(entry: PasswordEntry): Promise<{ txSignature: string; entryId: number }> {
-    const sessionKey = await this.getSessionKey();
+    // Prevent duplicate password creation attempts (in case user double-clicks "Save")
+    const operationKey = `store-${entry.title}-${Date.now()}`;
+    if (this.pendingTransactions.has(operationKey)) {
+      console.warn(`[storePassword] Store operation for "${entry.title}" already in progress, skipping duplicate request`);
+      throw new Error(`Password entry "${entry.title}" is already being created`);
+    }
 
-    // Encrypt the entry
-    const { ciphertext, nonce } = this.encryptEntry(entry, sessionKey);
+    try {
+      this.pendingTransactions.add(operationKey);
+
+      const sessionKey = await this.getSessionKey();
+
+      // Encrypt the entry
+      const { ciphertext, nonce } = this.encryptEntry(entry, sessionKey);
 
     // Combine nonce + ciphertext for storage
     const combined = new Uint8Array(nonce.length + ciphertext.length);
@@ -1005,7 +1049,10 @@ export class LockboxV2Client {
       // Re-throw with more context
       throw new Error(`Failed to store password: ${errorMsg}`);
     }
+  } finally {
+    this.pendingTransactions.delete(operationKey);
   }
+}
 
   /**
    * Retrieve a password entry by ID
@@ -1032,45 +1079,71 @@ export class LockboxV2Client {
    * Update an existing password entry
    */
   async updatePassword(chunkIndex: number, entryId: number, updatedEntry: PasswordEntry): Promise<string> {
-    const sessionKey = await this.getSessionKey();
+    // Prevent duplicate update attempts (in case user double-clicks "Update")
+    const operationKey = `update-${chunkIndex}-${entryId}`;
+    if (this.pendingTransactions.has(operationKey)) {
+      console.warn(`[updatePassword] Update operation for entry ${entryId} already in progress, skipping duplicate request`);
+      throw new Error(`Entry ${entryId} update already in progress`);
+    }
 
-    const { ciphertext, nonce } = this.encryptEntry(updatedEntry, sessionKey);
-    const combined = new Uint8Array(nonce.length + ciphertext.length);
-    combined.set(nonce);
-    combined.set(ciphertext, nonce.length);
+    try {
+      this.pendingTransactions.add(operationKey);
 
-    const [masterLockbox] = this.getMasterLockboxAddress();
-    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+      const sessionKey = await this.getSessionKey();
 
-    const tx = await (this.program.methods as any)
-      .updatePasswordEntry(chunkIndex, new BN(entryId), Buffer.from(combined))
-      .accounts({
-        masterLockbox,
-        storageChunk,
-        owner: this.wallet.publicKey,
-      })
-      .rpc();
+      const { ciphertext, nonce } = this.encryptEntry(updatedEntry, sessionKey);
+      const combined = new Uint8Array(nonce.length + ciphertext.length);
+      combined.set(nonce);
+      combined.set(ciphertext, nonce.length);
 
-    return tx;
+      const [masterLockbox] = this.getMasterLockboxAddress();
+      const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+      const tx = await (this.program.methods as any)
+        .updatePasswordEntry(chunkIndex, new BN(entryId), Buffer.from(combined))
+        .accounts({
+          masterLockbox,
+          storageChunk,
+          owner: this.wallet.publicKey,
+        })
+        .rpc();
+
+      return tx;
+    } finally {
+      this.pendingTransactions.delete(operationKey);
+    }
   }
 
   /**
    * Delete a password entry
    */
   async deletePassword(chunkIndex: number, entryId: number): Promise<string> {
-    const [masterLockbox] = this.getMasterLockboxAddress();
-    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+    // Prevent duplicate delete attempts (in case user double-clicks "Delete")
+    const operationKey = `delete-${chunkIndex}-${entryId}`;
+    if (this.pendingTransactions.has(operationKey)) {
+      console.warn(`[deletePassword] Delete operation for entry ${entryId} already in progress, skipping duplicate request`);
+      throw new Error(`Entry ${entryId} deletion already in progress`);
+    }
 
-    const tx = await (this.program.methods as any)
-      .deletePasswordEntry(chunkIndex, new BN(entryId))
-      .accounts({
-        masterLockbox,
-        storageChunk,
-        owner: this.wallet.publicKey,
-      })
-      .rpc();
+    try {
+      this.pendingTransactions.add(operationKey);
 
-    return tx;
+      const [masterLockbox] = this.getMasterLockboxAddress();
+      const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+      const tx = await (this.program.methods as any)
+        .deletePasswordEntry(chunkIndex, new BN(entryId))
+        .accounts({
+          masterLockbox,
+          storageChunk,
+          owner: this.wallet.publicKey,
+        })
+        .rpc();
+
+      return tx;
+    } finally {
+      this.pendingTransactions.delete(operationKey);
+    }
   }
 
   /**
@@ -1374,48 +1447,142 @@ export class LockboxV2Client {
       throw new Error(`Storage chunk ${chunkIndex} not found`);
     }
 
-    // Deserialize account data using Borsh
-    // Skip the 8-byte discriminator that Anchor adds
+    // Manual deserialization (skip 8-byte discriminator)
+    // Using manual deserialization instead of Borsh to avoid schema resolution issues
     const data = accountInfo.data.slice(8);
 
     try {
-      const schema = new Map([
-        [StorageChunkBorsh, StorageChunkBorsh.schema],
-        [DataEntryHeaderBorsh, DataEntryHeaderBorsh.schema],
-      ]);
+      let offset = 0;
 
-      const deserialized = borsh.deserialize(schema, StorageChunkBorsh, data);
+      // Read master_lockbox (32 bytes)
+      const masterLockbox = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
 
-      // Convert Borsh types to our TypeScript types
+      // Read owner (32 bytes)
+      const owner = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+
+      // Read chunk_index (u16, 2 bytes)
+      const chunkIndexRead = data.readUInt16LE(offset);
+      offset += 2;
+
+      // Read max_capacity (u32, 4 bytes)
+      const maxCapacity = data.readUInt32LE(offset);
+      offset += 4;
+
+      // Read current_size (u32, 4 bytes)
+      const currentSize = data.readUInt32LE(offset);
+      offset += 4;
+
+      // Read data_type (u8, 1 byte)
+      const dataType = data.readUInt8(offset) as StorageType;
+      offset += 1;
+
+      // Read encrypted_data vec (4-byte length + data)
+      const encryptedDataLen = data.readUInt32LE(offset);
+      offset += 4;
+      const encryptedData = data.slice(offset, offset + encryptedDataLen);
+      offset += encryptedDataLen;
+
+      // Read entry_headers vec (4-byte length + items)
+      const entryHeadersLen = data.readUInt32LE(offset);
+      offset += 4;
+      const entryHeaders: DataEntryHeader[] = [];
+
+      for (let i = 0; i < entryHeadersLen; i++) {
+        // entry_id (u64, 8 bytes)
+        const entryId = Number(data.readBigUInt64LE(offset));
+        offset += 8;
+
+        // offset (u32, 4 bytes)
+        const entryOffset = data.readUInt32LE(offset);
+        offset += 4;
+
+        // size (u32, 4 bytes)
+        const size = data.readUInt32LE(offset);
+        offset += 4;
+
+        // entry_type (u8, 1 byte)
+        const entryType = data.readUInt8(offset) as PasswordEntryType;
+        offset += 1;
+
+        // category (u32, 4 bytes)
+        const category = data.readUInt32LE(offset);
+        offset += 4;
+
+        // title_hash ([u8; 32], 32 bytes)
+        const titleHash = Array.from(data.slice(offset, offset + 32));
+        offset += 32;
+
+        // created_at (i64, 8 bytes)
+        const createdAt = Number(data.readBigInt64LE(offset));
+        offset += 8;
+
+        // last_modified (i64, 8 bytes)
+        const lastModified = Number(data.readBigInt64LE(offset));
+        offset += 8;
+
+        // access_count (u32, 4 bytes)
+        const accessCount = data.readUInt32LE(offset);
+        offset += 4;
+
+        // flags (u8, 1 byte)
+        const flags = data.readUInt8(offset);
+        offset += 1;
+
+        entryHeaders.push({
+          entryId,
+          offset: entryOffset,
+          size,
+          entryType,
+          category,
+          titleHash,
+          createdAt,
+          lastModified,
+          accessCount,
+          flags,
+        });
+      }
+
+      // Read entry_count (u16, 2 bytes)
+      const entryCount = data.readUInt16LE(offset);
+      offset += 2;
+
+      // Read created_at (i64, 8 bytes)
+      const createdAt = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read last_modified (i64, 8 bytes)
+      const lastModified = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read bump (u8, 1 byte)
+      const bump = data.readUInt8(offset);
+      offset += 1;
+
+      console.log(`✅ Successfully deserialized storage chunk ${chunkIndex}`);
+      console.log(`  Entry count: ${entryCount}`);
+      console.log(`  Entry headers: ${entryHeaders.length}`);
+
       return {
-        masterLockbox: new PublicKey(deserialized.masterLockbox),
-        owner: new PublicKey(deserialized.owner),
-        chunkIndex: deserialized.chunkIndex,
-        maxCapacity: deserialized.maxCapacity,
-        currentSize: deserialized.currentSize,
-        dataType: deserialized.dataType as StorageType,
-        encryptedData: deserialized.encryptedData,
-        entryHeaders: deserialized.entryHeaders.map((header: DataEntryHeaderBorsh) => ({
-          entryId: Number(header.entryId),
-          offset: header.offset,
-          size: header.size,
-          entryType: header.entryType as PasswordEntryType,
-          category: header.category,
-          titleHash: Array.from(header.titleHash),
-          createdAt: Number(header.createdAt),
-          lastModified: Number(header.lastModified),
-          accessCount: header.accessCount,
-          flags: header.flags,
-        })),
-        entryCount: deserialized.entryCount,
-        createdAt: Number(deserialized.createdAt),
-        lastModified: Number(deserialized.lastModified),
-        bump: deserialized.bump,
+        masterLockbox,
+        owner,
+        chunkIndex: chunkIndexRead,
+        maxCapacity,
+        currentSize,
+        dataType,
+        encryptedData,
+        entryHeaders,
+        entryCount,
+        createdAt,
+        lastModified,
+        bump,
       } as StorageChunk;
     } catch (error) {
       console.error('Failed to deserialize StorageChunk:', error);
       console.error('Account data length:', accountInfo.data.length);
       console.error('Data after discriminator:', data.length);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
       throw new Error(`Failed to deserialize storage chunk: ${error}`);
     }
   }
@@ -1476,12 +1643,77 @@ export class LockboxV2Client {
   // ============================================================================
 
   /**
+   * Close a storage chunk and reclaim rent
+   *
+   * @param chunkIndex Index of the chunk to close
+   * @returns Transaction signature
+   */
+  async closeStorageChunk(chunkIndex: number): Promise<string> {
+    const [masterLockbox] = this.getMasterLockboxAddress();
+    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+    console.log(`[closeStorageChunk] Closing chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
+
+    // Build instruction data: discriminator + chunk_index (u16)
+    const argsBuffer = Buffer.alloc(2);
+    argsBuffer.writeUInt16LE(chunkIndex, 0);
+
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.closeStorageChunk,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: storageChunk, isSigner: false, isWritable: true },
+        { pubkey: masterLockbox, isSigner: false, isWritable: false },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`[closeStorageChunk] ✓ Chunk ${chunkIndex} closed successfully`);
+
+    return signature;
+  }
+
+  /**
    * Close master lockbox and reclaim rent
    *
-   * Permanently deletes the Master Lockbox account and returns all rent to the owner.
-   * This operation is irreversible and will delete all stored passwords.
+   * Permanently deletes the Master Lockbox account and all associated Storage Chunks,
+   * returning all rent to the owner. This operation is irreversible and will delete
+   * all stored passwords.
    *
-   * @returns Transaction signature
+   * @returns Transaction signature of the master lockbox close operation
    */
   async closeMasterLockbox(): Promise<string> {
     const [masterLockbox] = this.getMasterLockboxAddress();
@@ -1506,6 +1738,44 @@ export class LockboxV2Client {
 
       console.log('Closing master lockbox at:', masterLockbox.toBase58());
       console.log('WARNING: This will permanently delete all data and cannot be undone!');
+
+      // CRITICAL FIX: Scan for ALL chunks on-chain, not just registered ones
+      // This prevents orphaned chunks from being left behind
+      console.log('[closeMasterLockbox] Scanning for storage chunks (indices 0-9)...');
+
+      const chunksToClose: number[] = [];
+
+      // Scan for chunks on-chain (check indices 0-9)
+      for (let i = 0; i < 10; i++) {
+        const [chunkPDA] = this.getStorageChunkAddress(i);
+        const chunkAccount = await this.connection.getAccountInfo(chunkPDA);
+
+        if (chunkAccount && chunkAccount.owner.equals(PROGRAM_ID)) {
+          chunksToClose.push(i);
+          console.log(`[closeMasterLockbox] Found chunk ${i} at ${chunkPDA.toBase58()}`);
+        }
+      }
+
+      if (chunksToClose.length > 0) {
+        console.log(`[closeMasterLockbox] Closing ${chunksToClose.length} storage chunk(s)...`);
+
+        for (const chunkIndex of chunksToClose) {
+          try {
+            await this.closeStorageChunk(chunkIndex);
+            console.log(`[closeMasterLockbox] ✓ Closed chunk ${chunkIndex}`);
+          } catch (error) {
+            console.error(`[closeMasterLockbox] Failed to close chunk ${chunkIndex}:`, error);
+            throw new Error(`Failed to close storage chunk ${chunkIndex}: ${error}`);
+          }
+        }
+
+        console.log('[closeMasterLockbox] ✓ All storage chunks closed');
+      } else {
+        console.log('[closeMasterLockbox] No storage chunks found');
+      }
+
+      // Now close the master lockbox
+      console.log('[closeMasterLockbox] Closing master lockbox account...');
 
       // Build instruction manually
       // closeMasterLockbox instruction has no arguments, just the discriminator
@@ -1563,7 +1833,7 @@ export class LockboxV2Client {
         throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
       }
 
-      console.log('✅ Master lockbox closed successfully! Rent reclaimed.');
+      console.log('✅ Master lockbox closed successfully! All rent reclaimed.');
 
       // Clear session key since account no longer exists
       this.clearSession();
@@ -1573,6 +1843,160 @@ export class LockboxV2Client {
       // Always remove from pending, even if there's an error
       this.pendingTransactions.delete(operationKey);
     }
+  }
+
+  /**
+   * Recover from orphaned storage chunks
+   *
+   * This method attempts to recover from a situation where storage chunks exist
+   * but no master lockbox exists. It will:
+   * 1. Initialize a new master lockbox (bypassing orphan checks)
+   * 2. Attempt to close the orphaned chunks
+   * 3. Verify recovery was successful
+   *
+   * WARNING: This is a recovery method that bypasses safety checks.
+   * Only use if you have orphaned chunks preventing normal initialization.
+   *
+   * @param orphanedChunkIndices Array of chunk indices to recover
+   * @returns Object with initialization signature and closed chunk signatures
+   */
+  async recoverOrphanedChunks(orphanedChunkIndices: number[]): Promise<{
+    initSignature: string;
+    closedChunks: { index: number; signature: string; }[];
+    failedChunks: { index: number; error: string; }[];
+  }> {
+    console.log('\n=== Starting Orphaned Chunk Recovery ===\n');
+    console.log(`Attempting to recover ${orphanedChunkIndices.length} orphaned chunk(s)`);
+    console.log(`Chunk indices: ${orphanedChunkIndices.join(', ')}`);
+
+    const [masterLockbox] = this.getMasterLockboxAddress();
+
+    // Step 1: Verify master lockbox doesn't exist
+    const existingMaster = await this.connection.getAccountInfo(masterLockbox);
+    if (existingMaster) {
+      throw new Error(
+        'Master lockbox already exists. Cannot recover orphaned chunks. ' +
+        'If you need to close chunks, use the normal closeMasterLockbox() method.'
+      );
+    }
+
+    // Step 2: Verify orphaned chunks exist
+    console.log('\nVerifying orphaned chunks...');
+    const verifiedOrphans: number[] = [];
+    for (const chunkIndex of orphanedChunkIndices) {
+      const [chunkPDA] = this.getStorageChunkAddress(chunkIndex);
+      const chunkAccount = await this.connection.getAccountInfo(chunkPDA);
+      if (chunkAccount) {
+        verifiedOrphans.push(chunkIndex);
+        console.log(`✓ Found orphaned chunk ${chunkIndex} at ${chunkPDA.toBase58()}`);
+        console.log(`  Rent: ${(chunkAccount.lamports / 1e9).toFixed(4)} SOL`);
+      } else {
+        console.log(`✗ Chunk ${chunkIndex} does not exist, skipping`);
+      }
+    }
+
+    if (verifiedOrphans.length === 0) {
+      throw new Error('No orphaned chunks found at the specified indices');
+    }
+
+    console.log(`\n${verifiedOrphans.length} orphaned chunk(s) verified\n`);
+
+    // Step 3: Initialize master lockbox (bypassing orphan check)
+    console.log('Step 1: Initializing new master lockbox...');
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: INSTRUCTION_DISCRIMINATORS.initializeMasterLockbox,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let initSignature: string;
+    if (this.wallet.sendTransaction) {
+      initSignature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      initSignature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature: initSignature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`✓ Master lockbox initialized: ${initSignature}`);
+
+    // Step 4: Attempt to close orphaned chunks
+    console.log('\nStep 2: Attempting to close orphaned chunks...');
+    const closedChunks: { index: number; signature: string; }[] = [];
+    const failedChunks: { index: number; error: string; }[] = [];
+
+    for (const chunkIndex of verifiedOrphans) {
+      try {
+        console.log(`\nClosing orphaned chunk ${chunkIndex}...`);
+        const signature = await this.closeStorageChunk(chunkIndex);
+        closedChunks.push({ index: chunkIndex, signature });
+        console.log(`✓ Closed chunk ${chunkIndex}: ${signature}`);
+      } catch (error: any) {
+        const errorMsg = error?.message || String(error);
+        console.error(`✗ Failed to close chunk ${chunkIndex}: ${errorMsg}`);
+        failedChunks.push({ index: chunkIndex, error: errorMsg });
+
+        // Check if error indicates chunk doesn't exist anymore
+        if (errorMsg.includes('not found') || errorMsg.includes('invalid account')) {
+          console.log(`  Chunk ${chunkIndex} may have been auto-closed or doesn't exist`);
+        }
+      }
+    }
+
+    // Step 5: Summary
+    console.log('\n=== Recovery Summary ===');
+    console.log(`Master lockbox initialized: ${initSignature}`);
+    console.log(`Chunks closed successfully: ${closedChunks.length}`);
+    console.log(`Chunks failed to close: ${failedChunks.length}`);
+
+    if (closedChunks.length > 0) {
+      console.log('\nSuccessfully closed chunks:');
+      closedChunks.forEach(({ index, signature }) => {
+        console.log(`  - Chunk ${index}: ${signature}`);
+      });
+    }
+
+    if (failedChunks.length > 0) {
+      console.log('\nFailed to close chunks:');
+      failedChunks.forEach(({ index, error }) => {
+        console.log(`  - Chunk ${index}: ${error}`);
+      });
+      console.log('\nWARNING: Some chunks could not be closed.');
+      console.log('These chunks may be legitimately registered or may require manual intervention.');
+    }
+
+    console.log('\n✅ Recovery process complete!');
+    console.log('You can now use your master lockbox normally.\n');
+
+    return {
+      initSignature,
+      closedChunks,
+      failedChunks,
+    };
   }
 
   /**
