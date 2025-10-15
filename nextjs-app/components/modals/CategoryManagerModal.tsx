@@ -199,8 +199,8 @@ export function CategoryManagerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content category-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="category-manager-modal-overlay" onClick={onClose}>
+      <div className="category-manager-modal-content category-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Category Manager</h2>
           <button className="modal-close" onClick={onClose}>
@@ -373,22 +373,22 @@ export function CategoryManagerModal({
           </button>
         </div>
 
-        <style jsx>{`
-          .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 1rem;
+        <style jsx global>{`
+          .category-manager-modal-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            background: rgba(0, 0, 0, 0.8) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 99999 !important;
+            padding: 1rem !important;
           }
 
-          .modal-content {
+          .category-manager-modal-content {
             background: white;
             border-radius: 16px;
             width: 100%;
@@ -826,7 +826,7 @@ export function CategoryManagerModal({
           }
 
           @media (max-width: 768px) {
-            .modal-content {
+            .category-manager-modal-content {
               max-width: 100%;
               margin: 0.5rem;
             }

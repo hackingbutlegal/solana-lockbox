@@ -23,5 +23,9 @@ export type { PasswordContextType } from './PasswordContext';
 export { SubscriptionProvider, useSubscription } from './SubscriptionContext';
 export type { SubscriptionContextType } from './SubscriptionContext';
 
+// Category Context
+export { CategoryProvider, useCategory } from './CategoryContext';
+export type { CategoryContextType } from './CategoryContext';
+
 // Legacy context (kept for backward compatibility during migration)
 export { LockboxV2Provider, useLockboxV2 } from './LockboxV2Context';

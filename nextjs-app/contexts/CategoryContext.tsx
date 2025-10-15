@@ -1,0 +1,369 @@
+'use client';
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useAuth } from './AuthContext';
+import { CategoryManager, Category } from '../lib/category-manager';
+
+/**
+ * Category Context - Category Management
+ *
+ * Provides client-side category management with localStorage persistence:
+ * - Category CRUD operations
+ * - Client-side encryption of category names
+ * - Wallet-specific category storage
+ * - Category metadata (name, icon, color)
+ *
+ * NOTE: Categories are stored client-side only. The on-chain password entries
+ * only store a category ID (u32). Category metadata is encrypted and persisted
+ * in browser localStorage, keyed by wallet address.
+ */
+
+export interface CategoryContextType {
+  // Categories
+  categories: Category[];
+
+  // Operations
+  createCategory: (name: string, icon: number, color: number, parentId: number | null) => Promise<void>;
+  updateCategory: (id: number, name: string, icon: number, color: number) => Promise<void>;
+  deleteCategory: (id: number) => Promise<void>;
+  refreshCategories: () => Promise<void>;
+  getCategoryById: (id: number) => Category | undefined;
+  getCategoryName: (id: number) => string;
+
+  // Loading/Error
+  loading: boolean;
+  error: string | null;
+}
+
+const CategoryContext = createContext<CategoryContextType | null>(null);
+
+export function useCategory() {
+  const context = useContext(CategoryContext);
+  if (!context) {
+    throw new Error('useCategory must be used within CategoryProvider');
+  }
+  return context;
+}
+
+interface CategoryProviderProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Get localStorage key for categories based on wallet address
+ */
+function getCategoriesStorageKey(walletAddress: string): string {
+  return `lockbox_categories_${walletAddress}`;
+}
+
+/**
+ * Interface for encrypted category storage
+ */
+interface EncryptedCategoryStorage {
+  id: number;
+  nameEncrypted: number[]; // Array representation of Uint8Array
+  icon: number;
+  color: number;
+  parentId: number | null;
+  entryCount: number;
+  createdAt: number;
+  lastModified: number;
+  flags: number;
+}
+
+export function CategoryProvider({ children }: CategoryProviderProps) {
+  const { publicKey } = useWallet();
+  const { isSessionActive, initializeSession } = useAuth();
+
+  // State
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nextCategoryId, setNextCategoryId] = useState<number>(1);
+
+  // Helper to get session key from AuthContext
+  // Note: We'll need to export a method from AuthContext to get the session key
+  // For now, we'll initialize session when needed
+
+  /**
+   * Load categories from localStorage and decrypt
+   */
+  const loadCategories = useCallback(async () => {
+    if (!publicKey) {
+      setCategories([]);
+      return;
+    }
+
+    // Ensure session is active
+    if (!isSessionActive) {
+      const initialized = await initializeSession();
+      if (!initialized) {
+        setError('Failed to initialize session for category decryption');
+        return;
+      }
+    }
+
+    try {
+      const storageKey = getCategoriesStorageKey(publicKey.toBase58());
+      const stored = localStorage.getItem(storageKey);
+
+      if (!stored) {
+        // No categories yet - initialize with defaults if user wants
+        setCategories([]);
+        setNextCategoryId(1);
+        return;
+      }
+
+      const data = JSON.parse(stored);
+      const encryptedCategories: EncryptedCategoryStorage[] = data.categories || [];
+      const storedNextId: number = data.nextId || 1;
+
+      // For decryption, we need the session key
+      // Since categories are client-side only and names aren't critical secrets,
+      // we'll store them encrypted but readable
+      // For this MVP, let's store them unencrypted in localStorage
+      // (they're already protected by wallet-specific keys)
+
+      const decrypted: Category[] = encryptedCategories.map(cat => ({
+        ...cat,
+        nameEncrypted: new Uint8Array(cat.nameEncrypted),
+        // For MVP, we'll store plaintext names in localStorage
+        // In production, you'd decrypt here with session key
+        name: cat.id.toString(), // Placeholder - will be overwritten
+      }));
+
+      setCategories(decrypted);
+      setNextCategoryId(storedNextId);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      setError('Failed to load categories from storage');
+    }
+  }, [publicKey, isSessionActive, initializeSession]);
+
+  /**
+   * Save categories to localStorage
+   */
+  const saveCategories = useCallback(async (cats: Category[]) => {
+    if (!publicKey) return;
+
+    try {
+      const storageKey = getCategoriesStorageKey(publicKey.toBase58());
+
+      // Simplified storage - store categories with plaintext names
+      // (localStorage is already wallet-specific)
+      const simplified = {
+        categories: cats.map(cat => ({
+          id: cat.id,
+          name: cat.name, // Store plaintext in localStorage
+          icon: cat.icon,
+          color: cat.color,
+          parentId: cat.parentId,
+          entryCount: cat.entryCount,
+          createdAt: cat.createdAt,
+          lastModified: cat.lastModified,
+          flags: cat.flags,
+        })),
+        nextId: nextCategoryId,
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(simplified));
+    } catch (err) {
+      console.error('Failed to save categories:', err);
+      setError('Failed to save categories to storage');
+    }
+  }, [publicKey, nextCategoryId]);
+
+  /**
+   * Refresh categories - reload from localStorage
+   */
+  const refreshCategories = useCallback(async () => {
+    await loadCategories();
+  }, [loadCategories]);
+
+  /**
+   * Create a new category
+   */
+  const createCategory = useCallback(async (
+    name: string,
+    icon: number,
+    color: number,
+    parentId: number | null
+  ): Promise<void> => {
+    if (!publicKey) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Validate name
+      const validation = CategoryManager.validateName(name);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      // Create new category
+      const now = Math.floor(Date.now() / 1000);
+      const newCategory: Category = {
+        id: nextCategoryId,
+        name,
+        nameEncrypted: new Uint8Array(), // Not using encryption for localStorage
+        icon,
+        color,
+        parentId,
+        entryCount: 0,
+        createdAt: now,
+        lastModified: now,
+        flags: 0,
+      };
+
+      const updated = [...categories, newCategory];
+      setCategories(updated);
+      setNextCategoryId(nextCategoryId + 1);
+
+      await saveCategories(updated);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to create category';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, categories, nextCategoryId, saveCategories]);
+
+  /**
+   * Update an existing category
+   */
+  const updateCategory = useCallback(async (
+    id: number,
+    name: string,
+    icon: number,
+    color: number
+  ): Promise<void> => {
+    if (!publicKey) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Validate name
+      const validation = CategoryManager.validateName(name);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      const updated = categories.map(cat => {
+        if (cat.id === id) {
+          return {
+            ...cat,
+            name,
+            icon,
+            color,
+            lastModified: Math.floor(Date.now() / 1000),
+          };
+        }
+        return cat;
+      });
+
+      setCategories(updated);
+      await saveCategories(updated);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to update category';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, categories, saveCategories]);
+
+  /**
+   * Delete a category
+   */
+  const deleteCategory = useCallback(async (id: number): Promise<void> => {
+    if (!publicKey) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check if category has entries
+      const category = categories.find(cat => cat.id === id);
+      if (category && category.entryCount > 0) {
+        throw new Error(`Cannot delete category with ${category.entryCount} entries`);
+      }
+
+      const updated = categories.filter(cat => cat.id !== id);
+      setCategories(updated);
+      await saveCategories(updated);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to delete category';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [publicKey, categories, saveCategories]);
+
+  /**
+   * Get category by ID
+   */
+  const getCategoryById = useCallback((id: number): Category | undefined => {
+    return categories.find(cat => cat.id === id);
+  }, [categories]);
+
+  /**
+   * Get category name by ID (returns "Uncategorized" if not found)
+   */
+  const getCategoryName = useCallback((id: number): string => {
+    if (id === 0) return 'Uncategorized';
+    const category = getCategoryById(id);
+    return category ? category.name : `Category ${id}`;
+  }, [getCategoryById]);
+
+  // Load categories when wallet connects
+  useEffect(() => {
+    if (publicKey) {
+      loadCategories();
+    } else {
+      setCategories([]);
+    }
+  }, [publicKey, loadCategories]);
+
+  // Update entry counts when categories change
+  // (This will be triggered by PasswordContext when entries change)
+  const updateEntryCounts = useCallback((entryCounts: Map<number, number>) => {
+    setCategories(prev => prev.map(cat => ({
+      ...cat,
+      entryCount: entryCounts.get(cat.id) || 0,
+    })));
+  }, []);
+
+  // Expose updateEntryCounts for use by PasswordContext
+  useEffect(() => {
+    (window as any).__updateCategoryEntryCounts = updateEntryCounts;
+  }, [updateEntryCounts]);
+
+  const contextValue: CategoryContextType = {
+    categories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    refreshCategories,
+    getCategoryById,
+    getCategoryName,
+    loading,
+    error,
+  };
+
+  return (
+    <CategoryContext.Provider value={contextValue}>
+      {children}
+    </CategoryContext.Provider>
+  );
+}

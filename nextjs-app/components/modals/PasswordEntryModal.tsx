@@ -6,6 +6,8 @@ import { PasswordGeneratorModal } from './PasswordGeneratorModal';
 import { PasswordGenerator } from '../../lib/password-generator';
 import { useToast } from '../ui/Toast';
 import { normalizeUrl, isValidUrl } from '../../lib/url-validation';
+import { useCategory } from '../../contexts/CategoryContext';
+import { CategoryManager } from '../../lib/category-manager';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -25,6 +27,7 @@ export function PasswordEntryModal({
   onDelete,
 }: PasswordEntryModalProps) {
   const toast = useToast();
+  const { categories } = useCategory();
   const [formData, setFormData] = useState<Partial<PasswordEntry> & {
     // Temporary fields to handle all entry types
     cardNumber?: string;
@@ -1003,26 +1006,30 @@ export function PasswordEntryModal({
                 </>
               )}
 
-              {/* Category - Show for all types except Secure Note */}
-              {formData.type !== PasswordEntryType.SecureNote && (
-                <div className="form-group">
-                  <label>Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })}
-                    disabled={!isEditing}
-                  >
-                    <option value={0}>Personal</option>
-                    <option value={1}>Work</option>
-                    <option value={2}>Financial</option>
-                    <option value={3}>Social</option>
-                    <option value={4}>Shopping</option>
-                    <option value={5}>Entertainment</option>
-                    <option value={6}>Development</option>
-                    <option value={7}>Education</option>
-                  </select>
-                </div>
-              )}
+              {/* Category - Show for all types */}
+              <div className="form-group">
+                <label>Category (Optional)</label>
+                <select
+                  value={formData.category || 0}
+                  onChange={(e) => setFormData({ ...formData, category: parseInt(e.target.value) })}
+                  disabled={!isEditing}
+                >
+                  <option value={0}>Uncategorized</option>
+                  {categories.map((cat) => {
+                    const icon = CategoryManager.getIcon(cat.icon);
+                    return (
+                      <option key={cat.id} value={cat.id}>
+                        {icon} {cat.name}
+                      </option>
+                    );
+                  })}
+                </select>
+                {categories.length === 0 && isEditing && (
+                  <p className="form-hint">
+                    💡 Create categories from the Categories menu to organize your passwords
+                  </p>
+                )}
+              </div>
 
               {/* Notes - Show for all types except Secure Note (which has its own content field) */}
               {formData.type !== PasswordEntryType.SecureNote && (

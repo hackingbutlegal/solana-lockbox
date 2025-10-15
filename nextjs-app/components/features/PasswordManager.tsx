@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useAuth, useLockbox, usePassword, useSubscription } from '../../contexts';
+import { useAuth, useLockbox, usePassword, useSubscription, useCategory } from '../../contexts';
 import { PasswordEntry, PasswordEntryType, TIER_INFO, LoginEntry } from '../../sdk/src/types-v2';
 import { searchEntries, sortEntries, groupByCategory, checkPasswordStrength, analyzePasswordHealth } from '../../sdk/src/utils';
 import { sanitizePasswordEntry } from '../../lib/input-sanitization-v2';
+import { CategoryManager } from '../../lib/category-manager';
 import { PasswordGeneratorModal } from '../modals/PasswordGeneratorModal';
 import { PasswordEntryModal } from '../modals/PasswordEntryModal';
 import { TOTPManagerModal } from '../modals/TOTPManagerModal';
@@ -43,6 +44,7 @@ export function PasswordManager() {
   const { masterLockbox, error: lockboxError } = useLockbox();
   const { entries, refreshEntries, createEntry, updateEntry, deleteEntry, loading, error } = usePassword();
   const { upgradeSubscription } = useSubscription();
+  const { categories, createCategory, updateCategory, deleteCategory, getCategoryName } = useCategory();
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -105,24 +107,20 @@ export function PasswordManager() {
 
   // Handle create entry
   const handleCreateEntry = async (entry: PasswordEntry) => {
-    console.log('[DEBUG] handleCreateEntry called with:', entry);
     try {
       // Sanitize input
       const sanitized = sanitizePasswordEntry(entry);
-      console.log('[DEBUG] Sanitized entry:', sanitized);
 
-      console.log('[DEBUG] Calling createEntry...');
       const entryId = await createEntry(sanitized as PasswordEntry);
-      console.log('[DEBUG] Entry created with ID:', entryId);
 
       if (entryId) {
         setShowCreateModal(false);
         toast.showSuccess(`Password saved successfully! Entry ID: ${entryId}`);
       } else {
-        toast.showError('Failed to create password entry. Check console for details.');
+        toast.showError('Failed to create password entry.');
       }
     } catch (err) {
-      console.error('[DEBUG] Failed to create entry:', err);
+      console.error('Failed to create entry:', err);
 
       // Check if this is a storage limit error
       // IMPORTANT: Storage limit validation happens in the SDK BEFORE creating any Solana transaction,
@@ -652,8 +650,6 @@ export function PasswordManager() {
   // Main password manager UI
   const tierInfo = TIER_INFO[masterLockbox.subscriptionTier];
 
-  console.log('[DEBUG] PasswordManager render - showCreateModal:', showCreateModal, 'entryModalMode:', entryModalMode);
-
   return (
     <div className="password-manager">
       <header className="pm-header">
@@ -679,8 +675,6 @@ export function PasswordManager() {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('[DEBUG] New Password button clicked');
-              console.log('[DEBUG] showCreateModal BEFORE:', showCreateModal);
 
               // Force state change by toggling: first set to false, then to true
               // This ensures React sees a state change even if already true
@@ -691,7 +685,6 @@ export function PasswordManager() {
               // Use setTimeout to ensure the false state is applied first
               setTimeout(() => {
                 setShowCreateModal(true);
-                console.log('[DEBUG] Modal opened');
               }, 0);
             }}
             disabled={loading}
@@ -704,7 +697,7 @@ export function PasswordManager() {
             <button
               className="tool-btn"
               onClick={() => {
-                console.log('[DEBUG] Health Dashboard button clicked, entries.length:', entries.length);
+                setShowCategoryModal(false); // Ensure other modals are closed
                 setShowHealthModal(true);
               }}
             >
@@ -720,7 +713,7 @@ export function PasswordManager() {
             <button
               className="tool-btn"
               onClick={() => {
-                console.log('[DEBUG] Categories button clicked');
+                setShowHealthModal(false); // Ensure other modals are closed
                 setShowCategoryModal(true);
               }}
             >
@@ -763,18 +756,24 @@ export function PasswordManager() {
           {categoryGroups.size > 0 && (
             <div className="sidebar-section">
               <h3>Categories</h3>
-              {Array.from(categoryGroups.entries()).map(([category, categoryEntries]) => (
-                <button
-                  key={category}
-                  className={`filter-btn ${selectedCategory === category ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedCategory(category);
-                    setSelectedType(null);
-                  }}
-                >
-                  Category {category} ({categoryEntries.length})
-                </button>
-              ))}
+              {Array.from(categoryGroups.entries()).map(([category, categoryEntries]) => {
+                const categoryName = getCategoryName(category);
+                const categoryData = categories.find(c => c.id === category);
+                const icon = categoryData ? CategoryManager.getIcon(categoryData.icon) : '📁';
+
+                return (
+                  <button
+                    key={category}
+                    className={`filter-btn ${selectedCategory === category ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedCategory(category);
+                      setSelectedType(null);
+                    }}
+                  >
+                    {icon} {categoryName} ({categoryEntries.length})
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -906,9 +905,23 @@ export function PasswordManager() {
                 >
                   <div className="entry-header">
                     <h3>{entry.title}</h3>
-                    <span className="entry-type">
-                      {PasswordEntryType[entry.type]}
-                    </span>
+                    <div className="entry-badges">
+                      <span className="entry-type">
+                        {PasswordEntryType[entry.type]}
+                      </span>
+                      {entry.category && entry.category > 0 && (() => {
+                        const categoryData = categories.find(c => c.id === entry.category);
+                        const categoryName = getCategoryName(entry.category);
+                        const icon = categoryData ? CategoryManager.getIcon(categoryData.icon) : '📁';
+                        const color = categoryData ? CategoryManager.getColor(categoryData.color) : '#6B7280';
+
+                        return (
+                          <span className="entry-category" style={{ background: color }}>
+                            {icon} {categoryName}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                   {entry.type === PasswordEntryType.Login && entry.username && (
                     <p className="entry-username">{entry.username}</p>
@@ -945,17 +958,10 @@ export function PasswordManager() {
       </div>
 
       {/* Password Entry Modal (Create/Edit/View) */}
-      {(() => {
-        console.log('[DEBUG] Modal render - showCreateModal:', showCreateModal, 'entryModalMode:', entryModalMode);
-        return null;
-      })()}
       {showCreateModal && entryModalMode === 'create' && (
         <PasswordEntryModal
           isOpen={showCreateModal}
-          onClose={() => {
-            console.log('[DEBUG] Closing create modal');
-            setShowCreateModal(false);
-          }}
+          onClose={() => setShowCreateModal(false)}
           onSave={handleCreateEntry}
           mode="create"
         />
@@ -1010,16 +1016,9 @@ export function PasswordManager() {
       />
 
       {/* Health Dashboard Modal */}
-      {(() => {
-        console.log('[DEBUG] Health Dashboard Modal render - isOpen:', showHealthModal, 'entries.length:', entries.length);
-        return null;
-      })()}
       <HealthDashboardModal
         isOpen={showHealthModal}
-        onClose={() => {
-          console.log('[DEBUG] Closing Health Dashboard modal');
-          setShowHealthModal(false);
-        }}
+        onClose={() => setShowHealthModal(false)}
         entries={entries
           .filter((e): e is LoginEntry => e.type === PasswordEntryType.Login)
           .map(e => ({
@@ -1043,29 +1042,13 @@ export function PasswordManager() {
       />
 
       {/* Category Manager Modal */}
-      {(() => {
-        console.log('[DEBUG] Category Manager Modal render - isOpen:', showCategoryModal);
-        return null;
-      })()}
       <CategoryManagerModal
         isOpen={showCategoryModal}
-        onClose={() => {
-          console.log('[DEBUG] Closing Categories modal');
-          setShowCategoryModal(false);
-        }}
-        categories={[]} // TODO: Implement category storage
-        onCreateCategory={async (name, icon, color, parentId) => {
-          // TODO: Implement category creation
-          console.log('Create category:', { name, icon, color, parentId });
-        }}
-        onUpdateCategory={async (id, name, icon, color) => {
-          // TODO: Implement category update
-          console.log('Update category:', { id, name, icon, color });
-        }}
-        onDeleteCategory={async (id) => {
-          // TODO: Implement category deletion
-          console.log('Delete category:', id);
-        }}
+        onClose={() => setShowCategoryModal(false)}
+        categories={categories}
+        onCreateCategory={createCategory}
+        onUpdateCategory={updateCategory}
+        onDeleteCategory={deleteCategory}
       />
 
       {/* Subscription Upgrade Modal */}
@@ -1603,12 +1586,27 @@ export function PasswordManager() {
           color: #2c3e50;
         }
 
+        .entry-badges {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
         .entry-type {
           background: #f8f9fa;
           padding: 0.25rem 0.5rem;
           border-radius: 4px;
           font-size: 0.75rem;
           color: #7f8c8d;
+        }
+
+        .entry-category {
+          color: white;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          white-space: nowrap;
         }
 
         .entry-username,
