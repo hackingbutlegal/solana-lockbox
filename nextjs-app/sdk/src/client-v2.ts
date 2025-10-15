@@ -1060,19 +1060,20 @@ export class LockboxV2Client {
   async retrievePassword(chunkIndex: number, entryId: number): Promise<PasswordEntry | null> {
     const sessionKey = await this.getSessionKey();
 
-    const [masterLockbox] = this.getMasterLockboxAddress();
-    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+    // Get the storage chunk data
+    const chunk = await this.getStorageChunk(chunkIndex);
 
-    const encryptedData = await (this.program.methods as any)
-      .retrievePasswordEntry(chunkIndex, new BN(entryId))
-      .accounts({
-        masterLockbox,
-        storageChunk,
-        owner: this.wallet.publicKey,
-      })
-      .view();
+    // Find the entry header for this entry ID
+    const header = chunk.entryHeaders.find(h => h.entryId === entryId);
+    if (!header) {
+      throw new Error(`Entry ${entryId} not found in chunk ${chunkIndex}`);
+    }
 
-    return this.decryptEntry(new Uint8Array(encryptedData), sessionKey);
+    // Extract the encrypted data from the chunk using offset and size from header
+    const encryptedEntry = chunk.encryptedData.slice(header.offset, header.offset + header.size);
+
+    // Decrypt and return
+    return this.decryptEntry(encryptedEntry, sessionKey);
   }
 
   /**
