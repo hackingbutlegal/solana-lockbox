@@ -27,7 +27,11 @@ Solana Lockbox v2.0 expands the original 1KB encrypted storage into a comprehens
 ### 🎯 Core Features
 - **Unlimited Storage**: Scale from 1KB to 1MB+ via dynamic chunk allocation
 - **Password Management**: Store, organize, and retrieve unlimited password entries
-- **Categories & Folders**: Organize credentials with hierarchical structure
+- **Categories & Organization**: Organize credentials with client-side categories (NEW)
+  - Hierarchical category structure with icons and colors
+  - Template-based quick category creation
+  - Wallet-specific encrypted category storage
+  - Category-based filtering and organization
 - **Encrypted Search**: Search without decrypting using blind indexes (coming Q1 2026)
 - **Secure Sharing**: Share passwords with other users via asymmetric encryption (coming Q2 2026)
 - **TOTP/2FA**: Built-in 2FA code generation (coming Q3 2026)
@@ -86,11 +90,12 @@ The codebase has undergone a comprehensive refactor to improve maintainability, 
 
 **Frontend Organization**:
 - Components organized by purpose: `modals/`, `ui/`, `features/`, `layout/`
-- Context architecture split into 4 focused providers:
+- Context architecture split into 5 focused providers:
   - `AuthContext`: Session management & client creation
   - `LockboxContext`: Master lockbox metadata
   - `PasswordContext`: Password CRUD operations
   - `SubscriptionContext`: Subscription tier management
+  - `CategoryContext`: Client-side category management (NEW)
 - Error boundaries at multiple layers for graceful failure handling
 - Enhanced toast system with loading states, actions, and progress bars
 - Consistent loading states across all async operations
@@ -129,8 +134,17 @@ Documentation navigation hub with organized sections:
 - Architecture & design documents
 - Deployment guides
 - Security documentation
-- Technical specifications
+- Technical specifications (including category system implementation)
 - Release notes
+- Refactor summary (comprehensive 10-phase documentation)
+
+📖 **[docs/REFACTOR_SUMMARY.md](./docs/REFACTOR_SUMMARY.md)**
+Comprehensive refactor documentation covering all improvements:
+- 10-phase refactor breakdown
+- Category system implementation details
+- Architecture improvements and best practices
+- Files created/modified/deleted metrics
+- Migration guides and lessons learned
 
 📖 **Legacy Documentation**
 - **[PASSWORD_MANAGER_EXPANSION.md](./PASSWORD_MANAGER_EXPANSION.md)**: Original v2.0 technical specification
@@ -187,6 +201,14 @@ Visit http://localhost:3000
 - [x] Enhanced password entry schema (v2 with versioning)
 - [x] Password entry type system (Login, SecureNote, CreditCard, etc.)
 - [x] Comprehensive category management system
+- [x] Client-side category implementation (October 2025)
+  - CategoryContext with localStorage persistence
+  - Category CRUD operations (create, update, delete)
+  - Hierarchical category structure support
+  - Icon and color customization (12 icons, 16 colors)
+  - Template-based category creation
+  - Wallet-specific category storage
+  - Category badges and filtering in UI
 - [x] Client-side encryption (XChaCha20-Poly1305 AEAD)
 - [x] Wallet-derived keys with HKDF
 - [x] Session management with 15-minute timeout
@@ -343,7 +365,9 @@ solana-lockbox/
 │   │   ├── AuthContext.tsx      # Session management
 │   │   ├── LockboxContext.tsx   # Lockbox metadata
 │   │   ├── PasswordContext.tsx  # Password operations
-│   │   └── SubscriptionContext.tsx
+│   │   ├── SubscriptionContext.tsx # Subscription management
+│   │   ├── CategoryContext.tsx  # Category management (client-side)
+│   │   └── index.ts             # Barrel exports
 │   └── lib/                     # Crypto & utilities
 ├── sdk/                          # TypeScript SDK (v2 default)
 │   ├── src/

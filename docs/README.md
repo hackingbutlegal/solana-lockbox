@@ -24,16 +24,24 @@ Security model, audit reports, and security fixes.
 
 ### `/technical`
 Technical deep-dives, specific fixes, and implementation details.
-- Toolchain documentation
-- Technical fix logs
+- `PENDING-TRANSACTION-TRACKING-FIX.md` - Fix for duplicate transaction processing errors
+- `ORPHANED-CHUNK-FIX-SUMMARY.md` - Prevention and recovery for orphaned storage chunks
+- `CLOSE-CHUNK-FIX.md` - Account ordering fix for chunk closure
+- `MULTI-WALLET-RECOVERY-GUIDE.md` - Multi-wallet orphan recovery procedures
+- Rust optimization recommendations
 - Implementation notes
-- Orphaned chunk prevention strategies
 
 ### `/releases`
 Release notes and version history.
 - Historical release notes
 - Schema migration guides
 - Breaking changes documentation
+
+### `/docs` (This Directory)
+Project-wide documentation and refactor summaries.
+- `REFACTOR_SUMMARY.md` - Comprehensive 10-phase refactor documentation
+- Category system implementation details
+- Architecture improvements
 
 ## Main Documentation (Root)
 
@@ -90,5 +98,7 @@ When updating documentation:
 
 ---
 
-**Last Updated**: January 2025 (Refactor Phase 1)
+---
+
+**Last Updated**: October 2025 (Post-Category System Implementation)
 **Maintained By**: GRAFFITO (@0xgraffito)
