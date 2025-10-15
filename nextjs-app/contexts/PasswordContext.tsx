@@ -45,7 +45,14 @@ interface PasswordProviderProps {
 }
 
 export function PasswordProvider({ children }: PasswordProviderProps) {
-  const { client, isSessionActive, initializeSession, updateActivity, clearSession } = useAuth();
+  const {
+    client,
+    isSessionActive,
+    initializeSession,
+    updateActivity,
+    clearSession,
+    checkSessionTimeout: checkAuthTimeout
+  } = useAuth();
   const { masterLockbox } = useLockbox();
 
   // State
@@ -56,17 +63,28 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
   // Track if we've already initialized to prevent multiple calls
   const hasInitialized = useRef(false);
 
-  // Helper to check session timeout
+  // SECURITY: Check session timeout before sensitive operations
   const checkSessionTimeout = useCallback(async (): Promise<boolean> => {
-    if (!isSessionActive) {
-      const initialized = await initializeSession();
-      if (!initialized) {
-        setError('Failed to initialize session');
-        return false;
+    try {
+      // First check if session has timed out
+      checkAuthTimeout();
+
+      // If session is not active, initialize it
+      if (!isSessionActive) {
+        const initialized = await initializeSession();
+        if (!initialized) {
+          setError('Failed to initialize session');
+          return false;
+        }
       }
+      return true;
+    } catch (err) {
+      // Session timeout error
+      const errorMsg = err instanceof Error ? err.message : 'Session expired';
+      setError(errorMsg);
+      return false;
     }
-    return true;
-  }, [isSessionActive, initializeSession]);
+  }, [checkAuthTimeout, isSessionActive, initializeSession]);
 
   // Refresh password entries
   const refreshEntries = useCallback(async () => {

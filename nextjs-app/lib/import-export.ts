@@ -75,7 +75,43 @@ export interface CSVFieldMapping {
 }
 
 /**
- * Parse CSV string into rows
+ * Sanitize CSV field to prevent formula injection
+ *
+ * SECURITY: CSV Injection Protection
+ * Prevents malicious formulas from executing when CSV is opened in Excel/Sheets
+ *
+ * Attack vectors prevented:
+ * - =cmd|'/c calc'!A1 (command execution)
+ * - +1+1 (formula evaluation)
+ * - @SUM(1+1) (function calls)
+ * - -1+1 (negative formulas)
+ * - \t=1+1 (tab-prefixed formulas)
+ *
+ * @param field - Raw CSV field value
+ * @returns Sanitized field safe for CSV export/import
+ */
+function sanitizeCSVField(field: string): string {
+  if (!field || field.length === 0) {
+    return field;
+  }
+
+  const trimmed = field.trim();
+  const firstChar = trimmed[0];
+
+  // Check for dangerous formula characters
+  const dangerousChars = ['=', '+', '-', '@', '\t', '\r'];
+
+  if (dangerousChars.includes(firstChar)) {
+    // Prefix with single quote to force text interpretation
+    // Excel/Sheets will treat '=1+1 as the literal string "=1+1"
+    return `'${field}`;
+  }
+
+  return field;
+}
+
+/**
+ * Parse CSV string into rows with formula injection protection
  */
 function parseCSV(csvText: string): string[][] {
   const rows: string[][] = [];
@@ -104,7 +140,10 @@ function parseCSV(csvText: string): string[][] {
 
     // Add last field
     fields.push(currentField.trim());
-    rows.push(fields);
+
+    // SECURITY: Sanitize all fields to prevent CSV injection
+    const sanitizedFields = fields.map(sanitizeCSVField);
+    rows.push(sanitizedFields);
   }
 
   return rows;
@@ -487,17 +526,20 @@ export function exportToCSV(entries: PasswordEntry[], options: ExportOptions = {
 
     const loginEntry = entry as LoginEntry;
 
-    rows.push([
-      `"${loginEntry.title.replace(/"/g, '""')}"`,
-      `"${loginEntry.username.replace(/"/g, '""')}"`,
-      `"${loginEntry.password.replace(/"/g, '""')}"`,
-      `"${loginEntry.url || ''}"`,
-      `"${loginEntry.notes || ''}"`,
+    // SECURITY: Sanitize fields before export to prevent CSV injection
+    const sanitizedRow = [
+      `"${sanitizeCSVField(loginEntry.title).replace(/"/g, '""')}"`,
+      `"${sanitizeCSVField(loginEntry.username).replace(/"/g, '""')}"`,
+      `"${sanitizeCSVField(loginEntry.password).replace(/"/g, '""')}"`,
+      `"${sanitizeCSVField(loginEntry.url || '').replace(/"/g, '""')}"`,
+      `"${sanitizeCSVField(loginEntry.notes || '').replace(/"/g, '""')}"`,
       'login',
       `${loginEntry.category || ''}`,
       `${loginEntry.favorite ? '1' : '0'}`,
-      `"${(loginEntry.tags || []).join(', ')}"`,
-    ]);
+      `"${sanitizeCSVField((loginEntry.tags || []).join(', ')).replace(/"/g, '""')}"`,
+    ];
+
+    rows.push(sanitizedRow);
   }
 
   return rows.map((row) => row.join(',')).join('\n');

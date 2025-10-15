@@ -30,6 +30,7 @@ export interface AuthContextType {
   initializeSession: () => Promise<boolean>;
   clearSession: () => void;
   updateActivity: () => void;
+  checkSessionTimeout: () => void; // SECURITY: Immediate timeout check for sensitive operations
 
   // Loading/Error
   loading: boolean;
@@ -56,25 +57,43 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
   const { publicKey, signMessage, signTransaction } = wallet;
   const { connection } = useConnection();
 
-  // SECURITY FIX (C-2): Use secure session key storage
-  // WeakMap prevents session key from being exposed in React DevTools
-  // and provides better memory isolation from browser extensions
-  const sessionKeyStorage = useMemo(() => new WeakMap<symbol, Uint8Array>(), []);
-  const [sessionKeyRef] = useState(() => Symbol('sessionKey'));
+  // SECURITY FIX (C-2): Secure session key storage using class-based encapsulation
+  // This prevents session key exposure in React DevTools and provides proper memory isolation
+  const sessionKeyStore = useMemo(() => {
+    class SessionKeyStore {
+      private key: Uint8Array | null = null;
+
+      set(newKey: Uint8Array | null): void {
+        // Wipe previous key before replacing
+        if (this.key) {
+          wipeSensitiveData(this.key);
+        }
+        this.key = newKey;
+      }
+
+      get(): Uint8Array | null {
+        return this.key;
+      }
+
+      clear(): void {
+        if (this.key) {
+          wipeSensitiveData(this.key);
+          this.key = null;
+        }
+      }
+    }
+    return new SessionKeyStore();
+  }, []);
 
   // Helper to get session key from secure storage
   const getSessionKey = useCallback((): Uint8Array | null => {
-    return sessionKeyStorage.get(sessionKeyRef) || null;
-  }, [sessionKeyStorage, sessionKeyRef]);
+    return sessionKeyStore.get();
+  }, [sessionKeyStore]);
 
   // Helper to set session key in secure storage
   const setSessionKey = useCallback((key: Uint8Array | null) => {
-    if (key === null) {
-      sessionKeyStorage.delete(sessionKeyRef);
-    } else {
-      sessionKeyStorage.set(sessionKeyRef, key);
-    }
-  }, [sessionKeyStorage, sessionKeyRef]);
+    sessionKeyStore.set(key);
+  }, [sessionKeyStore]);
 
   // State
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -139,6 +158,16 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
   const updateActivity = useCallback(() => {
     setLastActivityTime(Date.now());
   }, []);
+
+  // SECURITY: Immediate session timeout check for sensitive operations
+  // This prevents race conditions where operations could proceed after timeout
+  // but before the 30-second polling interval detects it
+  const checkSessionTimeout = useCallback(() => {
+    if (isSessionTimedOut()) {
+      clearSession();
+      throw new Error('Session expired. Please sign in again to continue.');
+    }
+  }, [isSessionTimedOut, clearSession]);
 
   // Create client instance (memoized)
   const client = useMemo(() => {
@@ -205,18 +234,14 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
 
   // Clear session and wipe sensitive data
   const clearSession = useCallback(() => {
-    // SECURITY FIX (C-2): Use secure storage accessor
-    const key = getSessionKey();
-    if (key) {
-      wipeSensitiveData(key);
-    }
-    setSessionKey(null);
+    // SECURITY FIX (C-2): Use secure storage with automatic cleanup
+    sessionKeyStore.clear();
     setIsSessionActive(false);
 
     // SECURITY FIX (C-3): Clear session timestamps
     setSessionStartTime(null);
     setLastActivityTime(null);
-  }, [getSessionKey, setSessionKey]);
+  }, [sessionKeyStore]);
 
   // SECURITY FIX (C-3): Automatic session timeout checking
   // Poll every 30 seconds to check for timeout
@@ -243,13 +268,10 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // SECURITY FIX (C-2): Use secure storage accessor
-      const key = getSessionKey();
-      if (key) {
-        wipeSensitiveData(key);
-      }
+      // SECURITY FIX (C-2): Automatic cleanup on unmount
+      sessionKeyStore.clear();
     };
-  }, [getSessionKey]);
+  }, [sessionKeyStore]);
 
   const contextValue: AuthContextType = {
     client,
@@ -258,6 +280,7 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
     initializeSession,
     clearSession,
     updateActivity,
+    checkSessionTimeout,
     loading,
     error,
   };
