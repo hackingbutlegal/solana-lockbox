@@ -1,9 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useLockbox } from './LockboxContext';
 import { PasswordEntry } from '../sdk/src/types-v2';
+import { PendingChangesManager, PendingChange, ChangeStats } from '../lib/pending-changes-manager';
 
 /**
  * Password Context - Password Operations
@@ -13,20 +14,33 @@ import { PasswordEntry } from '../sdk/src/types-v2';
  * - CRUD operations (create, read, update, delete)
  * - Entry refresh
  * - Error handling for password operations
+ * - Batched updates for blockchain efficiency
  */
 
 export interface PasswordContextType {
   // Password Entries
   entries: PasswordEntry[];
 
-  // Operations
+  // Immediate Operations (sends transaction immediately)
   refreshEntries: () => Promise<void>;
   createEntry: (entry: PasswordEntry) => Promise<number | null>;
   updateEntry: (chunkIndex: number, entryId: number, entry: PasswordEntry) => Promise<boolean>;
   deleteEntry: (chunkIndex: number, entryId: number) => Promise<boolean>;
 
+  // Batched Operations (queues locally, syncs later)
+  queueUpdate: (chunkIndex: number, entryId: number, entry: PasswordEntry) => void;
+  queueDelete: (chunkIndex: number, entryId: number) => void;
+  syncPendingChanges: () => Promise<boolean>;
+  discardPendingChanges: () => void;
+
+  // Pending Changes State
+  pendingChanges: PendingChange[];
+  pendingStats: ChangeStats;
+  hasPendingChanges: boolean;
+
   // Loading/Error
   loading: boolean;
+  syncing: boolean;
   error: string | null;
 }
 
@@ -58,10 +72,38 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
   // State
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Track if we've already initialized to prevent multiple calls
   const hasInitialized = useRef(false);
+
+  // Pending changes manager (persists across renders)
+  const pendingChangesManager = useRef(new PendingChangesManager()).current;
+
+  // Pending changes state (triggers re-renders)
+  const [pendingChangesVersion, setPendingChangesVersion] = useState(0);
+
+  // Derived state from pending changes
+  const pendingChanges = useMemo(() =>
+    pendingChangesManager.getAllChanges(),
+    [pendingChangesManager, pendingChangesVersion]
+  );
+
+  const pendingStats = useMemo(() =>
+    pendingChangesManager.getStats(),
+    [pendingChangesManager, pendingChangesVersion]
+  );
+
+  const hasPendingChanges = useMemo(() =>
+    pendingChangesManager.hasPendingChanges(),
+    [pendingChangesManager, pendingChangesVersion]
+  );
+
+  // Trigger re-render when pending changes update
+  const notifyPendingChanges = useCallback(() => {
+    setPendingChangesVersion(v => v + 1);
+  }, []);
 
   // SECURITY: Check session timeout before sensitive operations
   const checkSessionTimeout = useCallback(async (): Promise<boolean> => {
@@ -243,6 +285,161 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     }
   }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
 
+  // ============================================================================
+  // BATCHED OPERATIONS
+  // ============================================================================
+
+  /**
+   * Queue an update locally (doesn't send transaction)
+   * Changes are applied optimistically to the UI
+   */
+  const queueUpdate = useCallback((
+    chunkIndex: number,
+    entryId: number,
+    entry: PasswordEntry
+  ) => {
+    // Find original entry for rollback
+    const originalEntry = entries.find(e => e.id === entryId);
+
+    // Add to pending changes
+    pendingChangesManager.addUpdate(chunkIndex, entryId, entry, originalEntry);
+    notifyPendingChanges();
+
+    // Apply optimistically to UI
+    setEntries(prevEntries =>
+      prevEntries.map(e => e.id === entryId ? { ...entry, id: entryId } : e)
+    );
+  }, [entries, pendingChangesManager, notifyPendingChanges]);
+
+  /**
+   * Queue a delete locally (doesn't send transaction)
+   * Changes are applied optimistically to the UI
+   */
+  const queueDelete = useCallback((
+    chunkIndex: number,
+    entryId: number
+  ) => {
+    // Find original entry for rollback
+    const originalEntry = entries.find(e => e.id === entryId);
+
+    // Add to pending changes
+    pendingChangesManager.addDelete(chunkIndex, entryId, originalEntry);
+    notifyPendingChanges();
+
+    // Apply optimistically to UI
+    setEntries(prevEntries => prevEntries.filter(e => e.id !== entryId));
+  }, [entries, pendingChangesManager, notifyPendingChanges]);
+
+  /**
+   * Sync all pending changes to blockchain in a batched transaction
+   */
+  const syncPendingChanges = useCallback(async (): Promise<boolean> => {
+    if (!client) {
+      setError('Client not initialized');
+      return false;
+    }
+
+    if (!pendingChangesManager.hasPendingChanges()) {
+      return true; // Nothing to sync
+    }
+
+    // Validate changes before syncing
+    const validation = pendingChangesManager.validateChanges();
+    if (!validation.valid) {
+      setError(`Invalid changes: ${validation.errors.join(', ')}`);
+      return false;
+    }
+
+    // Check session and initialize if needed
+    const sessionValid = await checkSessionTimeout();
+    if (!sessionValid) {
+      return false;
+    }
+
+    // Update activity timestamp
+    updateActivity();
+
+    try {
+      setSyncing(true);
+      setError(null);
+
+      const changes = pendingChangesManager.getAllChanges();
+      console.log(`[PasswordContext] Syncing ${changes.length} pending changes...`);
+
+      // Process each change sequentially for now
+      // TODO: Batch multiple instructions into one transaction
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const change of changes) {
+        try {
+          switch (change.type) {
+            case 'update':
+              if (change.chunkIndex !== undefined && change.entryId !== undefined && change.entry) {
+                await client.updatePassword(change.chunkIndex, change.entryId, change.entry);
+                successCount++;
+              }
+              break;
+
+            case 'delete':
+              if (change.chunkIndex !== undefined && change.entryId !== undefined) {
+                await client.deletePassword(change.chunkIndex, change.entryId);
+                successCount++;
+              }
+              break;
+
+            case 'create':
+              if (change.entry) {
+                await client.storePassword(change.entry);
+                successCount++;
+              }
+              break;
+          }
+        } catch (err) {
+          console.error(`[PasswordContext] Failed to sync change ${change.id}:`, err);
+          failCount++;
+        }
+      }
+
+      console.log(`[PasswordContext] Sync complete: ${successCount} success, ${failCount} failed`);
+
+      // Clear pending changes after successful sync
+      if (failCount === 0) {
+        pendingChangesManager.clearAll();
+        notifyPendingChanges();
+
+        // Refresh entries from blockchain
+        await refreshEntries();
+
+        return true;
+      } else {
+        setError(`Sync completed with errors: ${failCount} operations failed`);
+        return false;
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to sync changes';
+      setError(errorMsg);
+      return false;
+    } finally {
+      setSyncing(false);
+    }
+  }, [client, pendingChangesManager, checkSessionTimeout, updateActivity, refreshEntries, notifyPendingChanges]);
+
+  /**
+   * Discard all pending changes and revert to blockchain state
+   */
+  const discardPendingChanges = useCallback(async () => {
+    pendingChangesManager.clearAll();
+    notifyPendingChanges();
+
+    // Refresh from blockchain to revert optimistic updates
+    await refreshEntries();
+  }, [pendingChangesManager, notifyPendingChanges, refreshEntries]);
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
   // Refresh entries when master lockbox is loaded (only once)
   // Session will be initialized automatically if needed by refreshEntries
   useEffect(() => {
@@ -259,7 +456,15 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     createEntry,
     updateEntry,
     deleteEntry,
+    queueUpdate,
+    queueDelete,
+    syncPendingChanges,
+    discardPendingChanges,
+    pendingChanges,
+    pendingStats,
+    hasPendingChanges,
     loading,
+    syncing,
     error,
   };
 
