@@ -7,6 +7,8 @@ import {
   PasswordSecurityAnalysis,
   type PasswordEntryForAnalysis,
 } from '../../lib/password-health';
+import { PasswordHealthCard } from '../features/PasswordHealthCard';
+import { analyzePasswordHealth } from '../../lib/password-health-analyzer';
 
 interface HealthDashboardModalProps {
   isOpen: boolean;
@@ -357,46 +359,24 @@ export function HealthDashboardModal({
                   <div className="critical-list">
                     {criticalPasswords.map((analysis) => {
                       const entry = entries.find((e) => e.id === analysis.entryId);
-                      if (!entry) return null;
+                      if (!entry || !entry.password) return null;
+
+                      // Convert to PasswordHealthDetails format
+                      const healthDetails = analyzePasswordHealth(entry.password);
 
                       return (
-                        <div key={analysis.entryId} className="critical-card">
-                          <div className="critical-card-header">
-                            <div className="critical-title">
-                              <h4>{entry.title}</h4>
-                              {entry.url && <span className="critical-url">{entry.url}</span>}
+                        <div key={analysis.entryId} className="critical-card-wrapper">
+                          <PasswordHealthCard
+                            title={entry.title}
+                            health={healthDetails}
+                            onClick={onEditEntry ? () => onEditEntry(typeof analysis.entryId === 'number' ? analysis.entryId : parseInt(String(analysis.entryId))) : undefined}
+                          />
+                          {entry.url && (
+                            <div className="critical-url-badge">
+                              <span className="url-icon">🔗</span>
+                              <span className="url-text">{entry.url}</span>
                             </div>
-                            {onEditEntry && (
-                              <button
-                                className="btn-fix"
-                                onClick={() => onEditEntry(typeof analysis.entryId === 'number' ? analysis.entryId : parseInt(String(analysis.entryId)))}
-                              >
-                                Fix
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="critical-strength">
-                            <div className="strength-bar-container">
-                              <div
-                                className={`strength-bar strength-${analysis.strengthScore}`}
-                                style={{ width: `${(analysis.strengthScore / 5) * 100}%` }}
-                              />
-                            </div>
-                            <span className="strength-text">
-                              Strength: {getStrengthLabel(analysis.strengthScore)}
-                            </span>
-                          </div>
-
-                          <div className="critical-issues">
-                            {analysis.issues.map((issue, idx) => (
-                              <div key={idx} className="issue-badge">
-                                {issue.includes('Weak') && '⚠️ Weak'}
-                                {issue.includes('reused') && '🔄 Reused'}
-                                {issue.includes('old') && '⏰ Old'}
-                              </div>
-                            ))}
-                          </div>
+                          )}
                         </div>
                       );
                     })}
@@ -708,105 +688,31 @@ export function HealthDashboardModal({
             gap: 1rem;
           }
 
-          .critical-card {
-            background: white;
-            border: 2px solid #e74c3c;
-            border-radius: 12px;
-            padding: 1.5rem;
-          }
-
-          .critical-card-header {
+          .critical-card-wrapper {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-          }
-
-          .critical-title h4 {
-            margin: 0 0 0.25rem 0;
-            color: #2c3e50;
-            font-size: 1.1rem;
-          }
-
-          .critical-url {
-            font-size: 0.85rem;
-            color: #7f8c8d;
-          }
-
-          .btn-fix {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-
-          .btn-fix:hover {
-            background: #5568d3;
-            transform: translateY(-1px);
-          }
-
-          .critical-strength {
-            margin-bottom: 1rem;
-          }
-
-          .strength-bar-container {
-            height: 8px;
-            background: #e1e8ed;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 0.5rem;
-          }
-
-          .strength-bar {
-            height: 100%;
-            transition: all 0.3s;
-            border-radius: 4px;
-          }
-
-          .strength-bar.strength-0,
-          .strength-bar.strength-1 {
-            background: #e74c3c;
-          }
-
-          .strength-bar.strength-2 {
-            background: #f39c12;
-          }
-
-          .strength-bar.strength-3 {
-            background: #f1c40f;
-          }
-
-          .strength-bar.strength-4 {
-            background: #2ecc71;
-          }
-
-          .strength-bar.strength-5 {
-            background: #27ae60;
-          }
-
-          .strength-text {
-            font-size: 0.85rem;
-            color: #7f8c8d;
-          }
-
-          .critical-issues {
-            display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 0.5rem;
-            margin-bottom: 1rem;
           }
 
-          .issue-badge {
-            background: #fff3cd;
-            color: #856404;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            font-weight: 600;
+          .critical-url-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #4a5568;
+          }
+
+          .url-icon {
+            font-size: 1rem;
+          }
+
+          .url-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
 
           .empty-state {

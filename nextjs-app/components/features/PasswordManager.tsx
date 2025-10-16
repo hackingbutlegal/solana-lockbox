@@ -25,6 +25,7 @@ import { VirtualizedPasswordList } from './VirtualizedPasswordList';
 import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
 import { BatchProgressModal } from '../modals/BatchProgressModal';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 /**
  * Password Manager Dashboard
@@ -283,6 +284,48 @@ export function PasswordManager() {
   const handleDeselectAll = () => {
     setSelectedEntryIds(new Set());
   };
+
+  // Keyboard shortcuts for batch operations
+  useHotkeys('ctrl+a, meta+a', (e) => {
+    e.preventDefault();
+    if (selectedEntries.length === filteredEntries.length) {
+      handleDeselectAll();
+    } else {
+      handleSelectAll();
+    }
+  }, { enableOnFormTags: false }, [selectedEntries, filteredEntries]);
+
+  useHotkeys('ctrl+d, meta+d', (e) => {
+    e.preventDefault();
+    handleDeselectAll();
+  }, { enableOnFormTags: false });
+
+  useHotkeys('delete', (e) => {
+    if (selectedEntries.length > 0) {
+      e.preventDefault();
+      handleDeleteSelected();
+    }
+  }, { enableOnFormTags: false }, [selectedEntries]);
+
+  useHotkeys('ctrl+shift+a, meta+shift+a', (e) => {
+    if (selectedEntries.length > 0) {
+      e.preventDefault();
+      handleArchiveSelected();
+    }
+  }, { enableOnFormTags: false }, [selectedEntries]);
+
+  useHotkeys('ctrl+e, meta+e', (e) => {
+    if (selectedEntries.length > 0) {
+      e.preventDefault();
+      handleExportSelected();
+    }
+  }, { enableOnFormTags: false }, [selectedEntries]);
+
+  useHotkeys('escape', () => {
+    if (selectedEntries.length > 0) {
+      handleDeselectAll();
+    }
+  }, { enableOnFormTags: false }, [selectedEntries]);
 
   const handleDeleteSelected = async () => {
     const confirmed = await confirm({

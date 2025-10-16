@@ -331,6 +331,7 @@ export function VirtualizedPasswordList({
 
   return (
     <div className={`virtualized-list-container ${className}`} onKeyDown={handleKeyDown}>
+      {/* @ts-ignore - react-window children type mismatch with Next.js */}
       <List
         ref={listRef}
         height={typeof height === 'number' ? height : parseInt(height) || 600}
