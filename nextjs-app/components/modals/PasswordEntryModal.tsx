@@ -8,6 +8,9 @@ import { useToast } from '../ui/Toast';
 import { normalizeUrl, isValidUrl } from '../../lib/url-validation';
 import { useCategory } from '../../contexts/CategoryContext';
 import { CategoryManager } from '../../lib/category-manager';
+import { trackPasswordChange, isPasswordReused } from '../../lib/password-history';
+import { TOTPManager } from '../../lib/totp';
+import QRCode from 'qrcode';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -96,6 +99,8 @@ export function PasswordEntryModal({
   const [passwordStrength, setPasswordStrength] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(mode === 'create' || mode === 'edit');
   const [urlError, setUrlError] = useState<string>('');
+  const [totpQRCode, setTotpQRCode] = useState<string>('');
+  const [showTotpQR, setShowTotpQR] = useState(false);
 
   // Initialize form data when entry changes
   useEffect(() => {
@@ -107,6 +112,27 @@ export function PasswordEntryModal({
       }
       setFormData(baseData);
     } else {
+      // Check for saved draft when creating new entry
+      const draftKey = 'lockbox_entry_draft_new';
+      try {
+        const savedDraft = sessionStorage.getItem(draftKey);
+        if (savedDraft) {
+          const draft = JSON.parse(savedDraft);
+          // Check if draft is recent (within last hour)
+          const draftAge = Date.now() - draft.timestamp;
+          if (draftAge < 3600000) { // 1 hour
+            setFormData(draft.data);
+            toast.showSuccess('Draft restored from previous session');
+            return;
+          } else {
+            // Clear old draft
+            sessionStorage.removeItem(draftKey);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to restore draft:', err);
+      }
+
       setFormData({
         title: '',
         username: '',
@@ -122,6 +148,34 @@ export function PasswordEntryModal({
     }
     setIsEditing(mode === 'create' || mode === 'edit');
   }, [entry, mode, isOpen]);
+
+  // Auto-save draft when creating new entry
+  useEffect(() => {
+    if (mode === 'create' && isEditing && isOpen) {
+      // Debounce save - wait 2 seconds after user stops typing
+      const timeoutId = setTimeout(() => {
+        const draftKey = 'lockbox_entry_draft_new';
+        try {
+          sessionStorage.setItem(draftKey, JSON.stringify({
+            data: formData,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          console.error('Failed to save draft:', err);
+        }
+      }, 2000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, mode, isEditing, isOpen]);
+
+  // Clear draft when modal is closed after successful save
+  useEffect(() => {
+    if (!isOpen && mode === 'create') {
+      const draftKey = 'lockbox_entry_draft_new';
+      sessionStorage.removeItem(draftKey);
+    }
+  }, [isOpen, mode]);
 
   // Assess password strength on change
   useEffect(() => {
@@ -313,13 +367,53 @@ export function PasswordEntryModal({
         return;
     }
 
+    // Track password history for Login entries with password changes
+    if (
+      entry.type === PasswordEntryType.Login &&
+      'password' in entry &&
+      entry.password &&
+      mode === 'edit' &&
+      formData.id
+    ) {
+      const oldPassword = (entry as any).password;
+      const newPassword = formData.password as string;
+
+      // Check if password has changed
+      if (oldPassword !== newPassword) {
+        // Check for password reuse
+        if (isPasswordReused(formData.id, newPassword)) {
+          const confirmed = window.confirm(
+            'Warning: This password was previously used for this entry. Reusing passwords reduces security. Continue anyway?'
+          );
+          if (!confirmed) return;
+        }
+
+        // Track the password change
+        trackPasswordChange(formData.id, oldPassword, newPassword);
+      }
+    }
+
     onSave(entry);
   };
 
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.showSuccess(`${label} copied to clipboard!`);
+      toast.showSuccess(`${label} copied to clipboard (will auto-clear in 30s)`);
+
+      // Auto-clear clipboard after 30 seconds for security
+      setTimeout(async () => {
+        try {
+          const currentClipboard = await navigator.clipboard.readText();
+          if (currentClipboard === text) {
+            await navigator.clipboard.writeText('');
+            // Silently clear - no notification to avoid interrupting user
+          }
+        } catch (err) {
+          // Silently fail if clipboard access denied (browser security)
+          console.debug('Clipboard auto-clear skipped:', err);
+        }
+      }, 30000);
     } catch (error) {
       console.error('Failed to copy:', error);
       toast.showError('Failed to copy to clipboard');
@@ -342,6 +436,41 @@ export function PasswordEntryModal({
       setUrlError('');
     } else {
       setUrlError('Please enter a valid URL (e.g., microsoft.com or https://example.com)');
+    }
+  };
+
+  // Generate TOTP QR Code
+  const generateTotpQRCode = async () => {
+    if (!formData.totpSecret) {
+      toast.showError('Please enter a TOTP secret first');
+      return;
+    }
+
+    try {
+      // Generate otpauth URI
+      const accountName = (formData as any).email || (formData as any).username || formData.title || 'Account';
+      const uri = TOTPManager.generateQRCodeURI(
+        formData.totpSecret,
+        accountName,
+        'Lockbox'
+      );
+
+      // Generate QR code data URL
+      const qrDataUrl = await QRCode.toDataURL(uri, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      });
+
+      setTotpQRCode(qrDataUrl);
+      setShowTotpQR(true);
+      toast.showSuccess('QR code generated! Scan with authenticator app');
+    } catch (error) {
+      console.error('Failed to generate QR code:', error);
+      toast.showError('Failed to generate QR code');
     }
   };
 
@@ -534,17 +663,45 @@ export function PasswordEntryModal({
 
                   <div className="form-group">
                     <label>2FA Secret (TOTP)</label>
-                    <input
-                      type="text"
-                      value={formData.totpSecret || ''}
-                      onChange={(e) => setFormData({ ...formData, totpSecret: e.target.value })}
-                      placeholder="Base32-encoded secret"
-                      disabled={!isEditing}
-                    />
-                    {formData.totpSecret && (
+                    <div className="totp-input-group">
+                      <input
+                        type="text"
+                        value={formData.totpSecret || ''}
+                        onChange={(e) => setFormData({ ...formData, totpSecret: e.target.value })}
+                        placeholder="Base32-encoded secret"
+                        disabled={!isEditing}
+                      />
+                      {formData.totpSecret && (
+                        <button
+                          type="button"
+                          onClick={generateTotpQRCode}
+                          className="btn-generate-qr"
+                          title="Generate QR Code"
+                        >
+                          📱 QR
+                        </button>
+                      )}
+                    </div>
+                    {formData.totpSecret && !showTotpQR && (
                       <p className="form-hint">
-                        💡 This will enable 2FA code generation for this entry
+                        💡 This will enable 2FA code generation for this entry. Click "QR" to generate setup code.
                       </p>
+                    )}
+                    {showTotpQR && totpQRCode && (
+                      <div className="totp-qr-container">
+                        <p className="qr-instruction">Scan this QR code with your authenticator app:</p>
+                        <img src={totpQRCode} alt="TOTP QR Code" className="totp-qr-image" />
+                        <p className="qr-manual-entry">
+                          Manual entry: <code>{formData.totpSecret}</code>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowTotpQR(false)}
+                          className="btn-close-qr"
+                        >
+                          Close QR Code
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>
@@ -1288,6 +1445,92 @@ export function PasswordEntryModal({
               font-size: 0.85rem;
               color: #e74c3c;
               font-weight: 500;
+            }
+
+            .totp-input-group {
+              display: flex;
+              gap: 0.5rem;
+              align-items: center;
+            }
+
+            .totp-input-group input {
+              flex: 1;
+            }
+
+            .btn-generate-qr {
+              padding: 0.5rem 1rem;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 0.9rem;
+              font-weight: 600;
+              transition: all 0.2s;
+              white-space: nowrap;
+            }
+
+            .btn-generate-qr:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            }
+
+            .totp-qr-container {
+              margin-top: 1rem;
+              padding: 1.5rem;
+              background: #f8f9fa;
+              border-radius: 12px;
+              text-align: center;
+              border: 2px solid #e1e8ed;
+            }
+
+            .qr-instruction {
+              margin: 0 0 1rem 0;
+              font-size: 0.95rem;
+              color: #2c3e50;
+              font-weight: 600;
+            }
+
+            .totp-qr-image {
+              max-width: 300px;
+              width: 100%;
+              height: auto;
+              border-radius: 8px;
+              background: white;
+              padding: 1rem;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+            .qr-manual-entry {
+              margin: 1rem 0;
+              font-size: 0.85rem;
+              color: #7f8c8d;
+            }
+
+            .qr-manual-entry code {
+              background: white;
+              padding: 0.25rem 0.5rem;
+              border-radius: 4px;
+              font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Courier New', monospace;
+              color: #2c3e50;
+              border: 1px solid #e1e8ed;
+            }
+
+            .btn-close-qr {
+              margin-top: 1rem;
+              padding: 0.5rem 1.5rem;
+              background: #95a5a6;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 0.9rem;
+              font-weight: 600;
+              transition: all 0.2s;
+            }
+
+            .btn-close-qr:hover {
+              background: #7f8c8d;
             }
 
             .modal-footer {

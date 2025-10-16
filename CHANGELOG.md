@@ -5,6 +5,49 @@ All notable changes to the Lockbox project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2025-10-15
+
+### Added
+- **Password History Tracking** - Track password changes with reuse prevention
+  - Tracks up to 5 previous passwords per entry
+  - Warns when reusing previous passwords
+  - Calculates password age in days
+  - Provides password change frequency statistics
+  - Module: `lib/password-history.ts` (430 lines)
+- **Auto-Clearing Clipboard** - Automatically clear clipboard after 30 seconds
+  - Enhanced `copyToClipboard` function in PasswordEntryModal
+  - Reduces exposure window for sensitive data
+  - Prevents clipboard snooping attacks
+  - Verifies clipboard content before clearing
+- **TOTP QR Code Generation** - Generate QR codes for easy 2FA setup
+  - Click "QR" button next to TOTP secret field
+  - Scan with Google Authenticator, Authy, or any RFC 6238 app
+  - Shows manual entry code as fallback
+  - Uses `qrcode@1.5.4` library (client-side only, no API calls)
+- **Auto-Save Draft** - Prevent data loss in password entry forms
+  - Auto-saves every 2 seconds (debounced)
+  - Restores drafts when reopening create modal
+  - Drafts expire after 1 hour
+  - Automatic cleanup on successful save
+
+### Changed
+- Enhanced PasswordEntryModal with security features
+  - Added password reuse detection with confirmation dialog
+  - Added TOTP QR code UI components
+  - Added draft auto-save hooks
+  - Added auto-clearing clipboard functionality
+
+### Dependencies
+- Added `qrcode@1.5.4` - QR code generation library
+- Added `@types/qrcode@1.5.5` - TypeScript types for qrcode
+
+### Testing
+- All 300 tests passing
+- No regressions introduced
+
+### Documentation
+- Created `docs/v2.2.3_RELEASE_NOTES.md` - Comprehensive release documentation
+
 ## [2.0.0] - 2025-10-12 (v2 Devnet Release)
 
 ### 🚀 Deployed

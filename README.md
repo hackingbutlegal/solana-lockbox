@@ -1,25 +1,30 @@
-# 🔒 Solana Lockbox v2.2.1
+# 🔒 Solana Lockbox v2.2.3
 ## Decentralized Password Manager
 
 > **🚧 Active Development - Pre-Production**
 > This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.
 > For the previous v1.0 pre-production release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Version**: v2.2.1 (October 15, 2025)
-**Status**: ✅ Live on Devnet - UI Enhancements & Import/Export Complete
+**Current Version**: v2.2.3 (October 15, 2025)
+**Status**: ✅ Live on Devnet - Security Enhancements & UX Complete
 **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
 **Last Updated**: October 15, 2025
 **Target Mainnet**: Q2 2026
 **Network**: Solana Devnet → Mainnet Beta
 
-### 🎉 What's New in v2.2.1?
-- **7 New UI Components** (2,500+ lines) - Enhanced search, filtering, batch operations
-- **125x Performance Improvement** - Virtual scrolling for large vaults (10,000+ entries)
-- **Visual Batch Operations** - Real-time progress modals for bulk actions
-- **Import/Export** - Migrate from LastPass, 1Password, Bitwarden
-- **Settings Modal** - Comprehensive settings with 4 tabs
-- **300 Tests Passing** - 95% coverage for core modules
-- See [v2.2.1 Release Notes](./nextjs-app/docs/v2.2.1_RELEASE_NOTES.md) for full details
+### 🎉 What's New in v2.2.3?
+- **Password History Tracking** - Track password changes with reuse prevention (5 passwords per entry)
+- **Auto-Clearing Clipboard** - Automatically clear sensitive data after 30 seconds
+- **TOTP QR Code Generation** - Easy 2FA setup with QR codes for authenticator apps
+- **Auto-Save Draft** - Prevent data loss with automatic form draft saving
+- **Enhanced Security** - Password reuse warnings, clipboard protection
+- **300 Tests Passing** - All tests green, no regressions
+- See [v2.2.3 Release Notes](./nextjs-app/docs/v2.2.3_RELEASE_NOTES.md) for full details
+
+### Previous Releases
+- **v2.2.2** - Keyboard shortcuts & Health Dashboard integration
+- **v2.2.1** - UI components, virtual scrolling, import/export
+- **v2.0.0** - Initial Devnet deployment
 
 📖 **[docs/deployment/DEPLOYMENT.md](./docs/deployment/DEPLOYMENT.md)** - Comprehensive deployment guide with all fixes
 
