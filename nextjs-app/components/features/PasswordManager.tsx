@@ -19,6 +19,7 @@ import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { KeyboardShortcutsHelp } from '../ui/KeyboardShortcutsHelp';
 import { SearchBar } from './SearchBar';
 import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
@@ -1728,6 +1729,9 @@ export function PasswordManager() {
         onClose={() => setShowBatchProgress(false)}
         canCancel={false}
       />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp />
 
       <style jsx>{`
         .password-manager {
