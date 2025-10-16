@@ -14,6 +14,7 @@ import { TOTPManagerModal } from '../modals/TOTPManagerModal';
 import { HealthDashboardModal } from '../modals/HealthDashboardModal';
 import { CategoryManagerModal } from '../modals/CategoryManagerModal';
 import { SettingsModal } from '../modals/SettingsModal';
+import { PasswordRotationModal } from '../modals/PasswordRotationModal';
 import { StorageUsageBar } from '../ui/StorageUsageBar';
 import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
@@ -91,6 +92,7 @@ export function PasswordManager() {
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showRotationModal, setShowRotationModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
@@ -1137,6 +1139,12 @@ export function PasswordManager() {
             </button>
             <button
               className="tool-btn"
+              onClick={() => setShowRotationModal(true)}
+            >
+              🔄 Password Rotation
+            </button>
+            <button
+              className="tool-btn"
               onClick={() => {
                 setShowHealthModal(false); // Ensure other modals are closed
                 setShowCategoryModal(true);
@@ -1571,6 +1579,22 @@ export function PasswordManager() {
         onClose={() => setShowSettingsModal(false)}
         entries={entries}
         onImport={handleBulkImport}
+      />
+
+      {/* Password Rotation Modal */}
+      <PasswordRotationModal
+        isOpen={showRotationModal}
+        onClose={() => setShowRotationModal(false)}
+        entries={entries}
+        onEditEntry={(entryId) => {
+          const entry = entries.find(e => e.id === entryId);
+          if (entry) {
+            setSelectedEntry(entry);
+            setEntryModalMode('edit');
+            setShowEditModal(true);
+            setShowRotationModal(false);
+          }
+        }}
       />
 
       {/* Subscription Upgrade Modal */}

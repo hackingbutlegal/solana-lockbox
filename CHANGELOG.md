@@ -5,6 +5,31 @@ All notable changes to the Lockbox project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.5] - 2025-10-16
+
+### Added
+- **Password Rotation Manager** - Automated password rotation tracking and management
+  - Configurable rotation policies (30/60/90 days customizable)
+  - Critical account detection (banks, financial, crypto - 60 day rotation)
+  - Visual rotation dashboard with real-time statistics
+  - Overdue, warning, and up-to-date password tracking
+  - Batch rotation operations and manual mark as rotated
+  - CSV export of rotation reports for compliance
+  - Module: `lib/password-rotation-manager.ts` (550 lines)
+  - UI: `components/modals/PasswordRotationModal.tsx` (700+ lines)
+
+### Changed
+- Added Password Rotation button to main toolbar
+- Integrated rotation modal with password edit workflow
+- Enhanced password management with rotation reminders
+
+### Testing
+- All 300 tests passing
+- Build successful (warnings only)
+
+### Documentation
+- Created `docs/v2.2.5_RELEASE_NOTES.md` - Complete rotation manager documentation
+
 ## [2.2.4] - 2025-10-16
 
 ### Added
