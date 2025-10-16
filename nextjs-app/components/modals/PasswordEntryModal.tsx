@@ -11,6 +11,7 @@ import { CategoryManager } from '../../lib/category-manager';
 import { trackPasswordChange, isPasswordReused } from '../../lib/password-history';
 import { TOTPManager } from '../../lib/totp';
 import QRCode from 'qrcode';
+import { validatePasswordPolicy, loadPasswordPolicy } from '../../lib/password-strength-policy';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -208,6 +209,20 @@ export function PasswordEntryModal({
           toast.showError('Username and password are required');
           return;
         }
+
+        // Validate password against policy
+        const policy = loadPasswordPolicy();
+        if (policy.enabled) {
+          const policyResult = validatePasswordPolicy(formAny.password, policy);
+          if (!policyResult.isValid) {
+            const errorMessages = policyResult.errors.join('\n• ');
+            toast.showError(`Password does not meet policy requirements:\n• ${errorMessages}`, {
+              duration: 8000,
+            });
+            return;
+          }
+        }
+
         entry = {
           type: PasswordEntryType.Login,
           title: formData.title!,
@@ -441,7 +456,8 @@ export function PasswordEntryModal({
 
   // Generate TOTP QR Code
   const generateTotpQRCode = async () => {
-    if (!formData.totpSecret) {
+    const totpSecret = (formData as any).totpSecret;
+    if (!totpSecret) {
       toast.showError('Please enter a TOTP secret first');
       return;
     }
@@ -450,7 +466,7 @@ export function PasswordEntryModal({
       // Generate otpauth URI
       const accountName = (formData as any).email || (formData as any).username || formData.title || 'Account';
       const uri = TOTPManager.generateQRCodeURI(
-        formData.totpSecret,
+        totpSecret,
         accountName,
         'Lockbox'
       );

@@ -16,6 +16,7 @@ import { CategoryManagerModal } from '../modals/CategoryManagerModal';
 import { SettingsModal } from '../modals/SettingsModal';
 import { PasswordRotationModal } from '../modals/PasswordRotationModal';
 import { ActivityLogModal } from '../modals/ActivityLogModal';
+import { PasswordPolicyModal } from '../modals/PasswordPolicyModal';
 import { StorageUsageBar } from '../ui/StorageUsageBar';
 import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
@@ -96,6 +97,7 @@ export function PasswordManager() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showActivityLogModal, setShowActivityLogModal] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
@@ -1187,6 +1189,12 @@ export function PasswordManager() {
             </button>
             <button
               className="tool-btn"
+              onClick={() => setShowPolicyModal(true)}
+            >
+              🔒 Password Policy
+            </button>
+            <button
+              className="tool-btn"
               onClick={() => {
                 setShowHealthModal(false); // Ensure other modals are closed
                 setShowCategoryModal(true);
@@ -1643,6 +1651,12 @@ export function PasswordManager() {
       <ActivityLogModal
         isOpen={showActivityLogModal}
         onClose={() => setShowActivityLogModal(false)}
+      />
+
+      {/* Password Policy Modal */}
+      <PasswordPolicyModal
+        isOpen={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
       />
 
       {/* Subscription Upgrade Modal */}
