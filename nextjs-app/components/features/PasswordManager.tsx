@@ -22,6 +22,7 @@ import { SearchBar } from './SearchBar';
 import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
 import { BatchOperationsToolbar } from './BatchOperationsToolbar';
+import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
 
 /**
  * Password Manager Dashboard
@@ -308,33 +309,181 @@ export function PasswordManager() {
   };
 
   const handleArchiveSelected = async () => {
-    // TODO: Implement batch archive when SDK supports archive flag
-    toast.showInfo('Batch archive coming soon!');
+    if (!client) return;
+
+    const confirmed = await confirm({
+      title: 'Archive Multiple Passwords',
+      message: `Archive ${selectedEntries.length} password(s)? You can unarchive them later.`,
+      confirmText: 'Archive All',
+      cancelText: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    const batchOps = new BatchUpdateOperations(client);
+    const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
+
+    toast.showInfo(`Archiving ${entryIds.length} passwords...`);
+
+    try {
+      const result = await batchOps.archiveEntries(entryIds);
+
+      setSelectedEntryIds(new Set());
+
+      if (result.totalFailed === 0) {
+        toast.showSuccess(`Successfully archived ${result.totalSuccessful} password(s)`);
+      } else {
+        toast.showWarning(
+          `Archived ${result.totalSuccessful} password(s), but ${result.totalFailed} failed`
+        );
+      }
+
+      // Refresh entries
+      await refreshEntries();
+    } catch (err) {
+      console.error('Batch archive error:', err);
+      toast.showError('Failed to archive passwords');
+    }
   };
 
   const handleUnarchiveSelected = async () => {
-    // TODO: Implement batch unarchive when SDK supports archive flag
-    toast.showInfo('Batch unarchive coming soon!');
+    if (!client) return;
+
+    const batchOps = new BatchUpdateOperations(client);
+    const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
+
+    toast.showInfo(`Unarchiving ${entryIds.length} passwords...`);
+
+    try {
+      const result = await batchOps.unarchiveEntries(entryIds);
+
+      setSelectedEntryIds(new Set());
+
+      if (result.totalFailed === 0) {
+        toast.showSuccess(`Successfully unarchived ${result.totalSuccessful} password(s)`);
+      } else {
+        toast.showWarning(
+          `Unarchived ${result.totalSuccessful} password(s), but ${result.totalFailed} failed`
+        );
+      }
+
+      await refreshEntries();
+    } catch (err) {
+      console.error('Batch unarchive error:', err);
+      toast.showError('Failed to unarchive passwords');
+    }
   };
 
   const handleFavoriteSelected = async () => {
-    // TODO: Implement batch favorite when SDK supports favorite flag
-    toast.showInfo('Batch favorite coming soon!');
+    if (!client) return;
+
+    const batchOps = new BatchUpdateOperations(client);
+    const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
+
+    toast.showInfo(`Marking ${entryIds.length} passwords as favorites...`);
+
+    try {
+      const result = await batchOps.favoriteEntries(entryIds);
+
+      setSelectedEntryIds(new Set());
+
+      if (result.totalFailed === 0) {
+        toast.showSuccess(`Successfully marked ${result.totalSuccessful} password(s) as favorites`);
+      } else {
+        toast.showWarning(
+          `Marked ${result.totalSuccessful} password(s) as favorites, but ${result.totalFailed} failed`
+        );
+      }
+
+      await refreshEntries();
+    } catch (err) {
+      console.error('Batch favorite error:', err);
+      toast.showError('Failed to mark passwords as favorites');
+    }
   };
 
   const handleUnfavoriteSelected = async () => {
-    // TODO: Implement batch unfavorite when SDK supports favorite flag
-    toast.showInfo('Batch unfavorite coming soon!');
+    if (!client) return;
+
+    const batchOps = new BatchUpdateOperations(client);
+    const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
+
+    toast.showInfo(`Unmarking ${entryIds.length} passwords as favorites...`);
+
+    try {
+      const result = await batchOps.unfavoriteEntries(entryIds);
+
+      setSelectedEntryIds(new Set());
+
+      if (result.totalFailed === 0) {
+        toast.showSuccess(`Successfully unmarked ${result.totalSuccessful} password(s) as favorites`);
+      } else {
+        toast.showWarning(
+          `Unmarked ${result.totalSuccessful} password(s) as favorites, but ${result.totalFailed} failed`
+        );
+      }
+
+      await refreshEntries();
+    } catch (err) {
+      console.error('Batch unfavorite error:', err);
+      toast.showError('Failed to unmark passwords as favorites');
+    }
   };
 
   const handleAssignCategory = async (categoryId: number) => {
-    // TODO: Implement batch category assignment
-    toast.showInfo(`Batch category assignment to category ${categoryId} coming soon!`);
+    if (!client) return;
+
+    const batchOps = new BatchUpdateOperations(client);
+    const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
+    const categoryName = getCategoryName(categoryId);
+
+    toast.showInfo(`Assigning ${entryIds.length} passwords to category "${categoryName}"...`);
+
+    try {
+      const result = await batchOps.assignCategory(entryIds, categoryId);
+
+      setSelectedEntryIds(new Set());
+
+      if (result.totalFailed === 0) {
+        toast.showSuccess(
+          `Successfully assigned ${result.totalSuccessful} password(s) to "${categoryName}"`
+        );
+      } else {
+        toast.showWarning(
+          `Assigned ${result.totalSuccessful} password(s) to "${categoryName}", but ${result.totalFailed} failed`
+        );
+      }
+
+      await refreshEntries();
+    } catch (err) {
+      console.error('Batch category assignment error:', err);
+      toast.showError('Failed to assign category');
+    }
   };
 
   const handleExportSelected = () => {
-    // TODO: Implement export for selected entries
-    toast.showInfo('Export selected entries coming soon!');
+    // Export selected entries to JSON
+    const entriesToExport = selectedEntries.map(entry => ({
+      ...entry,
+      // Convert dates to ISO strings for JSON serialization
+      createdAt: entry.createdAt?.toISOString(),
+      lastModified: entry.lastModified?.toISOString(),
+    }));
+
+    const dataStr = JSON.stringify(entriesToExport, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `lockbox-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    toast.showSuccess(`Exported ${selectedEntries.length} password(s) to JSON`);
   };
 
   const handleClearAllFilters = () => {
