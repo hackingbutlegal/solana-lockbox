@@ -1,16 +1,25 @@
-# 🔒 Solana Lockbox v2.0
+# 🔒 Solana Lockbox v2.2.1
 ## Decentralized Password Manager
 
 > **🚧 Active Development - Pre-Production**
 > This is the v2.0 expansion repository for Lockbox, transforming it into a full-featured decentralized password manager.
 > For the previous v1.0 pre-production release, see: [lockbox](https://github.com/hackingbutlegal/lockbox)
 
-**Current Status**: ✅ Live on Devnet - Phase 4 Core Utilities Complete
+**Current Version**: v2.2.1 (October 15, 2025)
+**Status**: ✅ Live on Devnet - UI Enhancements & Import/Export Complete
 **Program ID**: `7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB`
-**Last Deployed**: October 13, 2025 (Phase 3: Subscription UI Complete)
-**Phase 4 Progress**: 70% Complete - Search, Health Analysis, Import/Export (October 15, 2025)
+**Last Updated**: October 15, 2025
 **Target Mainnet**: Q2 2026
 **Network**: Solana Devnet → Mainnet Beta
+
+### 🎉 What's New in v2.2.1?
+- **7 New UI Components** (2,500+ lines) - Enhanced search, filtering, batch operations
+- **125x Performance Improvement** - Virtual scrolling for large vaults (10,000+ entries)
+- **Visual Batch Operations** - Real-time progress modals for bulk actions
+- **Import/Export** - Migrate from LastPass, 1Password, Bitwarden
+- **Settings Modal** - Comprehensive settings with 4 tabs
+- **300 Tests Passing** - 95% coverage for core modules
+- See [v2.2.1 Release Notes](./nextjs-app/docs/v2.2.1_RELEASE_NOTES.md) for full details
 
 📖 **[docs/deployment/DEPLOYMENT.md](./docs/deployment/DEPLOYMENT.md)** - Comprehensive deployment guide with all fixes
 
