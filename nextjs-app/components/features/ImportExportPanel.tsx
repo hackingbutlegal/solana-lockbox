@@ -8,7 +8,7 @@ import {
   importPasswords,
   exportToCSV,
   exportToJSON,
-  detectFormat,
+  detectImportFormat,
 } from '../../lib/import-export';
 
 /**
@@ -56,7 +56,7 @@ export function ImportExportPanel({ entries, onImport, className = '' }: ImportE
       const text = await file.text();
 
       // Auto-detect format if not explicitly set
-      const detectedFormat = detectFormat(text);
+      const detectedFormat = detectImportFormat(text);
       if (detectedFormat) {
         setImportFormat(detectedFormat);
       }

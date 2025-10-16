@@ -23,6 +23,7 @@ import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
 import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
+import { BatchProgressModal } from '../modals/BatchProgressModal';
 
 /**
  * Password Manager Dashboard
@@ -69,6 +70,14 @@ export function PasswordManager() {
   // Batch operations state
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
   const [isVirtualizedView, setIsVirtualizedView] = useState(false);
+
+  // Batch progress modal state
+  const [showBatchProgress, setShowBatchProgress] = useState(false);
+  const [batchOperation, setBatchOperation] = useState<string>('');
+  const [batchProgress, setBatchProgress] = useState<BatchUpdateProgress | null>(null);
+  const [batchTotalItems, setBatchTotalItems] = useState(0);
+  const [batchSuccessCount, setBatchSuccessCount] = useState(0);
+  const [batchFailureCount, setBatchFailureCount] = useState(0);
 
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -320,144 +329,182 @@ export function PasswordManager() {
 
     if (!confirmed) return;
 
-    const batchOps = new BatchUpdateOperations(client);
     const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
 
-    toast.showInfo(`Archiving ${entryIds.length} passwords...`);
+    // Initialize progress modal
+    setBatchOperation('Archive');
+    setBatchTotalItems(entryIds.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+
+    const batchOps = new BatchUpdateOperations(client);
 
     try {
-      const result = await batchOps.archiveEntries(entryIds);
+      const result = await batchOps.archiveEntries(entryIds, (progress) => {
+        setBatchProgress(progress);
+        if (progress.status === 'success') {
+          setBatchSuccessCount(prev => prev + 1);
+        } else if (progress.status === 'failed') {
+          setBatchFailureCount(prev => prev + 1);
+        }
+      });
 
       setSelectedEntryIds(new Set());
 
-      if (result.totalFailed === 0) {
-        toast.showSuccess(`Successfully archived ${result.totalSuccessful} password(s)`);
-      } else {
-        toast.showWarning(
-          `Archived ${result.totalSuccessful} password(s), but ${result.totalFailed} failed`
-        );
-      }
-
-      // Refresh entries
+      // Refresh entries after completion
       await refreshEntries();
     } catch (err) {
       console.error('Batch archive error:', err);
       toast.showError('Failed to archive passwords');
+      setShowBatchProgress(false);
     }
   };
 
   const handleUnarchiveSelected = async () => {
     if (!client) return;
 
-    const batchOps = new BatchUpdateOperations(client);
+    const confirmed = await confirm({
+      title: 'Unarchive Multiple Passwords',
+      message: `Unarchive ${selectedEntries.length} password(s)?`,
+      confirmText: 'Unarchive All',
+      cancelText: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
     const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
 
-    toast.showInfo(`Unarchiving ${entryIds.length} passwords...`);
+    // Initialize progress modal
+    setBatchOperation('Unarchive');
+    setBatchTotalItems(entryIds.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+
+    const batchOps = new BatchUpdateOperations(client);
 
     try {
-      const result = await batchOps.unarchiveEntries(entryIds);
+      const result = await batchOps.unarchiveEntries(entryIds, (progress) => {
+        setBatchProgress(progress);
+        if (progress.status === 'success') {
+          setBatchSuccessCount(prev => prev + 1);
+        } else if (progress.status === 'failed') {
+          setBatchFailureCount(prev => prev + 1);
+        }
+      });
 
       setSelectedEntryIds(new Set());
-
-      if (result.totalFailed === 0) {
-        toast.showSuccess(`Successfully unarchived ${result.totalSuccessful} password(s)`);
-      } else {
-        toast.showWarning(
-          `Unarchived ${result.totalSuccessful} password(s), but ${result.totalFailed} failed`
-        );
-      }
-
       await refreshEntries();
     } catch (err) {
       console.error('Batch unarchive error:', err);
       toast.showError('Failed to unarchive passwords');
+      setShowBatchProgress(false);
     }
   };
 
   const handleFavoriteSelected = async () => {
     if (!client) return;
 
-    const batchOps = new BatchUpdateOperations(client);
     const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
 
-    toast.showInfo(`Marking ${entryIds.length} passwords as favorites...`);
+    // Initialize progress modal
+    setBatchOperation('Favorite');
+    setBatchTotalItems(entryIds.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+
+    const batchOps = new BatchUpdateOperations(client);
 
     try {
-      const result = await batchOps.favoriteEntries(entryIds);
+      const result = await batchOps.favoriteEntries(entryIds, (progress) => {
+        setBatchProgress(progress);
+        if (progress.status === 'success') {
+          setBatchSuccessCount(prev => prev + 1);
+        } else if (progress.status === 'failed') {
+          setBatchFailureCount(prev => prev + 1);
+        }
+      });
 
       setSelectedEntryIds(new Set());
-
-      if (result.totalFailed === 0) {
-        toast.showSuccess(`Successfully marked ${result.totalSuccessful} password(s) as favorites`);
-      } else {
-        toast.showWarning(
-          `Marked ${result.totalSuccessful} password(s) as favorites, but ${result.totalFailed} failed`
-        );
-      }
-
       await refreshEntries();
     } catch (err) {
       console.error('Batch favorite error:', err);
       toast.showError('Failed to mark passwords as favorites');
+      setShowBatchProgress(false);
     }
   };
 
   const handleUnfavoriteSelected = async () => {
     if (!client) return;
 
-    const batchOps = new BatchUpdateOperations(client);
     const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
 
-    toast.showInfo(`Unmarking ${entryIds.length} passwords as favorites...`);
+    // Initialize progress modal
+    setBatchOperation('Unfavorite');
+    setBatchTotalItems(entryIds.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+
+    const batchOps = new BatchUpdateOperations(client);
 
     try {
-      const result = await batchOps.unfavoriteEntries(entryIds);
+      const result = await batchOps.unfavoriteEntries(entryIds, (progress) => {
+        setBatchProgress(progress);
+        if (progress.status === 'success') {
+          setBatchSuccessCount(prev => prev + 1);
+        } else if (progress.status === 'failed') {
+          setBatchFailureCount(prev => prev + 1);
+        }
+      });
 
       setSelectedEntryIds(new Set());
-
-      if (result.totalFailed === 0) {
-        toast.showSuccess(`Successfully unmarked ${result.totalSuccessful} password(s) as favorites`);
-      } else {
-        toast.showWarning(
-          `Unmarked ${result.totalSuccessful} password(s) as favorites, but ${result.totalFailed} failed`
-        );
-      }
-
       await refreshEntries();
     } catch (err) {
       console.error('Batch unfavorite error:', err);
       toast.showError('Failed to unmark passwords as favorites');
+      setShowBatchProgress(false);
     }
   };
 
   const handleAssignCategory = async (categoryId: number) => {
     if (!client) return;
 
-    const batchOps = new BatchUpdateOperations(client);
     const entryIds = selectedEntries.filter(e => e.id).map(e => e.id!);
     const categoryName = getCategoryName(categoryId);
 
-    toast.showInfo(`Assigning ${entryIds.length} passwords to category "${categoryName}"...`);
+    // Initialize progress modal
+    setBatchOperation(`Assign to "${categoryName}"`);
+    setBatchTotalItems(entryIds.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+
+    const batchOps = new BatchUpdateOperations(client);
 
     try {
-      const result = await batchOps.assignCategory(entryIds, categoryId);
+      const result = await batchOps.assignCategory(entryIds, categoryId, (progress) => {
+        setBatchProgress(progress);
+        if (progress.status === 'success') {
+          setBatchSuccessCount(prev => prev + 1);
+        } else if (progress.status === 'failed') {
+          setBatchFailureCount(prev => prev + 1);
+        }
+      });
 
       setSelectedEntryIds(new Set());
-
-      if (result.totalFailed === 0) {
-        toast.showSuccess(
-          `Successfully assigned ${result.totalSuccessful} password(s) to "${categoryName}"`
-        );
-      } else {
-        toast.showWarning(
-          `Assigned ${result.totalSuccessful} password(s) to "${categoryName}", but ${result.totalFailed} failed`
-        );
-      }
-
       await refreshEntries();
     } catch (err) {
       console.error('Batch category assignment error:', err);
       toast.showError('Failed to assign category');
+      setShowBatchProgress(false);
     }
   };
 
@@ -1554,6 +1601,18 @@ export function PasswordManager() {
           </div>
         </div>
       )}
+
+      {/* Batch Progress Modal */}
+      <BatchProgressModal
+        isOpen={showBatchProgress}
+        operation={batchOperation}
+        progress={batchProgress}
+        totalItems={batchTotalItems}
+        successCount={batchSuccessCount}
+        failureCount={batchFailureCount}
+        onClose={() => setShowBatchProgress(false)}
+        canCancel={false}
+      />
 
       <style jsx>{`
         .password-manager {

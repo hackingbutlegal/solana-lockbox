@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useCallback } from 'react';
-// @ts-ignore - react-window types are incompatible with Next.js
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - react-window types are not fully compatible with Next.js
 import { List } from 'react-window';
 import { PasswordEntry, PasswordEntryType } from '../../sdk/src/types-v2';
 
