@@ -13,6 +13,7 @@ import { PasswordEntryModal } from '../modals/PasswordEntryModal';
 import { TOTPManagerModal } from '../modals/TOTPManagerModal';
 import { HealthDashboardModal } from '../modals/HealthDashboardModal';
 import { CategoryManagerModal } from '../modals/CategoryManagerModal';
+import { SettingsModal } from '../modals/SettingsModal';
 import { StorageUsageBar } from '../ui/StorageUsageBar';
 import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
@@ -87,6 +88,7 @@ export function PasswordManager() {
   const [showTOTPModal, setShowTOTPModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
@@ -531,6 +533,62 @@ export function PasswordManager() {
     URL.revokeObjectURL(url);
 
     toast.showSuccess(`Exported ${selectedEntries.length} password(s) to JSON`);
+  };
+
+  const handleBulkImport = async (entriesToImport: PasswordEntry[]) => {
+    if (!createEntry) {
+      toast.showError('Cannot import: createEntry function not available');
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Import Passwords',
+      message: `Import ${entriesToImport.length} password(s)? This will create new entries.`,
+      confirmText: 'Import All',
+      cancelText: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    // Initialize progress modal
+    setBatchOperation('Import');
+    setBatchTotalItems(entriesToImport.length);
+    setBatchSuccessCount(0);
+    setBatchFailureCount(0);
+    setBatchProgress(null);
+    setShowBatchProgress(true);
+    setShowSettingsModal(false); // Close settings modal
+
+    for (let i = 0; i < entriesToImport.length; i++) {
+      const entry = entriesToImport[i];
+
+      // Update progress
+      setBatchProgress({
+        current: i + 1,
+        total: entriesToImport.length,
+        entryId: i,
+        status: 'pending',
+      });
+
+      try {
+        // Create entry using SDK
+        await createEntry(entry);
+        setBatchSuccessCount(prev => prev + 1);
+        setBatchProgress(prev => prev ? { ...prev, status: 'success' } : null);
+      } catch (err) {
+        console.error(`Failed to import entry ${i}:`, err);
+        setBatchFailureCount(prev => prev + 1);
+        setBatchProgress(prev => prev ? { ...prev, status: 'failed' } : null);
+      }
+
+      // 500ms delay between operations to avoid nonce conflicts
+      if (i < entriesToImport.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    // Refresh entries after import
+    await refreshEntries();
   };
 
   const handleClearAllFilters = () => {
@@ -1042,6 +1100,12 @@ export function PasswordManager() {
             >
               📂 Categories
             </button>
+            <button
+              className="tool-btn"
+              onClick={() => setShowSettingsModal(true)}
+            >
+              ⚙️ Settings
+            </button>
           </div>
 
           <div className="sidebar-section">
@@ -1455,6 +1519,14 @@ export function PasswordManager() {
         onCreateCategory={createCategory}
         onUpdateCategory={updateCategory}
         onDeleteCategory={deleteCategory}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        entries={entries}
+        onImport={handleBulkImport}
       />
 
       {/* Subscription Upgrade Modal */}
