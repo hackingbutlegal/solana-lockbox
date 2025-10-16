@@ -359,10 +359,21 @@ export function HealthDashboardModal({
                   <div className="critical-list">
                     {criticalPasswords.map((analysis) => {
                       const entry = entries.find((e) => e.id === analysis.entryId);
-                      if (!entry || !entry.password) return null;
+                      if (!entry || !entry.password || !entry.title) return null;
+
+                      // Build password map for reuse detection
+                      const passwordMap = new Map<string, string[]>();
+                      entries.forEach(e => {
+                        const pwd = e.password;
+                        if (pwd && typeof pwd === 'string' && e.title) {
+                          const titles = passwordMap.get(pwd) || [];
+                          titles.push(e.title);
+                          passwordMap.set(pwd, titles);
+                        }
+                      });
 
                       // Convert to PasswordHealthDetails format
-                      const healthDetails = analyzePasswordHealth(entry.password);
+                      const healthDetails = analyzePasswordHealth(entry as any, passwordMap);
 
                       return (
                         <div key={analysis.entryId} className="critical-card-wrapper">

@@ -15,6 +15,7 @@ import { HealthDashboardModal } from '../modals/HealthDashboardModal';
 import { CategoryManagerModal } from '../modals/CategoryManagerModal';
 import { SettingsModal } from '../modals/SettingsModal';
 import { PasswordRotationModal } from '../modals/PasswordRotationModal';
+import { ActivityLogModal } from '../modals/ActivityLogModal';
 import { StorageUsageBar } from '../ui/StorageUsageBar';
 import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
@@ -28,6 +29,7 @@ import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
 import { BatchProgressModal } from '../modals/BatchProgressModal';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { logActivity, ActivityType } from '../../lib/activity-logger';
 
 /**
  * Password Manager Dashboard
@@ -93,6 +95,7 @@ export function PasswordManager() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRotationModal, setShowRotationModal] = useState(false);
+  const [showActivityLogModal, setShowActivityLogModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
@@ -172,6 +175,17 @@ export function PasswordManager() {
       if (entryId) {
         setShowCreateModal(false);
         toast.showSuccess(`Password saved successfully! Entry ID: ${entryId}`);
+
+        // Log activity
+        logActivity(
+          ActivityType.CREATE,
+          `Created password entry: ${sanitized.title}`,
+          {
+            entryId,
+            entryTitle: sanitized.title,
+            severity: 'info',
+          }
+        );
       } else {
         toast.showError('Failed to create password entry.');
       }
@@ -221,7 +235,18 @@ export function PasswordManager() {
       if (success) {
         setShowEditModal(false);
         setSelectedEntry(null);
-        // TODO: Show success notification
+        toast.showSuccess('Password updated successfully');
+
+        // Log activity
+        logActivity(
+          ActivityType.UPDATE,
+          `Updated password entry: ${sanitized.title}`,
+          {
+            entryId: selectedEntry.id,
+            entryTitle: sanitized.title,
+            severity: 'info',
+          }
+        );
       }
     } catch (err) {
       console.error('Failed to update entry:', err);
@@ -253,6 +278,17 @@ export function PasswordManager() {
         setShowDetailsModal(false);
         setSelectedEntry(null);
         toast.showSuccess('Password deleted successfully');
+
+        // Log activity
+        logActivity(
+          ActivityType.DELETE,
+          `Deleted password entry: ${entry.title}`,
+          {
+            entryId: entry.id,
+            entryTitle: entry.title,
+            severity: 'warning',
+          }
+        );
       }
     } catch (err) {
       console.error('Failed to delete entry:', err);
@@ -1145,6 +1181,12 @@ export function PasswordManager() {
             </button>
             <button
               className="tool-btn"
+              onClick={() => setShowActivityLogModal(true)}
+            >
+              📋 Activity Log
+            </button>
+            <button
+              className="tool-btn"
               onClick={() => {
                 setShowHealthModal(false); // Ensure other modals are closed
                 setShowCategoryModal(true);
@@ -1595,6 +1637,12 @@ export function PasswordManager() {
             setShowRotationModal(false);
           }
         }}
+      />
+
+      {/* Activity Log Modal */}
+      <ActivityLogModal
+        isOpen={showActivityLogModal}
+        onClose={() => setShowActivityLogModal(false)}
       />
 
       {/* Subscription Upgrade Modal */}

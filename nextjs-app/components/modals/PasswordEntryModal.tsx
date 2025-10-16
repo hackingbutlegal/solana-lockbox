@@ -376,7 +376,7 @@ export function PasswordEntryModal({
       formData.id
     ) {
       const oldPassword = (entry as any).password;
-      const newPassword = formData.password as string;
+      const newPassword = (formData as any).password as string;
 
       // Check if password has changed
       if (oldPassword !== newPassword) {
