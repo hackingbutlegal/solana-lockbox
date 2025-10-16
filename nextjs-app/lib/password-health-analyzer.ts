@@ -32,6 +32,7 @@
  */
 
 import { PasswordEntry, PasswordEntryType, isLoginEntry } from '../sdk/src/types-v2';
+import { checkPasswordBreach, getCommonPatterns, getBreachRiskDescription } from './breach-checker';
 
 /**
  * Password strength score (0-5)
@@ -57,6 +58,7 @@ export interface PasswordHealthDetails {
   isOld: boolean; // > 90 days
   isWeak: boolean; // strength <= 2
   isCommon: boolean; // in common password list
+  isExposed: boolean; // appears in breach databases
   hasPatterns: boolean; // keyboard patterns, sequences
   characterDiversity: {
     lowercase: boolean;
@@ -66,6 +68,11 @@ export interface PasswordHealthDetails {
   };
   daysSinceChange: number;
   recommendations: string[];
+  breachDetails?: {
+    crackTime: string;
+    warning: string;
+    patterns: string[];
+  };
 }
 
 /**
@@ -377,6 +384,14 @@ function calculatePasswordStrength(
 function generateRecommendations(health: PasswordHealthDetails): string[] {
   const recommendations: string[] = [];
 
+  // CRITICAL: Exposed passwords should be changed immediately
+  if (health.isExposed) {
+    recommendations.push('⚠️ CRITICAL: Password appears in breach databases or is easily crackable. Change immediately!');
+    if (health.breachDetails?.warning) {
+      recommendations.push(health.breachDetails.warning);
+    }
+  }
+
   if (health.isCommon) {
     recommendations.push('This is a commonly used password. Change it immediately.');
   }
@@ -412,6 +427,11 @@ function generateRecommendations(health: PasswordHealthDetails): string[] {
     recommendations.push('Increase password length for better security.');
   }
 
+  // Add breach details patterns if available
+  if (health.breachDetails?.patterns && health.breachDetails.patterns.length > 0) {
+    recommendations.push(`Detected patterns: ${health.breachDetails.patterns.join(', ')}`);
+  }
+
   return recommendations;
 }
 
@@ -442,6 +462,7 @@ export function analyzePasswordHealth(
       isOld: false,
       isWeak: false,
       isCommon: false,
+      isExposed: false,
       hasPatterns: false,
       characterDiversity: {
         lowercase: false,
@@ -460,6 +481,22 @@ export function analyzePasswordHealth(
   const hasPatterns = hasKeyboardPatterns(password);
   const commonPasswords = getCommonPasswords();
   const isCommon = commonPasswords.has(password.toLowerCase());
+
+  // Check for breaches using zxcvbn
+  const userInputs = [];
+  if (isLoginEntry(entry)) {
+    if (entry.username) userInputs.push(entry.username);
+    if (entry.url) {
+      try {
+        const domain = new URL(entry.url).hostname;
+        userInputs.push(domain);
+      } catch {
+        // Invalid URL, skip
+      }
+    }
+  }
+  const breachResult = checkPasswordBreach(password, userInputs);
+  const isExposed = breachResult.isBreached;
 
   // Calculate strength score
   const strength = calculatePasswordStrength(password, entropy, diversity, hasPatterns, isCommon);
@@ -485,10 +522,16 @@ export function analyzePasswordHealth(
     isOld,
     isWeak,
     isCommon,
+    isExposed,
     hasPatterns,
     characterDiversity: diversity,
     daysSinceChange,
     recommendations: [],
+    breachDetails: isExposed ? {
+      crackTime: breachResult.crackTimeDisplay,
+      warning: breachResult.warning,
+      patterns: getCommonPatterns(breachResult),
+    } : undefined,
   };
 
   // Generate recommendations

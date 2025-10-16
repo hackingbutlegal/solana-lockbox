@@ -331,18 +331,17 @@ export function VirtualizedPasswordList({
 
   return (
     <div className={`virtualized-list-container ${className}`} onKeyDown={handleKeyDown}>
-      {/* @ts-ignore - react-window children type mismatch with Next.js */}
-      <List
-        ref={listRef}
-        height={typeof height === 'number' ? height : parseInt(height) || 600}
-        itemCount={entries.length}
-        itemSize={itemHeight}
-        width={width}
-        itemData={itemData}
-        overscanCount={overscanCount}
-      >
-        {PasswordRow}
-      </List>
+      {/* Type cast required due to react-window/Next.js compatibility */}
+      {React.createElement(List as any, {
+        ref: listRef,
+        height: typeof height === 'number' ? height : parseInt(height) || 600,
+        itemCount: entries.length,
+        itemSize: itemHeight,
+        width,
+        itemData,
+        overscanCount,
+        children: PasswordRow,
+      })}
 
       <div className="list-footer">
         <span className="entry-count">

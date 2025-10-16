@@ -5,6 +5,48 @@ All notable changes to the Lockbox project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - 2025-10-16
+
+### Added
+- **Recovery Backup Codes** - Complete account recovery system
+  - Generate 10 cryptographically random backup codes
+  - Download/copy codes for offline storage
+  - Single-use validation and tracking
+  - Low code warnings (< 3 remaining)
+  - Auto-expiration after 90 days
+  - Module: `lib/backup-codes-manager.ts` (370 lines)
+  - UI: `components/modals/BackupCodesModal.tsx` (600+ lines)
+- **Local Breach Detection** - Offline password breach checking using zxcvbn
+  - Dictionary attack detection (30K+ passwords)
+  - Keyboard pattern recognition
+  - L33t speak and sequence analysis
+  - Crack time estimation
+  - Context-aware checking (username, domain)
+  - Module: `lib/breach-checker.ts` (450 lines)
+
+### Changed
+- Enhanced password health analyzer with breach detection
+  - Added `isExposed` field to PasswordHealthDetails
+  - Added `breachDetails` with crack time and patterns
+  - Enhanced recommendations with critical breach warnings
+- Updated Settings modal with Recovery & Backup section
+  - Backup codes status card
+  - Generate/Manage codes button
+  - Visual code count and warnings
+- Improved VirtualizedPasswordList type compatibility
+
+### Dependencies
+- Added `@zxcvbn-ts/core@3.0.4`
+- Added `@zxcvbn-ts/language-common@3.0.4`
+- Added `@zxcvbn-ts/language-en@3.0.2`
+
+### Testing
+- All 300 tests passing
+- Build successful with no type errors
+
+### Documentation
+- Created `docs/v2.2.4_RELEASE_NOTES.md` - Comprehensive release documentation
+
 ## [2.2.3] - 2025-10-15
 
 ### Added

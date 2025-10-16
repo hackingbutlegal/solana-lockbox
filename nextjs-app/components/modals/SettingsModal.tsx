@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { PasswordEntry } from '../../sdk/src/types-v2';
 import { ImportExportPanel } from '../features/ImportExportPanel';
+import { BackupCodesModal } from './BackupCodesModal';
+import { getBackupCodesStats, hasBackupCodes } from '../../lib/backup-codes-manager';
 
 /**
  * SettingsModal Component
@@ -40,6 +42,8 @@ export function SettingsModal({
   onImport,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('import-export');
+  const [showBackupCodesModal, setShowBackupCodesModal] = useState(false);
+  const backupCodesStats = hasBackupCodes() ? getBackupCodesStats() : null;
 
   if (!isOpen) return null;
 
@@ -107,6 +111,36 @@ export function SettingsModal({
 
             {activeTab === 'security' && (
               <div className="tab-panel">
+                <h3>Recovery & Backup</h3>
+                <div className="settings-section">
+                  <div className="backup-codes-card">
+                    <div className="backup-codes-info">
+                      <div className="backup-codes-header">
+                        <span className="backup-icon">🔐</span>
+                        <div>
+                          <h4>Recovery Backup Codes</h4>
+                          <p>
+                            {backupCodesStats
+                              ? `${backupCodesStats.unused} of ${backupCodesStats.total} codes remaining`
+                              : 'Generate backup codes to recover your account if you lose wallet access'}
+                          </p>
+                        </div>
+                      </div>
+                      {backupCodesStats && backupCodesStats.unused < 3 && (
+                        <div className="backup-warning">
+                          ⚠️ Low on backup codes! Consider regenerating.
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      className="btn-backup-codes"
+                      onClick={() => setShowBackupCodesModal(true)}
+                    >
+                      {backupCodesStats ? '🔄 Manage Codes' : '✨ Generate Codes'}
+                    </button>
+                  </div>
+                </div>
+
                 <h3>Security Settings</h3>
                 <div className="settings-section">
                   <div className="setting-item">
@@ -129,7 +163,7 @@ export function SettingsModal({
                   </div>
                   <div className="setting-item">
                     <label>
-                      <input type="checkbox" />
+                      <input type="checkbox" defaultChecked />
                       <span>Enable clipboard auto-clear (30 seconds)</span>
                     </label>
                   </div>
@@ -137,6 +171,12 @@ export function SettingsModal({
                     <label>
                       <input type="checkbox" defaultChecked />
                       <span>Show password strength warnings</span>
+                    </label>
+                  </div>
+                  <div className="setting-item">
+                    <label>
+                      <input type="checkbox" defaultChecked />
+                      <span>Warn when reusing passwords</span>
                     </label>
                   </div>
                 </div>
@@ -429,6 +469,72 @@ export function SettingsModal({
           border-radius: 4px;
         }
 
+        .backup-codes-card {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+          border: 2px solid #dee2e6;
+          border-radius: 12px;
+          gap: 1.5rem;
+        }
+
+        .backup-codes-info {
+          flex: 1;
+        }
+
+        .backup-codes-header {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
+        }
+
+        .backup-icon {
+          font-size: 2rem;
+          line-height: 1;
+        }
+
+        .backup-codes-header h4 {
+          margin: 0 0 0.25rem 0;
+          color: #2c3e50;
+          font-size: 1.1rem;
+        }
+
+        .backup-codes-header p {
+          margin: 0;
+          color: #7f8c8d;
+          font-size: 0.9rem;
+        }
+
+        .backup-warning {
+          margin-top: 0.75rem;
+          padding: 0.5rem 0.75rem;
+          background: #fff3cd;
+          border-left: 3px solid #ffc107;
+          color: #856404;
+          font-size: 0.85rem;
+          border-radius: 4px;
+        }
+
+        .btn-backup-codes {
+          padding: 0.75rem 1.5rem;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.95rem;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+
+        .btn-backup-codes:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
         .about-section {
           display: flex;
           flex-direction: column;
@@ -555,6 +661,13 @@ export function SettingsModal({
           }
         }
       `}</style>
+
+      {/* Backup Codes Modal */}
+      <BackupCodesModal
+        isOpen={showBackupCodesModal}
+        onClose={() => setShowBackupCodesModal(false)}
+        isFirstTime={!hasBackupCodes()}
+      />
     </div>
   );
 }

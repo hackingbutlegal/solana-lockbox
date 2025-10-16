@@ -684,7 +684,7 @@ export function PasswordEntryModal({
                     </div>
                     {formData.totpSecret && !showTotpQR && (
                       <p className="form-hint">
-                        💡 This will enable 2FA code generation for this entry. Click "QR" to generate setup code.
+                        💡 This will enable 2FA code generation for this entry. Click &quot;QR&quot; to generate setup code.
                       </p>
                     )}
                     {showTotpQR && totpQRCode && (
