@@ -380,6 +380,30 @@ export class LockboxV2Client {
     );
   }
 
+  /**
+   * Get recovery config V2 PDA
+   */
+  getRecoveryConfigV2Address(owner?: PublicKey): [PublicKey, number] {
+    const ownerKey = owner || this.wallet.publicKey;
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from('recovery_config_v2'), ownerKey.toBuffer()],
+      PROGRAM_ID
+    );
+  }
+
+  /**
+   * Get recovery request V2 PDA
+   */
+  getRecoveryRequestV2Address(owner: PublicKey, requestId: number): [PublicKey, number] {
+    const requestIdBuffer = Buffer.alloc(8);
+    requestIdBuffer.writeBigUInt64LE(BigInt(requestId));
+
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from('recovery_request_v2'), owner.toBuffer(), requestIdBuffer],
+      PROGRAM_ID
+    );
+  }
+
   // ============================================================================
   // Encryption & Key Management
   // ============================================================================
@@ -2212,6 +2236,256 @@ export class LockboxV2Client {
   get masterLockboxPDA(): PublicKey {
     const [pda] = this.getMasterLockboxAddress();
     return pda;
+  }
+
+  // ============================================================================
+  // Social Recovery V2 (Secure)
+  // ============================================================================
+
+  /**
+   * Initialize recovery configuration V2 (with commitments)
+   *
+   * @param threshold - Minimum guardians needed for recovery (M)
+   * @param recoveryDelay - Time-lock delay in seconds (e.g., 7 days = 604800)
+   * @param masterSecretHash - SHA256 hash of master secret (32 bytes)
+   * @returns Transaction signature
+   */
+  async initializeRecoveryConfigV2(
+    threshold: number,
+    recoveryDelay: number,
+    masterSecretHash: Uint8Array
+  ): Promise<string> {
+    const [recoveryConfig] = this.getRecoveryConfigV2Address();
+    const [masterLockbox] = this.getMasterLockboxAddress();
+
+    // Build instruction data
+    // Discriminator (8 bytes) + threshold (u8) + recovery_delay (i64) + master_secret_hash (32 bytes)
+    const data = Buffer.alloc(49);
+    // TODO: Add correct discriminator for initialize_recovery_config_v2
+    data.writeBigUInt64LE(BigInt(0), 0); // Discriminator placeholder
+    data.writeUInt8(threshold, 8);
+    data.writeBigInt64LE(BigInt(recoveryDelay), 9);
+    Buffer.from(masterSecretHash).copy(data, 17);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: recoveryConfig, isSigner: false, isWritable: true },
+        { pubkey: masterLockbox, isSigner: false, isWritable: false },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const signature = await this.wallet.sendTransaction(transaction, this.connection);
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    console.log('Recovery config V2 initialized:', signature);
+    return signature;
+  }
+
+  /**
+   * Add guardian V2 (with share commitment)
+   *
+   * @param guardianPubkey - Guardian's wallet address
+   * @param shareIndex - Share index (1 to N)
+   * @param shareCommitment - SHA256(share || guardian_pubkey) - 32 bytes
+   * @param nicknameEncrypted - Encrypted guardian nickname
+   * @returns Transaction signature
+   */
+  async addGuardianV2(
+    guardianPubkey: PublicKey,
+    shareIndex: number,
+    shareCommitment: Uint8Array,
+    nicknameEncrypted: Uint8Array
+  ): Promise<string> {
+    const [recoveryConfig] = this.getRecoveryConfigV2Address();
+
+    // Build instruction data
+    // Discriminator (8) + guardian_pubkey (32) + share_index (1) + share_commitment (32) + nickname_len (4) + nickname
+    const nicknameLen = nicknameEncrypted.length;
+    const data = Buffer.alloc(8 + 32 + 1 + 32 + 4 + nicknameLen);
+
+    // TODO: Add correct discriminator for add_guardian_v2
+    data.writeBigUInt64LE(BigInt(0), 0); // Discriminator placeholder
+    guardianPubkey.toBuffer().copy(data, 8);
+    data.writeUInt8(shareIndex, 40);
+    Buffer.from(shareCommitment).copy(data, 41);
+    data.writeUInt32LE(nicknameLen, 73);
+    Buffer.from(nicknameEncrypted).copy(data, 77);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: recoveryConfig, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const signature = await this.wallet.sendTransaction(transaction, this.connection);
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    console.log('Guardian V2 added:', signature);
+    return signature;
+  }
+
+  /**
+   * Fetch recovery configuration V2
+   *
+   * @param owner - Optional owner address (defaults to current wallet)
+   * @returns Recovery configuration or null if not initialized
+   */
+  async getRecoveryConfigV2(owner?: PublicKey): Promise<any | null> {
+    try {
+      const [recoveryConfig] = this.getRecoveryConfigV2Address(owner);
+      const accountInfo = await this.connection.getAccountInfo(recoveryConfig);
+
+      if (!accountInfo) {
+        return null;
+      }
+
+      // TODO: Deserialize account data properly
+      // For now, return raw data
+      return {
+        address: recoveryConfig.toBase58(),
+        data: accountInfo.data,
+        // TODO: Parse guardians, threshold, etc.
+      };
+    } catch (error) {
+      console.error('Error fetching recovery config V2:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Initiate recovery V2 (generate challenge)
+   *
+   * @param owner - Owner whose vault to recover
+   * @param requestId - Unique request ID (monotonically increasing)
+   * @param encryptedChallenge - Challenge encrypted with master secret (80 bytes)
+   * @param challengeHash - SHA256 hash of plaintext challenge (32 bytes)
+   * @param newOwner - New owner to transfer to after recovery
+   * @returns Transaction signature
+   */
+  async initiateRecoveryV2(
+    owner: PublicKey,
+    requestId: number,
+    encryptedChallenge: Uint8Array,
+    challengeHash: Uint8Array,
+    newOwner: PublicKey
+  ): Promise<string> {
+    const [recoveryConfig] = this.getRecoveryConfigV2Address(owner);
+    const [recoveryRequest] = this.getRecoveryRequestV2Address(owner, requestId);
+
+    // Build instruction data
+    const data = Buffer.alloc(8 + 8 + 80 + 32 + 32);
+    // TODO: Add correct discriminator for initiate_recovery_v2
+    data.writeBigUInt64LE(BigInt(0), 0);
+    data.writeBigUInt64LE(BigInt(requestId), 8);
+    Buffer.from(encryptedChallenge).copy(data, 16);
+    Buffer.from(challengeHash).copy(data, 96);
+    newOwner.toBuffer().copy(data, 128);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: recoveryConfig, isSigner: false, isWritable: true },
+        { pubkey: recoveryRequest, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true }, // Guardian (requester)
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const signature = await this.wallet.sendTransaction(transaction, this.connection);
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    console.log('Recovery V2 initiated:', signature);
+    return signature;
+  }
+
+  /**
+   * Confirm participation in recovery (guardian)
+   *
+   * @param owner - Owner whose vault is being recovered
+   * @param requestId - Recovery request ID
+   * @returns Transaction signature
+   */
+  async confirmParticipationV2(
+    owner: PublicKey,
+    requestId: number
+  ): Promise<string> {
+    const [recoveryConfig] = this.getRecoveryConfigV2Address(owner);
+    const [recoveryRequest] = this.getRecoveryRequestV2Address(owner, requestId);
+
+    // Build instruction data
+    const data = Buffer.alloc(8);
+    // TODO: Add correct discriminator for confirm_participation
+    data.writeBigUInt64LE(BigInt(0), 0);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: recoveryConfig, isSigner: false, isWritable: false },
+        { pubkey: recoveryRequest, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false }, // Guardian
+      ],
+      programId: PROGRAM_ID,
+      data,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const signature = await this.wallet.sendTransaction(transaction, this.connection);
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    console.log('Participation confirmed:', signature);
+    return signature;
+  }
+
+  /**
+   * Complete recovery with proof (submit decrypted challenge)
+   *
+   * @param owner - Owner whose vault is being recovered
+   * @param requestId - Recovery request ID
+   * @param challengePlaintext - Decrypted challenge (32 bytes)
+   * @returns Transaction signature
+   */
+  async completeRecoveryWithProof(
+    owner: PublicKey,
+    requestId: number,
+    challengePlaintext: Uint8Array
+  ): Promise<string> {
+    const [recoveryConfig] = this.getRecoveryConfigV2Address(owner);
+    const [recoveryRequest] = this.getRecoveryRequestV2Address(owner, requestId);
+    const [masterLockbox] = this.getMasterLockboxAddress();
+
+    // Build instruction data
+    const data = Buffer.alloc(8 + 32);
+    // TODO: Add correct discriminator for complete_recovery_with_proof
+    data.writeBigUInt64LE(BigInt(0), 0);
+    Buffer.from(challengePlaintext).copy(data, 8);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: recoveryConfig, isSigner: false, isWritable: false },
+        { pubkey: recoveryRequest, isSigner: false, isWritable: true },
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false }, // Requester
+      ],
+      programId: PROGRAM_ID,
+      data,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const signature = await this.wallet.sendTransaction(transaction, this.connection);
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    console.log('Recovery completed with proof:', signature);
+    return signature;
   }
 
   // ============================================================================
