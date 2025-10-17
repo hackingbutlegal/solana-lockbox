@@ -60,7 +60,7 @@ let LOG_TABLE: Uint8Array | null = null;
 
 /**
  * Initialize lookup tables for GF(2^8) arithmetic
- * Based on generator element α = 0x02
+ * Based on generator element α = 0x03 (which is primitive for this polynomial)
  */
 function initializeTables(): void {
   if (EXP_TABLE && LOG_TABLE) return; // Already initialized
@@ -73,14 +73,33 @@ function initializeTables(): void {
     EXP_TABLE[i] = x;
     LOG_TABLE[x] = i;
 
-    // Multiply by generator (0x02) with reduction
-    x = (x << 1) ^ (x & 0x80 ? IRREDUCIBLE_POLY : 0);
+    // Multiply by generator (0x03) with reduction
+    x = gfMultiply(x, 3);
   }
 
   // Extend exp table for easier computation
   for (let i = 255; i < 512; i++) {
     EXP_TABLE[i] = EXP_TABLE[i - 255];
   }
+}
+
+/**
+ * Raw GF(2^8) multiplication without lookup tables (used during initialization)
+ */
+function gfMultiply(a: number, b: number): number {
+  let result = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) {
+      result ^= a;
+    }
+    const highBit = a & 0x80;
+    a <<= 1;
+    if (highBit) {
+      a ^= IRREDUCIBLE_POLY;
+    }
+    b >>= 1;
+  }
+  return result & 0xff;
 }
 
 /**

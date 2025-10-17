@@ -473,6 +473,75 @@ pub mod lockbox {
     }
 
     // ============================================================================
+    // Social Recovery Instructions V2 (Secure - Recommended)
+    // ============================================================================
+
+    /// Initialize recovery configuration V2 with hash commitments
+    pub fn initialize_recovery_config_v2(
+        ctx: Context<InitializeRecoveryConfigV2>,
+        threshold: u8,
+        recovery_delay: i64,
+        master_secret_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::recovery_management_v2::initialize_recovery_config_v2_handler(
+            ctx,
+            threshold,
+            recovery_delay,
+            master_secret_hash,
+        )
+    }
+
+    /// Add guardian V2 with share commitment
+    pub fn add_guardian_v2(
+        ctx: Context<AddGuardianV2>,
+        guardian_pubkey: Pubkey,
+        share_index: u8,
+        share_commitment: [u8; 32],
+        nickname_encrypted: Vec<u8>,
+    ) -> Result<()> {
+        instructions::recovery_management_v2::add_guardian_v2_handler(
+            ctx,
+            guardian_pubkey,
+            share_index,
+            share_commitment,
+            nickname_encrypted,
+        )
+    }
+
+    /// Initiate recovery V2 with challenge generation
+    pub fn initiate_recovery_v2(
+        ctx: Context<InitiateRecoveryV2>,
+        request_id: u64,
+        encrypted_challenge: Vec<u8>,
+        challenge_hash: [u8; 32],
+        new_owner: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::recovery_management_v2::initiate_recovery_v2_handler(
+            ctx,
+            request_id,
+            encrypted_challenge,
+            challenge_hash,
+            new_owner,
+        )
+    }
+
+    /// Guardian confirms participation (V2 - no shares submitted)
+    pub fn confirm_participation(ctx: Context<ConfirmParticipation>) -> Result<()> {
+        instructions::recovery_management_v2::confirm_participation_handler(ctx)
+    }
+
+    /// Complete recovery with proof of reconstruction (V2 - Secure)
+    pub fn complete_recovery_with_proof(
+        ctx: Context<CompleteRecoveryV2>,
+        challenge_plaintext: [u8; 32],
+    ) -> Result<()> {
+        instructions::recovery_management_v2::complete_recovery_with_proof_handler(
+            ctx,
+            challenge_plaintext,
+        )
+    }
+
+    // ============================================================================
     // V1 Instructions - Legacy (Backward Compatibility)
     // ============================================================================
 
