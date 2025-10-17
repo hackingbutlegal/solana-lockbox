@@ -29,6 +29,7 @@ import { VirtualizedPasswordList } from './VirtualizedPasswordList';
 import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 import { FavoritesSidebar } from './FavoritesSidebar';
 import { Dashboard } from './Dashboard';
+import { ShareManagementModal } from '../modals/ShareManagementModal';
 import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
 import { BatchProgressModal } from '../modals/BatchProgressModal';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -105,6 +106,8 @@ export function PasswordManager() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [showFavoritesSidebar, setShowFavoritesSidebar] = useState(false);
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareEntry, setShareEntry] = useState<PasswordEntry | undefined>(undefined);
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
   // and handles session initialization as needed, so no manual trigger required here
@@ -1216,6 +1219,15 @@ export function PasswordManager() {
             <button
               className="tool-btn"
               onClick={() => {
+                setShareEntry(undefined);
+                setShowShareModal(true);
+              }}
+            >
+              🔗 Share Manager
+            </button>
+            <button
+              className="tool-btn"
+              onClick={() => {
                 setShowHealthModal(false); // Ensure other modals are closed
                 setShowCategoryModal(true);
               }}
@@ -1713,6 +1725,17 @@ export function PasswordManager() {
       <PasswordPolicyModal
         isOpen={showPolicyModal}
         onClose={() => setShowPolicyModal(false)}
+      />
+
+      {/* Share Management Modal */}
+      <ShareManagementModal
+        isOpen={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          setShareEntry(undefined);
+        }}
+        entry={shareEntry}
+        walletAddress={publicKey?.toBase58() || ''}
       />
 
       {/* Subscription Upgrade Modal */}
