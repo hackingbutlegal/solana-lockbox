@@ -29,29 +29,119 @@ body {
   width: 100%;
 }
 
-/* Global Modal Styles */
-.modal-overlay {
+/* Global Modal Styles - Standardized for all modals */
+.modal-overlay,
+.category-manager-modal-overlay,
+.health-dashboard-modal-overlay {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background: rgba(0, 0, 0, 0.7) !important;
+  background: rgba(0, 0, 0, 0.75) !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
   z-index: 9999 !important;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px) !important;
+  padding: 1rem !important;
 }
 
-.modal-content, .activity-log-modal, .rotation-modal, .policy-modal {
-  background: white;
-  border-radius: 16px;
-  max-width: 900px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  position: relative;
-  z-index: 10000;
+.modal-content,
+.modal-container,
+.activity-log-modal,
+.rotation-modal,
+.policy-modal,
+.totp-modal,
+.backup-codes-modal,
+.password-entry-modal,
+.password-policy-modal,
+.health-modal,
+.health-dashboard-modal-content,
+.category-modal,
+.category-manager-modal-content {
+  background: white !important;
+  border-radius: 16px !important;
+  max-width: 1000px !important;
+  width: 90% !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  position: relative !important;
+  z-index: 10000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  animation: modalSlideIn 0.3s ease-out !important;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Standardized Modal Header */
+.modal-header {
+  padding: 1.5rem !important;
+  border-bottom: 2px solid #e1e8ed !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+
+.modal-header h2 {
+  margin: 0 !important;
+  font-size: 1.5rem !important;
+  color: #2c3e50 !important;
+  font-weight: 700 !important;
+}
+
+.modal-close,
+.btn-close {
+  background: transparent !important;
+  border: none !important;
+  font-size: 1.5rem !important;
+  color: #7f8c8d !important;
+  cursor: pointer !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  transition: all 0.2s !important;
+  line-height: 1 !important;
+}
+
+.modal-close:hover,
+.btn-close:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #2c3e50 !important;
+  transform: rotate(90deg) !important;
+}
+
+/* Standardized Modal Body */
+.modal-body {
+  padding: 1.5rem !important;
+  overflow-y: auto !important;
+  max-height: calc(90vh - 180px) !important;
+}
+
+/* Standardized Modal Footer */
+.modal-footer,
+.activity-log-footer,
+.backup-codes-footer {
+  padding: 1rem 1.5rem !important;
+  border-top: 2px solid #e1e8ed !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important;
+  background: #f8f9fa !important;
+  border-radius: 0 0 16px 16px !important;
 }
