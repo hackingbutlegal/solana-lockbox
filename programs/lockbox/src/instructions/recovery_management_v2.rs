@@ -19,9 +19,9 @@
 //! 7. On-chain verification → ownership transfer
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use crate::state::*;
 use crate::errors::*;
-use solana_program::hash::hash;
 
 /// Initialize recovery configuration V2 (with commitments)
 ///
@@ -132,7 +132,7 @@ pub fn add_guardian_v2_handler(
     recovery_config.total_guardians = recovery_config.guardians.len() as u8;
     recovery_config.last_modified = clock.unix_timestamp;
 
-    emit!(GuardianAddedEvent {
+    emit!(GuardianAddedV2Event {
         owner: recovery_config.owner,
         guardian: guardian_pubkey,
         share_index,
@@ -197,7 +197,7 @@ pub fn initiate_recovery_v2_handler(
     // Update last request ID
     recovery_config.last_request_id = request_id;
 
-    emit!(RecoveryInitiatedEvent {
+    emit!(RecoveryInitiatedV2Event {
         owner: recovery_config.owner,
         requester,
         request_id,
@@ -318,7 +318,7 @@ pub fn complete_recovery_with_proof_handler(
     // Mark recovery as completed
     recovery_request.status = RecoveryStatus::Completed;
 
-    emit!(RecoveryCompletedEvent {
+    emit!(RecoveryCompletedV2Event {
         previous_owner,
         new_owner,
         request_id: recovery_request.request_id,
@@ -430,14 +430,14 @@ pub struct CompleteRecoveryV2<'info> {
 // ============================================================================
 
 #[event]
-pub struct GuardianAddedEvent {
+pub struct GuardianAddedV2Event {
     pub owner: Pubkey,
     pub guardian: Pubkey,
     pub share_index: u8,
 }
 
 #[event]
-pub struct RecoveryInitiatedEvent {
+pub struct RecoveryInitiatedV2Event {
     pub owner: Pubkey,
     pub requester: Pubkey,
     pub request_id: u64,
@@ -445,7 +445,7 @@ pub struct RecoveryInitiatedEvent {
 }
 
 #[event]
-pub struct RecoveryCompletedEvent {
+pub struct RecoveryCompletedV2Event {
     pub previous_owner: Pubkey,
     pub new_owner: Pubkey,
     pub request_id: u64,

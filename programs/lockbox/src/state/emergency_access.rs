@@ -128,7 +128,7 @@ pub struct EmergencyContact {
 }
 
 /// Emergency access level enum
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub enum EmergencyAccessLevel {
     /// Can view specified entries only
     ViewOnly,
@@ -141,7 +141,7 @@ pub enum EmergencyAccessLevel {
 }
 
 /// Emergency contact status
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub enum EmergencyContactStatus {
     /// Pending contact acceptance
     PendingAcceptance,

@@ -183,7 +183,7 @@ impl RecoveryConfigV2 {
     ) -> bool {
         if let Some(guardian) = self.guardians.iter().find(|g| &g.guardian_pubkey == guardian_pubkey) {
             // Recompute commitment: SHA256(share || guardian_pubkey)
-            use solana_program::hash::hash;
+            use anchor_lang::solana_program::hash::hash;
             let mut data = Vec::new();
             data.extend_from_slice(share_bytes);
             data.extend_from_slice(guardian_pubkey.as_ref());
