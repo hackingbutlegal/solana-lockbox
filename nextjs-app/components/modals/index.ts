@@ -6,3 +6,4 @@ export { SubscriptionUpgradeModal } from './SubscriptionUpgradeModal';
 export { TOTPManagerModal } from './TOTPManagerModal';
 export { default as RecoverySetupModal } from './RecoverySetupModal';
 export { default as GuardianManagementModal } from './GuardianManagementModal';
+export { default as RecoveryInitiationModal } from './RecoveryInitiationModal';
