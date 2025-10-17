@@ -4,6 +4,8 @@ pub mod subscription;
 pub mod chunk_management;
 pub mod category_management;
 pub mod close_account;
+pub mod recovery_management;
+pub mod emergency_access_management;
 
 pub use initialize::*;
 pub use password_entry::*;
@@ -11,3 +13,5 @@ pub use subscription::*;
 pub use chunk_management::*;
 pub use category_management::*;
 pub use close_account::*;
+pub use recovery_management::*;
+pub use emergency_access_management::*;

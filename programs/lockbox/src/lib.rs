@@ -324,6 +324,155 @@ pub mod lockbox {
     }
 
     // ============================================================================
+    // Social Recovery Instructions (v2)
+    // ============================================================================
+
+    /// Initialize social recovery configuration
+    pub fn initialize_recovery_config(
+        ctx: Context<InitializeRecoveryConfig>,
+        threshold: u8,
+        recovery_delay: i64,
+    ) -> Result<()> {
+        instructions::recovery_management::initialize_recovery_config_handler(
+            ctx,
+            threshold,
+            recovery_delay,
+        )
+    }
+
+    /// Add a guardian to the recovery network
+    pub fn add_guardian(
+        ctx: Context<AddGuardian>,
+        guardian_pubkey: Pubkey,
+        share_index: u8,
+        encrypted_share: Vec<u8>,
+        nickname_encrypted: Vec<u8>,
+    ) -> Result<()> {
+        instructions::recovery_management::add_guardian_handler(
+            ctx,
+            guardian_pubkey,
+            share_index,
+            encrypted_share,
+            nickname_encrypted,
+        )
+    }
+
+    /// Guardian accepts their role
+    pub fn accept_guardianship(ctx: Context<AcceptGuardianship>) -> Result<()> {
+        instructions::recovery_management::accept_guardianship_handler(ctx)
+    }
+
+    /// Remove a guardian
+    pub fn remove_guardian(
+        ctx: Context<RemoveGuardian>,
+        guardian_pubkey: Pubkey,
+    ) -> Result<()> {
+        instructions::recovery_management::remove_guardian_handler(ctx, guardian_pubkey)
+    }
+
+    /// Initiate wallet recovery
+    pub fn initiate_recovery(
+        ctx: Context<InitiateRecovery>,
+        request_id: u64,
+        new_owner: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::recovery_management::initiate_recovery_handler(ctx, request_id, new_owner)
+    }
+
+    /// Approve recovery with guardian share
+    pub fn approve_recovery(
+        ctx: Context<ApproveRecovery>,
+        share_decrypted: [u8; 32],
+    ) -> Result<()> {
+        instructions::recovery_management::approve_recovery_handler(ctx, share_decrypted)
+    }
+
+    /// Complete recovery and transfer ownership
+    pub fn complete_recovery(ctx: Context<CompleteRecovery>) -> Result<()> {
+        instructions::recovery_management::complete_recovery_handler(ctx)
+    }
+
+    /// Cancel an active recovery request
+    pub fn cancel_recovery(ctx: Context<CancelRecovery>) -> Result<()> {
+        instructions::recovery_management::cancel_recovery_handler(ctx)
+    }
+
+    // ============================================================================
+    // Emergency Access Instructions (v2)
+    // ============================================================================
+
+    /// Initialize emergency access configuration
+    pub fn initialize_emergency_access(
+        ctx: Context<InitializeEmergencyAccess>,
+        inactivity_period: i64,
+        grace_period: i64,
+    ) -> Result<()> {
+        instructions::emergency_access_management::initialize_emergency_access_handler(
+            ctx,
+            inactivity_period,
+            grace_period,
+        )
+    }
+
+    /// Add an emergency contact
+    pub fn add_emergency_contact(
+        ctx: Context<AddEmergencyContact>,
+        contact_pubkey: Pubkey,
+        contact_name_encrypted: Vec<u8>,
+        access_level: EmergencyAccessLevel,
+        encrypted_key: Vec<u8>,
+    ) -> Result<()> {
+        instructions::emergency_access_management::add_emergency_contact_handler(
+            ctx,
+            contact_pubkey,
+            contact_name_encrypted,
+            access_level,
+            encrypted_key,
+        )
+    }
+
+    /// Emergency contact accepts their role
+    pub fn accept_emergency_contact(ctx: Context<AcceptEmergencyContact>) -> Result<()> {
+        instructions::emergency_access_management::accept_emergency_contact_handler(ctx)
+    }
+
+    /// Remove an emergency contact
+    pub fn remove_emergency_contact(
+        ctx: Context<RemoveEmergencyContact>,
+        contact_pubkey: Pubkey,
+    ) -> Result<()> {
+        instructions::emergency_access_management::remove_emergency_contact_handler(
+            ctx,
+            contact_pubkey,
+        )
+    }
+
+    /// Record activity (extends countdown)
+    pub fn record_activity(ctx: Context<RecordActivity>) -> Result<()> {
+        instructions::emergency_access_management::record_activity_handler(ctx)
+    }
+
+    /// Manual activity ping
+    pub fn manual_activity_ping(ctx: Context<ManualActivityPing>) -> Result<()> {
+        instructions::emergency_access_management::manual_activity_ping_handler(ctx)
+    }
+
+    /// Check and start countdown (cron job)
+    pub fn check_and_start_countdown(ctx: Context<CheckAndStartCountdown>) -> Result<()> {
+        instructions::emergency_access_management::check_and_start_countdown_handler(ctx)
+    }
+
+    /// Activate emergency access
+    pub fn activate_emergency_access(ctx: Context<ActivateEmergencyAccess>) -> Result<()> {
+        instructions::emergency_access_management::activate_emergency_access_handler(ctx)
+    }
+
+    /// Cancel emergency countdown
+    pub fn cancel_emergency_countdown(ctx: Context<CancelEmergencyCountdown>) -> Result<()> {
+        instructions::emergency_access_management::cancel_emergency_countdown_handler(ctx)
+    }
+
+    // ============================================================================
     // V1 Instructions - Legacy (Backward Compatibility)
     // ============================================================================
 
