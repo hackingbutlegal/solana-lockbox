@@ -28,6 +28,7 @@ import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
 import { BatchOperationsToolbar } from './BatchOperationsToolbar';
 import { FavoritesSidebar } from './FavoritesSidebar';
+import { Dashboard } from './Dashboard';
 import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
 import { BatchProgressModal } from '../modals/BatchProgressModal';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -103,6 +104,7 @@ export function PasswordManager() {
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showResetModal, setShowResetModal] = useState(false);
   const [showFavoritesSidebar, setShowFavoritesSidebar] = useState(false);
+  const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
   // and handles session initialization as needed, so no manual trigger required here
@@ -1123,6 +1125,22 @@ export function PasswordManager() {
         <div className="pm-header-content">
           <h1>🔐 Password Manager</h1>
           <div className="header-actions">
+            <div className="view-switcher">
+              <button
+                className={`view-btn ${currentView === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setCurrentView('dashboard')}
+                title="Dashboard View"
+              >
+                📊
+              </button>
+              <button
+                className={`view-btn ${currentView === 'list' ? 'active' : ''}`}
+                onClick={() => setCurrentView('list')}
+                title="List View"
+              >
+                📋
+              </button>
+            </div>
             <div className="storage-info">
               <span className="tier-badge">{tierInfo.name}</span>
               <span className="storage-used">
@@ -1319,8 +1337,42 @@ export function PasswordManager() {
             }}
           />
 
-          {/* Enhanced Search Bar */}
-          <SearchBar
+          {/* Dashboard View */}
+          {currentView === 'dashboard' && (
+            <Dashboard
+              entries={entries}
+              onEntryClick={(entry) => {
+                setSelectedEntry(entry);
+                setEntryModalMode('view');
+                setShowDetailsModal(true);
+              }}
+              onQuickAction={(action) => {
+                switch (action) {
+                  case 'add':
+                    setShowCreateModal(false);
+                    setEntryModalMode('create');
+                    setSelectedEntry(null);
+                    setTimeout(() => setShowCreateModal(true), 0);
+                    break;
+                  case 'generate':
+                    toast.showInfo('Password generator coming soon!');
+                    break;
+                  case 'health':
+                    setShowHealthModal(true);
+                    break;
+                  case 'import':
+                    toast.showInfo('Import feature coming soon!');
+                    break;
+                }
+              }}
+            />
+          )}
+
+          {/* List View */}
+          {currentView === 'list' && (
+            <>
+              {/* Enhanced Search Bar */}
+              <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             onClear={() => setSearchQuery('')}
@@ -1528,6 +1580,8 @@ export function PasswordManager() {
             onExportSelected={handleExportSelected}
             categories={categories.map(cat => ({ id: cat.id, name: cat.name }))}
           />
+            </>
+          )}
         </main>
       </div>
 
@@ -1855,6 +1909,33 @@ export function PasswordManager() {
           display: flex;
           gap: 1rem;
           align-items: center;
+        }
+
+        .view-switcher {
+          display: flex;
+          gap: 0.5rem;
+          padding: 0.25rem;
+          background: #f8f9fa;
+          border-radius: 8px;
+        }
+
+        .view-btn {
+          padding: 0.5rem 0.75rem;
+          border: none;
+          background: transparent;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 1.25rem;
+          transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+          background: white;
+        }
+
+        .view-btn.active {
+          background: white;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .storage-info {

@@ -101,10 +101,6 @@ export function SettingsModal({
                 <ImportExportPanel
                   entries={entries}
                   onImport={onImport}
-                  onExport={(exportedData, format) => {
-                    console.log(`Exported ${entries.length} entries as ${format}`);
-                  }}
-                  supportedFormats={['json', 'csv', 'lastpass', '1password', 'bitwarden']}
                 />
               </div>
             )}

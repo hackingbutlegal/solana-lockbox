@@ -22,7 +22,7 @@ export default function PasswordManagerExample() {
   } = usePassword();
 
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<Partial<PasswordEntry>>({});
+  const [editForm, setEditForm] = useState<any>({});
 
   // ============================================================================
   // EDIT HANDLERS (using batched operations)
@@ -40,23 +40,20 @@ export default function PasswordManagerExample() {
   };
 
   const handleSaveEdit = (entry: PasswordEntry) => {
-    if (!entry.id || entry.chunkIndex === undefined) {
-      console.error('Cannot update entry without id or chunkIndex');
+    if (!entry.id) {
+      console.error('Cannot update entry without id');
       return;
     }
 
-    const updatedEntry: PasswordEntry = {
+    const updatedEntry = {
       ...entry,
       title: editForm.title || entry.title,
-      username: editForm.username || (entry.type === PasswordEntryType.Login ? entry.username : ''),
-      password: editForm.password || (entry.type === PasswordEntryType.Login ? entry.password : ''),
-      url: editForm.url || (entry.type === PasswordEntryType.Login ? entry.url : undefined),
       notes: editForm.notes,
       lastModified: new Date(),
-    };
+    } as PasswordEntry;
 
     // Queue update (instant UI update, no blockchain wait)
-    queueUpdate(entry.chunkIndex, entry.id, updatedEntry);
+    queueUpdate(0, entry.id, updatedEntry);
 
     // Clear edit state
     setEditingId(null);
@@ -72,14 +69,14 @@ export default function PasswordManagerExample() {
   };
 
   const handleDelete = (entry: PasswordEntry) => {
-    if (!entry.id || entry.chunkIndex === undefined) {
-      console.error('Cannot delete entry without id or chunkIndex');
+    if (!entry.id) {
+      console.error('Cannot delete entry without id');
       return;
     }
 
     // Confirm before queueing delete
     if (confirm(`Delete "${entry.title}"? Changes will be synced later.`)) {
-      queueDelete(entry.chunkIndex, entry.id);
+      queueDelete(0, entry.id);
     }
   };
 

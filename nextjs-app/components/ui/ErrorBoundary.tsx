@@ -399,6 +399,8 @@ export class ContextErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      errorCount: 0,
+      lastErrorTime: 0,
     };
   }
 
