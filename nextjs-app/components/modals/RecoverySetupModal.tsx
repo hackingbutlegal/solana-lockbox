@@ -27,6 +27,7 @@ import {
   RecoverySetup,
 } from '@/lib/recovery-client-v2';
 import { splitSecret, Share } from '@/lib/shamir-secret-sharing';
+import { useRecovery } from '@/contexts';
 
 // Types
 interface RecoverySetupModalProps {
@@ -56,6 +57,7 @@ export default function RecoverySetupModal({
   masterSecret,
 }: RecoverySetupModalProps) {
   const { publicKey } = useWallet();
+  const { initializeRecovery, loading: recoveryLoading, error: recoveryError } = useRecovery();
 
   // State
   const [currentStep, setCurrentStep] = useState<SetupStep>('guardians');
@@ -170,12 +172,38 @@ export default function RecoverySetupModal({
   };
 
   const handleSubmit = async () => {
-    // TODO: Submit to blockchain
-    // This will call the on-chain initialize_recovery_config_v2 instruction
-    console.log('Submitting recovery setup to blockchain...');
-    console.log('Recovery Setup:', recoverySetup);
-    // For now, just close the modal
-    onClose();
+    if (!recoverySetup || !publicKey) {
+      setError('Recovery setup incomplete or wallet not connected');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Convert GuardianInput to GuardianInfo format
+      const guardianInfos: GuardianInfo[] = validGuardians.map((g, index) => ({
+        pubkey: new PublicKey(g.address),
+        nickname: g.nickname,
+        shareIndex: index + 1, // 1-based indexing
+      }));
+
+      // Initialize recovery via context
+      await initializeRecovery(
+        threshold,
+        recoveryDelay,
+        guardianInfos,
+        masterSecret
+      );
+
+      // Success - close modal
+      onClose();
+    } catch (err: any) {
+      console.error('Recovery setup failed:', err);
+      setError(err?.message || 'Failed to setup recovery. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const downloadShare = (guardianIndex: number) => {
@@ -578,6 +606,13 @@ export default function RecoverySetupModal({
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-900 border-t border-cyan-500/30 px-6 py-4">
+          {/* Error Display */}
+          {(error || recoveryError) && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-sm text-red-400">{error || recoveryError}</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <button
               onClick={handlePrevStep}
@@ -594,18 +629,18 @@ export default function RecoverySetupModal({
             {currentStep === 'confirmation' ? (
               <button
                 onClick={handleSubmit}
-                disabled={isLoading}
+                disabled={isLoading || recoveryLoading}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Submitting...' : 'Complete Setup'}
+                {isLoading || recoveryLoading ? 'Submitting...' : 'Complete Setup'}
               </button>
             ) : (
               <button
                 onClick={handleNextStep}
-                disabled={!canProceed[currentStep] || isLoading}
+                disabled={!canProceed[currentStep] || isLoading || recoveryLoading}
                 className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Processing...' : 'Next'}
+                {isLoading || recoveryLoading ? 'Processing...' : 'Next'}
               </button>
             )}
           </div>

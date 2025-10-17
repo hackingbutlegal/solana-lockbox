@@ -14,9 +14,10 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useRecovery } from '@/contexts';
 
 // Types
 interface GuardianManagementModalProps {
@@ -88,6 +89,13 @@ export default function GuardianManagementModal({
   onClose,
 }: GuardianManagementModalProps) {
   const { publicKey } = useWallet();
+  const {
+    recoveryConfig,
+    removeGuardian,
+    loading,
+    error,
+    refreshRecoveryConfig
+  } = useRecovery();
 
   // State
   const [config, setConfig] = useState<RecoveryConfig>(mockRecoveryConfig);
@@ -95,26 +103,35 @@ export default function GuardianManagementModal({
   const [showAddGuardian, setShowAddGuardian] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
+  // Sync with context data
+  useEffect(() => {
+    if (recoveryConfig) {
+      setConfig(recoveryConfig);
+    }
+  }, [recoveryConfig]);
+
   // Handlers
   const handleRemoveGuardian = (guardian: Guardian) => {
     setSelectedGuardian(guardian);
     setShowRemoveConfirm(true);
   };
 
-  const confirmRemoveGuardian = () => {
+  const confirmRemoveGuardian = async () => {
     if (!selectedGuardian) return;
 
-    // TODO: Call on-chain remove_guardian instruction
-    console.log('Removing guardian:', selectedGuardian);
+    try {
+      // Call on-chain remove_guardian instruction via context
+      await removeGuardian(new PublicKey(selectedGuardian.pubkey), selectedGuardian.shareIndex);
 
-    setConfig({
-      ...config,
-      guardians: config.guardians.filter(g => g.pubkey !== selectedGuardian.pubkey),
-      totalGuardians: config.totalGuardians - 1,
-    });
+      // Refresh config from on-chain
+      await refreshRecoveryConfig();
 
-    setShowRemoveConfirm(false);
-    setSelectedGuardian(null);
+      setShowRemoveConfirm(false);
+      setSelectedGuardian(null);
+    } catch (err: any) {
+      console.error('Failed to remove guardian:', err);
+      // Error is already handled by context
+    }
   };
 
   const handleResendShare = (guardian: Guardian) => {
@@ -182,6 +199,20 @@ export default function GuardianManagementModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+              <p className="text-sm text-cyan-400">Loading recovery configuration...</p>
+            </div>
+          )}
+
           {/* Recovery Configuration Summary */}
           <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
             <h3 className="text-lg font-semibold text-white mb-4">Recovery Configuration</h3>
@@ -299,15 +330,17 @@ export default function GuardianManagementModal({
                     setShowRemoveConfirm(false);
                     setSelectedGuardian(null);
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmRemoveGuardian}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Remove Guardian
+                  {loading ? 'Removing...' : 'Remove Guardian'}
                 </button>
               </div>
             </div>

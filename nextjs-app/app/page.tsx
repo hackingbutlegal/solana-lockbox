@@ -8,7 +8,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
-import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider, CategoryProvider } from '../contexts';
+import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider, CategoryProvider, RecoveryProvider } from '../contexts';
 import { ErrorBoundary, ContextErrorBoundary } from '../components/ui';
 
 // Import wallet adapter styles
@@ -62,9 +62,11 @@ export default function Home() {
                   <CategoryProvider>
                     <PasswordProvider>
                       <SubscriptionProvider>
-                        <ErrorBoundary>
-                          <PasswordManager />
-                        </ErrorBoundary>
+                        <RecoveryProvider>
+                          <ErrorBoundary>
+                            <PasswordManager />
+                          </ErrorBoundary>
+                        </RecoveryProvider>
                       </SubscriptionProvider>
                     </PasswordProvider>
                   </CategoryProvider>
