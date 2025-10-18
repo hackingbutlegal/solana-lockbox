@@ -373,6 +373,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
 
       let successCount = 0;
       let failCount = 0;
+      const failedChanges: any[] = []; // Track which specific changes failed for retry
 
       // BATCH UPDATES: Send all updates in a single transaction (max 10 per batch)
       if (updates.length > 0) {
@@ -402,6 +403,8 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
           } catch (err) {
             console.error(`[PasswordContext] Failed to sync batch of updates:`, err);
             failCount += batch.length;
+            // BUGFIX: Track which entries failed so they can be retried
+            failedChanges.push(...batch);
           }
         }
       }
@@ -416,6 +419,8 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
         } catch (err) {
           console.error(`[PasswordContext] Failed to delete entry ${change.entryId}:`, err);
           failCount++;
+          // BUGFIX: Track which entries failed so they can be retried
+          failedChanges.push(change);
         }
       }
 
@@ -429,13 +434,16 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
         } catch (err) {
           console.error(`[PasswordContext] Failed to create entry:`, err);
           failCount++;
+          // BUGFIX: Track which entries failed so they can be retried
+          failedChanges.push(change);
         }
       }
 
       console.log(`[PasswordContext] Sync complete: ${successCount} success, ${failCount} failed`);
 
-      // Clear pending changes after successful sync
+      // BUGFIX: Clear only successful changes, keep failed ones for retry
       if (failCount === 0) {
+        // All operations succeeded - clear everything
         pendingChangesManager.clearAll();
         notifyPendingChanges();
 
@@ -444,7 +452,36 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
 
         return true;
       } else {
-        setError(`Sync completed with errors: ${failCount} operations failed`);
+        // Partial failure - keep only failed changes for retry
+        // Remove all changes first, then re-add only the failed ones
+        const failedChangeIds = new Set(failedChanges.map(c => c.id));
+        const allChanges = pendingChangesManager.getAllChanges();
+
+        pendingChangesManager.clearAll();
+
+        // Re-add only the changes that failed
+        for (const change of allChanges) {
+          if (failedChangeIds.has(change.id)) {
+            // Re-add the failed change
+            if (change.type === 'create' && change.entry) {
+              pendingChangesManager.addChange('create', undefined, undefined, change.entry);
+            } else if (change.type === 'update' && change.chunkIndex !== undefined && change.entryId !== undefined && change.entry) {
+              pendingChangesManager.addChange('update', change.chunkIndex, change.entryId, change.entry, change.originalEntry);
+            } else if (change.type === 'delete' && change.chunkIndex !== undefined && change.entryId !== undefined) {
+              pendingChangesManager.addChange('delete', change.chunkIndex, change.entryId, undefined, change.originalEntry);
+            }
+          }
+        }
+
+        notifyPendingChanges();
+
+        // Partial success - refresh to show successful changes
+        await refreshEntries();
+
+        setError(
+          `Sync partially completed: ${successCount} operations succeeded, ${failCount} failed. ` +
+          `Failed operations have been retained and will be retried on next sync.`
+        );
         return false;
       }
     } catch (err) {

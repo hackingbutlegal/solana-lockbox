@@ -116,11 +116,13 @@ export function LockboxProvider({ children }: LockboxProviderProps) {
   }, [client, refreshLockbox]);
 
   // Auto-refresh master lockbox when wallet connects
+  // NOTE: refreshLockbox not in deps because it only depends on client (already included)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (publicKey && client) {
       refreshLockbox();
     }
-  }, [publicKey, client, refreshLockbox]);
+  }, [publicKey, client]);
 
   const contextValue: LockboxContextType = {
     masterLockbox,

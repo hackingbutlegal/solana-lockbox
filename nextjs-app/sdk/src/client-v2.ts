@@ -642,15 +642,22 @@ export class LockboxV2Client {
     const [masterLockbox] = this.getMasterLockboxAddress();
     const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
 
-    // Prevent duplicate chunk creation attempts
+    // BUGFIX: Prevent race condition in duplicate chunk creation attempts
+    // Use atomic check-and-set by checking AFTER adding to the set
     const operationKey = `chunk-${storageChunk.toBase58()}`;
-    if (this.pendingTransactions.has(operationKey)) {
+
+    // Get the size before adding
+    const sizeBefore = this.pendingTransactions.size;
+    this.pendingTransactions.add(operationKey);
+    const sizeAfter = this.pendingTransactions.size;
+
+    // If size didn't increase, the key was already in the set
+    if (sizeBefore === sizeAfter) {
       console.warn(`[initializeStorageChunk] Chunk ${chunkIndex} creation already in progress, skipping duplicate request`);
       throw new Error(`Chunk ${chunkIndex} initialization already in progress`);
     }
 
     try {
-      this.pendingTransactions.add(operationKey);
 
       // Check if chunk already exists (from a previous failed transaction)
       const existingChunk = await this.connection.getAccountInfo(storageChunk);
