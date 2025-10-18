@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { PublicKey } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from './AuthContext';
 import { setupRecovery, GuardianInfo, RecoverySetup } from '@/lib/recovery-client-v2';
 
@@ -114,7 +115,8 @@ interface RecoveryProviderProps {
 }
 
 export function RecoveryProvider({ children }: RecoveryProviderProps) {
-  const { client, isAuthenticated, walletAddress } = useAuth();
+  const { client, isSessionActive } = useAuth();
+  const { publicKey } = useWallet();
 
   // State
   const [recoveryConfig, setRecoveryConfig] = useState<RecoveryConfig | null>(null);
@@ -137,7 +139,7 @@ export function RecoveryProvider({ children }: RecoveryProviderProps) {
 
   // Fetch recovery configuration from blockchain
   const refreshRecoveryConfig = useCallback(async () => {
-    if (!client || !isAuthenticated) return;
+    if (!client || !isSessionActive) return;
 
     try {
       setLoading(true);
@@ -173,7 +175,7 @@ export function RecoveryProvider({ children }: RecoveryProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, isAuthenticated]);
+  }, [client, isSessionActive]);
 
   // Initialize recovery configuration
   const initializeRecovery = useCallback(async (
@@ -416,10 +418,10 @@ export function RecoveryProvider({ children }: RecoveryProviderProps) {
 
   // Load recovery config on mount and when wallet changes
   useEffect(() => {
-    if (isAuthenticated && walletAddress) {
+    if (isSessionActive && publicKey) {
       refreshRecoveryConfig();
     }
-  }, [isAuthenticated, walletAddress, refreshRecoveryConfig]);
+  }, [isSessionActive, publicKey, refreshRecoveryConfig]);
 
   const value: RecoveryContextType = {
     // Config

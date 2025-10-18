@@ -92,6 +92,35 @@ import {
 } from './types-v2';
 import { serializeEntry, deserializeEntry, DataCorruptionError, SchemaValidationError, PasswordEntrySchema } from './schema';
 
+/**
+ * SECURITY FIX: Safe BigInt to Number conversion
+ *
+ * JavaScript's Number type can only safely represent integers up to 2^53 - 1 (9,007,199,254,740,991).
+ * Converting larger BigInt values to Number can result in precision loss and incorrect values.
+ *
+ * This utility ensures safe conversion and throws an error if the value would overflow.
+ */
+function safeBigIntToNumber(value: bigint, fieldName: string): number {
+  const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+
+  if (value > MAX_SAFE_INTEGER) {
+    throw new Error(
+      `BigInt overflow: ${fieldName} value ${value} exceeds JavaScript Number.MAX_SAFE_INTEGER (${MAX_SAFE_INTEGER}). ` +
+      `This indicates the value is too large to safely represent as a Number. ` +
+      `Consider using BigInt throughout the application for this field.`
+    );
+  }
+
+  if (value < 0n && value < -MAX_SAFE_INTEGER) {
+    throw new Error(
+      `BigInt underflow: ${fieldName} value ${value} is below -Number.MAX_SAFE_INTEGER (-${MAX_SAFE_INTEGER}). ` +
+      `This indicates the value is too large (in magnitude) to safely represent as a Number.`
+    );
+  }
+
+  return Number(value);
+}
+
 // Borsh schema definitions for account deserialization
 class StorageChunkInfoBorsh {
   chunkAddress: Uint8Array;
@@ -993,7 +1022,7 @@ export class LockboxV2Client {
 
       // Fetch updated master to get entry ID
       const updatedMaster = await this.getMasterLockbox();
-      const entryId = Number(updatedMaster.nextEntryId) - 1;
+      const entryId = safeBigIntToNumber(updatedMaster.nextEntryId, 'nextEntryId') - 1;
 
       console.log(`[storePassword] Entry ID: ${entryId}`);
 
@@ -1662,7 +1691,7 @@ export class LockboxV2Client {
       offset += 32;
 
       // Read total_entries (u64, 8 bytes)
-      const totalEntries = Number(data.readBigUInt64LE(offset));
+      const totalEntries = safeBigIntToNumber(data.readBigUInt64LE(offset), 'totalEntries');
       offset += 8;
 
       // Read storage_chunks_count (u16, 2 bytes)
@@ -1674,19 +1703,19 @@ export class LockboxV2Client {
       offset += 1;
 
       // Read last_accessed (i64, 8 bytes)
-      const lastAccessed = Number(data.readBigInt64LE(offset));
+      const lastAccessed = safeBigIntToNumber(data.readBigInt64LE(offset), 'lastAccessed');
       offset += 8;
 
       // Read subscription_expires (i64, 8 bytes)
-      const subscriptionExpires = Number(data.readBigInt64LE(offset));
+      const subscriptionExpires = safeBigIntToNumber(data.readBigInt64LE(offset), 'subscriptionExpires');
       offset += 8;
 
       // Read total_capacity (u64, 8 bytes)
-      const totalCapacity = Number(data.readBigUInt64LE(offset));
+      const totalCapacity = safeBigIntToNumber(data.readBigUInt64LE(offset), 'totalCapacity');
       offset += 8;
 
       // Read storage_used (u64, 8 bytes)
-      const storageUsed = Number(data.readBigUInt64LE(offset));
+      const storageUsed = safeBigIntToNumber(data.readBigUInt64LE(offset), 'storageUsed');
       offset += 8;
 
       // Read storage_chunks vec (4-byte length + items)
@@ -1717,11 +1746,11 @@ export class LockboxV2Client {
         offset += 1;
 
         // created_at (i64, 8 bytes)
-        const chunkCreatedAt = Number(data.readBigInt64LE(offset));
+        const chunkCreatedAt = safeBigIntToNumber(data.readBigInt64LE(offset), 'chunkCreatedAt');
         offset += 8;
 
         // last_modified (i64, 8 bytes)
-        const lastModified = Number(data.readBigInt64LE(offset));
+        const lastModified = safeBigIntToNumber(data.readBigInt64LE(offset), 'lastModified');
         offset += 8;
 
         storageChunks.push({
@@ -1742,7 +1771,7 @@ export class LockboxV2Client {
       offset += encryptedIndexLen;
 
       // Read next_entry_id (u64, 8 bytes)
-      const nextEntryId = Number(data.readBigUInt64LE(offset));
+      const nextEntryId = safeBigIntToNumber(data.readBigUInt64LE(offset), 'nextEntryId');
       offset += 8;
 
       // Read categories_count (u32, 4 bytes)
@@ -1750,7 +1779,7 @@ export class LockboxV2Client {
       offset += 4;
 
       // Read created_at (i64, 8 bytes)
-      const createdAt = Number(data.readBigInt64LE(offset));
+      const createdAt = safeBigIntToNumber(data.readBigInt64LE(offset), 'createdAt');
       offset += 8;
 
       // Read bump (u8, 1 byte)
@@ -1842,7 +1871,7 @@ export class LockboxV2Client {
 
       for (let i = 0; i < entryHeadersLen; i++) {
         // entry_id (u64, 8 bytes)
-        const entryId = Number(data.readBigUInt64LE(offset));
+        const entryId = safeBigIntToNumber(data.readBigUInt64LE(offset), 'entryId');
         offset += 8;
 
         // offset (u32, 4 bytes)
@@ -1866,11 +1895,11 @@ export class LockboxV2Client {
         offset += 32;
 
         // created_at (i64, 8 bytes)
-        const createdAt = Number(data.readBigInt64LE(offset));
+        const createdAt = safeBigIntToNumber(data.readBigInt64LE(offset), 'createdAt');
         offset += 8;
 
         // last_modified (i64, 8 bytes)
-        const lastModified = Number(data.readBigInt64LE(offset));
+        const lastModified = safeBigIntToNumber(data.readBigInt64LE(offset), 'lastModified');
         offset += 8;
 
         // access_count (u32, 4 bytes)
@@ -1900,11 +1929,11 @@ export class LockboxV2Client {
       offset += 2;
 
       // Read created_at (i64, 8 bytes)
-      const createdAt = Number(data.readBigInt64LE(offset));
+      const createdAt = safeBigIntToNumber(data.readBigInt64LE(offset), 'createdAt');
       offset += 8;
 
       // Read last_modified (i64, 8 bytes)
-      const lastModified = Number(data.readBigInt64LE(offset));
+      const lastModified = safeBigIntToNumber(data.readBigInt64LE(offset), 'lastModified');
       offset += 8;
 
       // Read bump (u8, 1 byte)
