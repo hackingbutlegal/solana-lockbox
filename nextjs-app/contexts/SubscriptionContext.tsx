@@ -105,9 +105,11 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   // Upgrade subscription tier
   const upgradeSubscription = useCallback(async (newTier: SubscriptionTier): Promise<void> => {
+    console.log('upgradeSubscription called with:', { newTier, client: !!client });
     if (!client) {
-      setError('Client not initialized');
-      throw new Error('Client not initialized');
+      const errorMsg = 'Wallet not connected or client not initialized. Please reconnect your wallet.';
+      setError(errorMsg);
+      throw new Error(errorMsg);
     }
 
     // Update activity timestamp

@@ -187,21 +187,35 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
 
   // Create client instance (memoized)
   const client = useMemo(() => {
-    if (!publicKey || !connection || !signTransaction) return null;
+    console.log('Client creation check:', {
+      hasPublicKey: !!publicKey,
+      hasConnection: !!connection,
+      hasWallet: !!wallet,
+      publicKey: publicKey?.toBase58()
+    });
+
+    // Only require publicKey and connection - wallet adapter will provide signTransaction when needed
+    if (!publicKey || !connection) {
+      console.warn('Client not created - missing publicKey or connection');
+      return null;
+    }
 
     try {
       // Use the actual wallet from useWallet hook
-      return new LockboxV2Client({
+      // The wallet adapter provides signTransaction/signMessage on-demand
+      const newClient = new LockboxV2Client({
         connection,
         wallet: wallet as any,
         programId: new PublicKey(programId),
         treasuryWallet: treasuryWallet, // Optional treasury wallet for fees
       });
+      console.log('✅ LockboxV2Client created successfully');
+      return newClient;
     } catch (err) {
-      console.error('Failed to create LockboxV2Client:', err);
+      console.error('❌ Failed to create LockboxV2Client:', err);
       return null;
     }
-  }, [publicKey, connection, signTransaction, wallet, programId, treasuryWallet]);
+  }, [publicKey, connection, wallet, programId, treasuryWallet]);
 
   // Initialize session key from wallet signature
   const initializeSession = useCallback(async (): Promise<boolean> => {

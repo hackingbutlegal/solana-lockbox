@@ -1,20 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useSubscription } from '../../contexts';
 import { SubscriptionTier, TIER_INFO } from '../../sdk/src/types-v2';
 import { SubscriptionCard } from './SubscriptionCard';
+import { StorageSliderModal } from '../modals/StorageSliderModal';
 
 /**
  * Subscription & Billing Panel
  *
  * Displays:
  * - Current subscription plan details
- * - Upgrade options (all tiers)
+ * - Storage expansion via slider modal
  * - Billing history (future: transaction log)
  */
 
 export function SubscriptionBillingPanel() {
+  const { connected } = useWallet();
   const {
     currentTier,
     storageUsed,
@@ -28,6 +31,7 @@ export function SubscriptionBillingPanel() {
   } = useSubscription();
 
   const [upgrading, setUpgrading] = useState(false);
+  const [showSliderModal, setShowSliderModal] = useState(false);
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -44,14 +48,37 @@ export function SubscriptionBillingPanel() {
     });
   };
 
-  const handleUpgrade = async (tier: SubscriptionTier) => {
+  const handleStorageExpansion = async (targetBytes: number) => {
+    // CRITICAL: Verify wallet is connected before proceeding
+    if (!connected) {
+      alert('Please connect your wallet first to expand storage.');
+      return;
+    }
+
+    console.log('handleStorageExpansion called with target:', targetBytes);
+
+    // Determine which tier covers this capacity
+    let targetTier = SubscriptionTier.Free;
+    if (targetBytes > 102400) {
+      targetTier = SubscriptionTier.Pro;
+    } else if (targetBytes > 10240) {
+      targetTier = SubscriptionTier.Premium;
+    } else if (targetBytes > 1024) {
+      targetTier = SubscriptionTier.Basic;
+    }
+
+    console.log('Calculated target tier:', SubscriptionTier[targetTier]);
+
     try {
       setUpgrading(true);
-      await upgradeSubscription(tier);
+      await upgradeSubscription(targetTier);
       // Success toast would go here
+      console.log('Storage expansion successful!');
     } catch (error) {
-      console.error('Failed to upgrade subscription:', error);
+      console.error('Failed to expand storage:', error);
       // Error toast would go here
+      alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
     } finally {
       setUpgrading(false);
     }
@@ -84,7 +111,7 @@ export function SubscriptionBillingPanel() {
               <span className="price-free">Free</span>
             ) : (
               <span className="price-amount">
-                {(TIER_INFO[currentTier].monthlyCost / 1_000_000_000).toFixed(3)} SOL/month
+                {(TIER_INFO[currentTier].monthlyCost / 1_000_000_000).toFixed(3)} SOL paid
               </span>
             )}
           </div>
@@ -121,25 +148,38 @@ export function SubscriptionBillingPanel() {
         </div>
       </div>
 
-      {/* Upgrade Options */}
-      <h3>Upgrade Options</h3>
+      {/* Storage Expansion */}
+      <h3>Expand Storage</h3>
       <p className="upgrade-description">
-        Choose the plan that fits your needs. Upgrade anytime to unlock more storage and features.
+        Need more space? Expand your storage capacity with our flexible slider. One-time payment includes refundable account rent plus a service fee to support platform development.
       </p>
 
-      <div className="subscription-tiers">
-        {Object.values(SubscriptionTier)
-          .filter(tier => typeof tier === 'number')
-          .map(tier => (
-            <SubscriptionCard
-              key={tier}
-              tier={tier as SubscriptionTier}
-              currentTier={currentTier}
-              onUpgrade={handleUpgrade}
-              disabled={upgrading || loading}
-            />
-          ))}
+      <div className="expansion-cta">
+        <div className="cta-content">
+          <div className="cta-icon">📦</div>
+          <div className="cta-text">
+            <h4>Expand Your Capacity</h4>
+            <p>Choose exactly how much storage you need • Starting at 0.003 SOL (~$0.42)</p>
+          </div>
+        </div>
+        <button
+          className="btn-expand"
+          onClick={() => setShowSliderModal(true)}
+          disabled={!connected || loading}
+          title={!connected ? 'Connect your wallet first' : ''}
+        >
+          {!connected ? 'Connect Wallet First' : 'Open Storage Slider'}
+        </button>
       </div>
+
+      {/* Storage Slider Modal */}
+      <StorageSliderModal
+        isOpen={showSliderModal}
+        onClose={() => setShowSliderModal(false)}
+        currentCapacity={storageLimit}
+        currentTier={currentTier}
+        onConfirm={handleStorageExpansion}
+      />
 
       {/* Billing History Section */}
       <h3>Billing History</h3>
@@ -260,11 +300,71 @@ export function SubscriptionBillingPanel() {
           transition: all 0.3s ease;
         }
 
-        .subscription-tiers {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 1.5rem;
+        .expansion-cta {
+          background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+          border: 2px solid #667eea;
+          border-radius: 20px;
+          padding: 2rem;
           margin-bottom: 2rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 2rem;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .expansion-cta:hover {
+          box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+          transform: translateY(-2px);
+        }
+
+        .cta-content {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+          flex: 1;
+        }
+
+        .cta-icon {
+          font-size: 3rem;
+          flex-shrink: 0;
+        }
+
+        .cta-text h4 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: #2c3e50;
+        }
+
+        .cta-text p {
+          margin: 0;
+          font-size: 0.95rem;
+          color: #6b7280;
+        }
+
+        .btn-expand {
+          padding: 1rem 2rem;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-size: 1rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+          white-space: nowrap;
+        }
+
+        .btn-expand:hover:not(:disabled) {
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-expand:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .billing-history {
@@ -282,16 +382,31 @@ export function SubscriptionBillingPanel() {
         }
 
         @media (max-width: 768px) {
-          .subscription-tiers {
-            grid-template-columns: 1fr;
-          }
-
           .current-plan-card {
             padding: 1.5rem;
           }
 
+          .plan-header {
+            flex-direction: column;
+            gap: 1rem;
+          }
+
           .plan-header h4 {
             font-size: 1.5rem;
+          }
+
+          .expansion-cta {
+            flex-direction: column;
+            text-align: center;
+          }
+
+          .cta-content {
+            flex-direction: column;
+            text-align: center;
+          }
+
+          .btn-expand {
+            width: 100%;
           }
         }
       `}</style>
