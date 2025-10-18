@@ -28,6 +28,11 @@ import {
 } from '@/lib/recovery-client-v2';
 import { splitSecret, Share } from '@/lib/shamir-secret-sharing';
 import { useRecovery } from '@/contexts';
+import {
+  generatePrintableShareCard,
+  downloadShareCard,
+  printShareCard,
+} from '@/lib/qr-code-generator';
 
 // Types
 interface RecoverySetupModalProps {
@@ -219,6 +224,7 @@ export default function RecoverySetupModal({
       },
       share: share.encrypted,
       commitment: Array.from(recoverySetup.guardianCommitments[guardianIndex].commitment),
+      shareIndex: guardianIndex + 1,
       setupDate: new Date().toISOString(),
     };
 
@@ -231,6 +237,54 @@ export default function RecoverySetupModal({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const printShareCard = async (guardianIndex: number) => {
+    if (!recoverySetup || !publicKey) return;
+
+    const guardian = validGuardians[guardianIndex];
+    const share = recoverySetup.encryptedShares[guardianIndex];
+    const commitment = recoverySetup.guardianCommitments[guardianIndex];
+
+    try {
+      const shareCard = await generatePrintableShareCard(
+        new PublicKey(guardian.address),
+        guardian.nickname,
+        share.encrypted,
+        commitment.commitment,
+        guardianIndex + 1,
+        publicKey
+      );
+
+      printShareCard(shareCard);
+    } catch (err: any) {
+      console.error('Failed to generate share card:', err);
+      setError('Failed to generate printable share card');
+    }
+  };
+
+  const downloadShareCard = async (guardianIndex: number) => {
+    if (!recoverySetup || !publicKey) return;
+
+    const guardian = validGuardians[guardianIndex];
+    const share = recoverySetup.encryptedShares[guardianIndex];
+    const commitment = recoverySetup.guardianCommitments[guardianIndex];
+
+    try {
+      const shareCard = await generatePrintableShareCard(
+        new PublicKey(guardian.address),
+        guardian.nickname,
+        share.encrypted,
+        commitment.commitment,
+        guardianIndex + 1,
+        publicKey
+      );
+
+      downloadShareCard(shareCard);
+    } catch (err: any) {
+      console.error('Failed to generate share card:', err);
+      setError('Failed to generate share card');
+    }
   };
 
   if (!isOpen) return null;
@@ -512,18 +566,35 @@ export default function RecoverySetupModal({
                     className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg"
                   >
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex-1">
                         <h4 className="font-semibold text-white">{guardian.nickname}</h4>
                         <p className="text-xs text-gray-400 font-mono">
                           {guardian.address.slice(0, 8)}...{guardian.address.slice(-8)}
                         </p>
                       </div>
-                      <button
-                        onClick={() => downloadShare(index)}
-                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors"
-                      >
-                        Download Share
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => downloadShare(index)}
+                          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                          title="Download JSON file"
+                        >
+                          📄 JSON
+                        </button>
+                        <button
+                          onClick={() => downloadShareCard(index)}
+                          className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors text-sm"
+                          title="Download printable card with QR code"
+                        >
+                          🎫 Card
+                        </button>
+                        <button
+                          onClick={() => printShareCard(index)}
+                          className="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
+                          title="Print share card"
+                        >
+                          🖨️ Print
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
