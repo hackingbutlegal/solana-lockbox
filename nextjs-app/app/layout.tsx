@@ -28,8 +28,11 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
-        <div id="static-loader">
+        {/* BUGFIX: Static loader with suppressHydrationWarning to prevent hydration mismatch */}
+        {/* This div is removed by LoadingScreen component after React hydrates */}
+        <div id="static-loader" suppressHydrationWarning>
           <div className="loader-content">
             <div className="loader-icon">🔐</div>
             <h1 className="loader-title">Solana Lockbox</h1>
