@@ -116,24 +116,25 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
       }
 
       const data = JSON.parse(stored);
-      const encryptedCategories: EncryptedCategoryStorage[] = data.categories || [];
+      const storedCategories = data.categories || [];
       const storedNextId: number = data.nextId || 1;
 
-      // For decryption, we need the session key
-      // Since categories are client-side only and names aren't critical secrets,
-      // we'll store them encrypted but readable
-      // For this MVP, let's store them unencrypted in localStorage
-      // (they're already protected by wallet-specific keys)
-
-      const decrypted: Category[] = encryptedCategories.map(cat => ({
-        ...cat,
-        nameEncrypted: new Uint8Array(cat.nameEncrypted),
-        // For MVP, we'll store plaintext names in localStorage
-        // In production, you'd decrypt here with session key
-        name: cat.id.toString(), // Placeholder - will be overwritten
+      // Categories are stored in localStorage with plaintext names
+      // (localStorage is already wallet-specific and browser-protected)
+      const loadedCategories: Category[] = storedCategories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name || `Category ${cat.id}`, // Use stored name or fallback
+        nameEncrypted: new Uint8Array(), // Not used for localStorage storage
+        icon: cat.icon || 0,
+        color: cat.color || 1,
+        parentId: cat.parentId || null,
+        entryCount: cat.entryCount || 0,
+        createdAt: cat.createdAt || Math.floor(Date.now() / 1000),
+        lastModified: cat.lastModified || Math.floor(Date.now() / 1000),
+        flags: cat.flags || 0,
       }));
 
-      setCategories(decrypted);
+      setCategories(loadedCategories);
       setNextCategoryId(storedNextId);
     } catch (err) {
       console.error('Failed to load categories:', err);
@@ -144,7 +145,7 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
   /**
    * Save categories to localStorage
    */
-  const saveCategories = useCallback(async (cats: Category[]) => {
+  const saveCategories = useCallback(async (cats: Category[], updatedNextId?: number) => {
     if (!publicKey) return;
 
     try {
@@ -164,7 +165,7 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
           lastModified: cat.lastModified,
           flags: cat.flags,
         })),
-        nextId: nextCategoryId,
+        nextId: updatedNextId !== undefined ? updatedNextId : nextCategoryId,
       };
 
       localStorage.setItem(storageKey, JSON.stringify(simplified));
@@ -220,10 +221,12 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
       };
 
       const updated = [...categories, newCategory];
-      setCategories(updated);
-      setNextCategoryId(nextCategoryId + 1);
+      const newNextId = nextCategoryId + 1;
 
-      await saveCategories(updated);
+      setCategories(updated);
+      setNextCategoryId(newNextId);
+
+      await saveCategories(updated, newNextId);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create category';
       setError(errorMsg);

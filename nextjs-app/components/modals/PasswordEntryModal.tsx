@@ -16,11 +16,11 @@ import { validatePasswordPolicy, loadPasswordPolicy } from '../../lib/password-s
 interface PasswordEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: PasswordEntry) => void;
+  onSave: (entry: PasswordEntry, queueForBatch?: boolean) => void;
   entry?: PasswordEntry | null;
   mode: 'create' | 'edit' | 'view';
   onDelete?: () => void;
-  isBatchMode?: boolean; // Whether batch mode is enabled
+  isBatchMode?: boolean; // Whether batch mode is enabled (only for edits, not creates)
 }
 
 export function PasswordEntryModal({
@@ -107,6 +107,9 @@ export function PasswordEntryModal({
 
   // Initialize form data when entry changes
   useEffect(() => {
+    // Only run when modal is opened (not when already open)
+    if (!isOpen) return;
+
     if (entry) {
       // Type-safe spreading - handle password field for LoginEntry
       const baseData: any = { ...entry };
@@ -150,7 +153,7 @@ export function PasswordEntryModal({
       });
     }
     setIsEditing(mode === 'create' || mode === 'edit');
-  }, [entry, mode, isOpen]);
+  }, [entry, mode, isOpen, toast]);
 
   // Auto-save draft when creating new entry
   useEffect(() => {
@@ -191,7 +194,7 @@ export function PasswordEntryModal({
     }
   }, [(formData as any).password]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, queueForBatch: boolean = false) => {
     e.preventDefault();
 
     // Validate title is always required
@@ -410,7 +413,7 @@ export function PasswordEntryModal({
       }
     }
 
-    onSave(entry);
+    onSave(entry, queueForBatch);
   };
 
   const copyToClipboard = async (text: string, label: string) => {
@@ -1249,13 +1252,49 @@ export function PasswordEntryModal({
                   <button type="button" onClick={onClose} className="btn-secondary">
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary">
-                    <span className="btn-icon">{isBatchMode ? '📝' : '⛓️'}</span>
-                    {isBatchMode
-                      ? (mode === 'create' ? 'Queue for Batch Sync' : 'Queue Update')
-                      : (mode === 'create' ? 'Save to Blockchain' : 'Update on Blockchain')
-                    }
-                  </button>
+
+                  {/* For CREATE mode: Only allow immediate save (security: never store plaintext passwords) */}
+                  {mode === 'create' && (
+                    <>
+                      <button type="submit" className="btn-primary">
+                        <span className="btn-icon">⛓️</span>
+                        Save to Blockchain
+                      </button>
+                      {isBatchMode && (
+                        <div className="security-notice">
+                          🔒 New passwords are saved immediately for security. Batch mode is only available for updates to existing passwords.
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* For EDIT mode: Allow both immediate save and queue for batch */}
+                  {mode === 'edit' && !isBatchMode && (
+                    <button type="submit" className="btn-primary">
+                      <span className="btn-icon">⛓️</span>
+                      Update on Blockchain
+                    </button>
+                  )}
+
+                  {mode === 'edit' && isBatchMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleSubmit(e, true); // Queue for batch
+                        }}
+                        className="btn-queue"
+                      >
+                        <span className="btn-icon">📝</span>
+                        Add to Queue
+                      </button>
+                      <button type="submit" className="btn-primary">
+                        <span className="btn-icon">⛓️</span>
+                        Save Now
+                      </button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -1568,7 +1607,8 @@ export function PasswordEntryModal({
             }
 
             .modal-footer {
-              display: flex;
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
               gap: 0.75rem;
               padding: 1.5rem;
               border-top: 1px solid #e1e8ed;
@@ -1579,8 +1619,8 @@ export function PasswordEntryModal({
             }
 
             .btn-secondary,
-            .btn-primary {
-              flex: 1;
+            .btn-primary,
+            .btn-queue {
               padding: 0.875rem;
               border: none;
               border-radius: 8px;
@@ -1612,6 +1652,34 @@ export function PasswordEntryModal({
             .btn-primary:hover {
               transform: translateY(-2px);
               box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+            }
+
+            .btn-queue {
+              background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+              color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.5rem;
+              box-shadow: 0 4px 12px rgba(251, 191, 36, 0.25);
+            }
+
+            .btn-queue:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 20px rgba(251, 191, 36, 0.35);
+            }
+
+            .security-notice {
+              grid-column: 1 / -1;
+              padding: 0.875rem 1rem;
+              background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+              border: 1px solid #6ee7b7;
+              border-radius: 8px;
+              color: #065f46;
+              font-size: 0.875rem;
+              font-weight: 500;
+              line-height: 1.5;
+              text-align: center;
             }
 
             .btn-icon {
