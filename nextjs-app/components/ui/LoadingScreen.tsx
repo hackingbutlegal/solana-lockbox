@@ -5,41 +5,51 @@ import React, { useEffect, useRef } from 'react';
 /**
  * Loading Screen Component
  *
- * This component fades out the static HTML loading screen.
- * The actual loader HTML is injected in layout.tsx for immediate display.
+ * CRITICAL FIX: Create and manage loader entirely client-side to prevent
+ * React hydration mismatch errors.
  *
- * BUGFIX: Use ref to ensure removal only happens once and doesn't interfere
- * with React's DOM updates during navigation.
+ * The loader is created via JavaScript before React hydrates, then removed
+ * after hydration completes. This prevents insertBefore/removeChild errors
+ * during navigation because React never tries to manage this element.
  */
 
 export function LoadingScreen() {
-  const hasRemovedLoader = useRef(false);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    // Only run once on initial mount
-    if (hasRemovedLoader.current) return;
+    // Only run once
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
-    // Wait for React to fully hydrate before touching the DOM
-    const timer = setTimeout(() => {
-      const loader = document.getElementById('static-loader');
-      if (loader && !hasRemovedLoader.current) {
-        hasRemovedLoader.current = true;
-        loader.classList.add('fade-out');
+    // Create loader element if it doesn't exist
+    let loader = document.getElementById('static-loader');
+    if (!loader) {
+      loader = document.createElement('div');
+      loader.id = 'static-loader';
+      loader.innerHTML = `
+        <div class="loader-content">
+          <div class="loader-icon">🔐</div>
+          <h1 class="loader-title">Solana Lockbox</h1>
+          <p class="loader-tagline">Blockchain Password Manager</p>
+        </div>
+      `;
+      document.body.insertBefore(loader, document.body.firstChild);
+    }
 
-        // Use a longer delay to ensure React has finished hydration
+    // Wait for app to fully load, then fade out and remove
+    setTimeout(() => {
+      const loaderElement = document.getElementById('static-loader');
+      if (loaderElement) {
+        loaderElement.classList.add('fade-out');
         setTimeout(() => {
-          // Double-check the loader still exists before removing
-          const loaderCheck = document.getElementById('static-loader');
-          if (loaderCheck && loaderCheck.parentNode) {
-            loaderCheck.remove();
+          const finalCheck = document.getElementById('static-loader');
+          if (finalCheck && finalCheck.parentNode) {
+            finalCheck.parentNode.removeChild(finalCheck);
           }
-        }, 800);
+        }, 600);
       }
-    }, 1500); // Increased from 1000ms to 1500ms for safer hydration
+    }, 1000);
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, []); // Empty deps - only run on mount
-
-  // This component doesn't render anything - it just controls the static loader
   return null;
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Subscription fees can now be sent to any wallet address you specify (instead of the program ID). This enables you to collect subscription revenue in a wallet you control.
+One-time storage expansion fees can now be sent to any wallet address you specify (instead of the program ID). This enables you to collect fees in a wallet you control. **Important**: These are not subscription fees - they're one-time payments for storage expansion that include Solana account rent, which is refundable when users close their accounts.
 
 ---
 
@@ -10,7 +10,7 @@ Subscription fees can now be sent to any wallet address you specify (instead of 
 
 ### Step 1: Choose Your Treasury Wallet
 
-Pick a wallet address to receive subscription fees:
+Pick a wallet address to receive one-time storage expansion fees:
 ```
 Example: GraffYourTreasuryWalletAddressHere123456789
 ```
@@ -77,10 +77,10 @@ solana balance YOUR_TREASURY_WALLET_ADDRESS --url devnet
 
 ## 💰 Fee Schedule
 
-When users upgrade, fees are sent to your treasury wallet:
+When users expand storage, one-time fees are sent to your treasury wallet:
 
-| Tier | Monthly Cost | Fee to Treasury |
-|------|-------------|-----------------|
+| Storage Tier | One-Time Fee | Fee to Treasury |
+|--------------|--------------|-----------------|
 | Free → Basic | 0.001 SOL | 0.001 SOL (~$0.14) |
 | Free → Premium | 0.01 SOL | 0.01 SOL (~$1.40) |
 | Free → Enterprise | 0.1 SOL | 0.1 SOL (~$14.00) |
@@ -88,7 +88,7 @@ When users upgrade, fees are sent to your treasury wallet:
 | Basic → Enterprise | 0.1 SOL | 0.1 SOL (~$14.00) |
 | Premium → Enterprise | 0.1 SOL | 0.1 SOL (~$14.00) |
 
-**Note**: Renewals also send fees to your treasury wallet.
+**Important**: These fees include Solana account rent and are refundable when users close their accounts. This is NOT a recurring subscription model.
 
 ---
 

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AppHeader } from '../../components/layout/AppHeader';
 import { AccountOverview } from '../../components/features/AccountOverview';
 import { SubscriptionBillingPanel } from '../../components/features/SubscriptionBillingPanel';
 import { SecuritySettingsPanel } from '../../components/features/SecuritySettingsPanel';
@@ -28,7 +27,9 @@ type SettingsTab = 'account' | 'subscription' | 'usage' | 'security' | 'import-e
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { entries, createEntry, updateEntry, deleteEntry } = usePassword();
+
+  // Import/Export functionality
+  const { entries, createEntry } = usePassword();
 
   // Get tab from URL query params, default to 'account'
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
@@ -59,7 +60,6 @@ function SettingsContent() {
 
   return (
     <div className="settings-page">
-      <AppHeader />
 
       <div className="settings-container">
         {/* Breadcrumb */}
@@ -151,13 +151,28 @@ function SettingsContent() {
       <style jsx>{`
         .settings-page {
           min-height: 100vh;
-          background: #f8f9fa;
+          background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+          position: relative;
+        }
+
+        .settings-page::before {
+          content: '';
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 300px;
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
+          z-index: 0;
+          pointer-events: none;
         }
 
         .settings-container {
           max-width: 1200px;
           margin: 0 auto;
           padding: 2rem;
+          position: relative;
+          z-index: 1;
         }
 
         .breadcrumb {
@@ -191,20 +206,37 @@ function SettingsContent() {
         }
 
         .page-header {
-          margin-bottom: 2rem;
+          margin-bottom: 2.5rem;
+          animation: fadeInDown 0.5s ease-out;
+        }
+
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .page-header h1 {
-          margin: 0 0 0.5rem 0;
-          font-size: 2.5rem;
-          font-weight: 700;
-          color: #2c3e50;
+          margin: 0 0 0.75rem 0;
+          font-size: 2.75rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.03em;
         }
 
         .page-header p {
           margin: 0;
-          font-size: 1.1rem;
-          color: #7f8c8d;
+          font-size: 1.15rem;
+          color: #6b7280;
+          font-weight: 500;
         }
 
         .tabs-nav {
@@ -220,7 +252,7 @@ function SettingsContent() {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.75rem 1.25rem;
+          padding: 0.85rem 1.5rem;
           border: none;
           background: transparent;
           color: #7f8c8d;
@@ -228,19 +260,37 @@ function SettingsContent() {
           font-weight: 600;
           cursor: pointer;
           border-bottom: 3px solid transparent;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           white-space: nowrap;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .tab-btn::before {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 50%;
+          width: 0;
+          height: 3px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: translateX(-50%);
         }
 
         .tab-btn:hover {
           color: #667eea;
-          background: rgba(102, 126, 234, 0.05);
+          background: rgba(102, 126, 234, 0.06);
         }
 
         .tab-btn.active {
           color: #667eea;
-          border-bottom-color: #667eea;
-          background: rgba(102, 126, 234, 0.08);
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+          font-weight: 700;
+        }
+
+        .tab-btn.active::before {
+          width: 100%;
         }
 
         .tab-icon {
@@ -249,10 +299,25 @@ function SettingsContent() {
 
         .tab-content {
           background: white;
-          border-radius: 16px;
-          padding: 2rem;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          border-radius: 20px;
+          padding: 2.5rem;
+          box-shadow:
+            0 4px 20px rgba(0, 0, 0, 0.08),
+            0 0 0 1px rgba(0, 0, 0, 0.03);
           min-height: 400px;
+          animation: fadeIn 0.4s ease-out;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .usage-panel h3,

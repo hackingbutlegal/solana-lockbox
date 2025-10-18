@@ -243,9 +243,8 @@ export function SettingsModal({
 
                 <div className="about-description">
                   <p>
-                    Solana Lockbox is a decentralized password manager built on the Solana blockchain.
-                    Your passwords are encrypted client-side and stored securely on-chain, giving you
-                    complete control over your data.
+                    Solana Lockbox is an open-source password manager with blockchain storage, built on Solana by Web3 Studios LLC.
+                    Your passwords are encrypted client-side and stored securely on-chain, accessible only with your wallet.
                   </p>
                   <p>
                     <strong>Key Features:</strong>

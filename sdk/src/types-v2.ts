@@ -11,7 +11,7 @@ export enum SubscriptionTier {
   Free = 0,
   Basic = 1,
   Premium = 2,
-  Enterprise = 3,
+  Pro = 3,
 }
 
 /**
@@ -273,7 +273,9 @@ export interface TierInfo {
   tier: SubscriptionTier;
   name: string;
   maxCapacity: number; // in bytes
-  monthlyCost: number; // in lamports
+  monthlyCost: number; // Total one-time fee (in lamports): includes rent (refundable) + service fee (non-refundable)
+  rentCost: number; // Solana account rent (in lamports) - refundable at account close
+  serviceFee: number; // Non-refundable service fee (in lamports) - covers program costs
   maxEntries: number; // approximate
   features: string[];
 }
@@ -283,6 +285,8 @@ export const TIER_INFO: Record<SubscriptionTier, TierInfo> = {
     tier: SubscriptionTier.Free,
     name: 'Free',
     maxCapacity: 1024, // 1KB
+    rentCost: 0,
+    serviceFee: 0,
     monthlyCost: 0,
     maxEntries: 10,
     features: ['1KB storage', '~10 passwords', 'Basic encryption'],
@@ -291,7 +295,9 @@ export const TIER_INFO: Record<SubscriptionTier, TierInfo> = {
     tier: SubscriptionTier.Basic,
     name: 'Basic',
     maxCapacity: 10240, // 10KB
-    monthlyCost: 1_000_000, // 0.001 SOL
+    rentCost: 1_000_000, // 0.001 SOL (refundable)
+    serviceFee: 2_000_000, // 0.002 SOL (non-refundable, 200% markup)
+    monthlyCost: 3_000_000, // 0.003 SOL total
     maxEntries: 100,
     features: ['10KB storage', '~100 passwords', 'Categories', 'Search'],
   },
@@ -299,15 +305,19 @@ export const TIER_INFO: Record<SubscriptionTier, TierInfo> = {
     tier: SubscriptionTier.Premium,
     name: 'Premium',
     maxCapacity: 102400, // 100KB
-    monthlyCost: 10_000_000, // 0.01 SOL
+    rentCost: 10_000_000, // 0.01 SOL (refundable)
+    serviceFee: 20_000_000, // 0.02 SOL (non-refundable, 200% markup)
+    monthlyCost: 30_000_000, // 0.03 SOL total
     maxEntries: 1000,
     features: ['100KB storage', '~1,000 passwords', 'Secure sharing', 'Audit logs', '2FA support'],
   },
-  [SubscriptionTier.Enterprise]: {
-    tier: SubscriptionTier.Enterprise,
-    name: 'Enterprise',
+  [SubscriptionTier.Pro]: {
+    tier: SubscriptionTier.Pro,
+    name: 'Pro',
     maxCapacity: 1048576, // 1MB
-    monthlyCost: 100_000_000, // 0.1 SOL
+    rentCost: 100_000_000, // 0.1 SOL (refundable)
+    serviceFee: 200_000_000, // 0.2 SOL (non-refundable, 200% markup)
+    monthlyCost: 300_000_000, // 0.3 SOL total
     maxEntries: 10000,
     features: ['1MB+ storage', 'Unlimited passwords', 'Team management', 'API access', 'Custom branding'],
   },
@@ -332,7 +342,7 @@ export interface LockboxV2ClientOptions {
   wallet: any; // Wallet adapter
   programId?: PublicKey;
   feeReceiver?: PublicKey; // DEPRECATED: Use treasuryWallet instead
-  treasuryWallet?: PublicKey; // Wallet address to receive subscription fees
+  treasuryWallet?: PublicKey; // Wallet address to receive one-time storage expansion fees
 }
 
 /**

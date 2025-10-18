@@ -41,7 +41,7 @@ pub fn initialize_recovery_config_v2_handler(
     require!(
         matches!(
             master_lockbox.subscription_tier,
-            SubscriptionTier::Premium | SubscriptionTier::Enterprise
+            SubscriptionTier::Premium | SubscriptionTier::Pro
         ),
         LockboxError::FeatureNotAvailable
     );

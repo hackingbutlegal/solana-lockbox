@@ -13,8 +13,8 @@ pub enum SubscriptionTier {
     Basic = 1,
     /// Premium tier: 100KB storage (~1,000 passwords) - 0.01 SOL/month
     Premium = 2,
-    /// Enterprise tier: 1MB+ storage (unlimited) - 0.1 SOL/month
-    Enterprise = 3,
+    /// Pro tier: 1MB+ storage (unlimited) - 0.1 SOL/month
+    Pro = 3,
     // Reserve 4-254 for future tiers
 }
 
@@ -25,7 +25,7 @@ impl SubscriptionTier {
             SubscriptionTier::Free => 1024,           // 1KB
             SubscriptionTier::Basic => 10_240,        // 10KB
             SubscriptionTier::Premium => 102_400,     // 100KB
-            SubscriptionTier::Enterprise => 1_048_576, // 1MB
+            SubscriptionTier::Pro => 1_048_576, // 1MB
         }
     }
 
@@ -35,7 +35,7 @@ impl SubscriptionTier {
             SubscriptionTier::Free => 0,
             SubscriptionTier::Basic => 1_000_000,      // 0.001 SOL
             SubscriptionTier::Premium => 10_000_000,   // 0.01 SOL
-            SubscriptionTier::Enterprise => 100_000_000, // 0.1 SOL
+            SubscriptionTier::Pro => 100_000_000, // 0.1 SOL
         }
     }
 
@@ -49,10 +49,10 @@ impl SubscriptionTier {
         match (self, target) {
             (SubscriptionTier::Free, SubscriptionTier::Basic) => true,
             (SubscriptionTier::Free, SubscriptionTier::Premium) => true,
-            (SubscriptionTier::Free, SubscriptionTier::Enterprise) => true,
+            (SubscriptionTier::Free, SubscriptionTier::Pro) => true,
             (SubscriptionTier::Basic, SubscriptionTier::Premium) => true,
-            (SubscriptionTier::Basic, SubscriptionTier::Enterprise) => true,
-            (SubscriptionTier::Premium, SubscriptionTier::Enterprise) => true,
+            (SubscriptionTier::Basic, SubscriptionTier::Pro) => true,
+            (SubscriptionTier::Premium, SubscriptionTier::Pro) => true,
             _ => false,
         }
     }
@@ -61,7 +61,7 @@ impl SubscriptionTier {
     pub fn supports_categories(&self) -> bool {
         matches!(
             self,
-            SubscriptionTier::Basic | SubscriptionTier::Premium | SubscriptionTier::Enterprise
+            SubscriptionTier::Basic | SubscriptionTier::Premium | SubscriptionTier::Pro
         )
     }
 }

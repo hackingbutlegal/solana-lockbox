@@ -34,7 +34,7 @@ export function StorageUsageBar({ used, total, tier, onUpgrade }: StorageUsageBa
   };
 
   const tierInfo = TIER_INFO[tier];
-  const canUpgrade = tier < SubscriptionTier.Enterprise;
+  const canUpgrade = tier < SubscriptionTier.Pro;
 
   return (
     <div className="storage-usage-container">

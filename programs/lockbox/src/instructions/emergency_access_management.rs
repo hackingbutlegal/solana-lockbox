@@ -42,11 +42,11 @@ pub fn initialize_emergency_access_handler(
     let master_lockbox = &ctx.accounts.master_lockbox;
     let clock = Clock::get()?;
 
-    // Verify subscription tier (Premium or Enterprise required)
+    // Verify subscription tier (Premium or Pro required)
     require!(
         matches!(
             master_lockbox.subscription_tier,
-            SubscriptionTier::Premium | SubscriptionTier::Enterprise
+            SubscriptionTier::Premium | SubscriptionTier::Pro
         ),
         LockboxError::FeatureNotAvailable
     );

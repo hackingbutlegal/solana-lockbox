@@ -23,8 +23,7 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
   const formatSOL = (lamports: number): string => {
     if (lamports === 0) return 'Free';
     const sol = lamports / 1_000_000_000;
-    const usd = (sol * SOL_TO_USD).toFixed(2);
-    return `${sol.toFixed(3)} SOL/month`;
+    return `${sol.toFixed(3)} SOL`;
   };
 
   const formatUSD = (lamports: number): string => {
@@ -57,15 +56,22 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
         <h3 className="tier-name">{info.name}</h3>
         {isCurrent && <span className="badge-current">Current Plan</span>}
         {tier === SubscriptionTier.Premium && !isCurrent && <span className="badge-popular">Most Popular</span>}
-        {tier === SubscriptionTier.Enterprise && !isCurrent && <span className="badge-best-value">Best Value</span>}
+        {tier === SubscriptionTier.Pro && !isCurrent && <span className="badge-best-value">Best Value</span>}
       </div>
 
       <div className="card-price">
+        <div className="price-label">One-Time Storage Fee</div>
         <span className="price-amount">{formatSOL(info.monthlyCost)}</span>
         {info.monthlyCost > 0 && (
-          <span className="price-usd" title="Estimated based on current SOL price">
-            {formatUSD(info.monthlyCost)}
-          </span>
+          <>
+            <span className="price-usd" title="Estimated based on current SOL price">
+              {formatUSD(info.monthlyCost)}
+            </span>
+            <div className="price-note">
+              <span className="note-icon">💡</span>
+              <span className="note-text">Refundable when you close your account</span>
+            </div>
+          </>
         )}
       </div>
 
@@ -92,7 +98,7 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
         )}
         {isUpgrade && (
           <button className="btn-upgrade" disabled={disabled}>
-            {disabled ? 'Processing...' : 'Upgrade Now'}
+            {disabled ? 'Processing...' : 'Expand Storage'}
           </button>
         )}
         {isDowngrade && (
@@ -106,24 +112,51 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
         .subscription-card {
           background: white;
           border: 2px solid #e1e8ed;
-          border-radius: 16px;
-          padding: 2rem;
-          transition: all 0.3s ease;
+          border-radius: 20px;
+          padding: 2.25rem;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           position: relative;
           display: flex;
           flex-direction: column;
           height: 100%;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          overflow: hidden;
+        }
+
+        .subscription-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          opacity: 0;
+          transition: opacity 0.3s;
         }
 
         .subscription-card.upgrade:hover {
           border-color: #667eea;
-          transform: translateY(-4px);
-          box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+          transform: translateY(-8px) scale(1.02);
+          box-shadow:
+            0 20px 40px rgba(102, 126, 234, 0.2),
+            0 0 0 1px rgba(102, 126, 234, 0.1);
+        }
+
+        .subscription-card.upgrade:hover::before {
+          opacity: 1;
         }
 
         .subscription-card.current {
           border-color: #667eea;
           background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+          box-shadow:
+            0 8px 24px rgba(102, 126, 234, 0.15),
+            0 0 0 1px rgba(102, 126, 234, 0.1);
+        }
+
+        .subscription-card.current::before {
+          opacity: 1;
         }
 
         .card-header {
@@ -174,7 +207,15 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
           margin-bottom: 1.5rem;
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          gap: 0.35rem;
+        }
+
+        .price-label {
+          font-size: 0.8rem;
+          color: #7f8c8d;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .price-amount {
@@ -187,6 +228,29 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
           font-size: 0.9rem;
           color: #7f8c8d;
           font-weight: 500;
+        }
+
+        .price-note {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+          padding: 0.65rem 0.85rem;
+          background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%);
+          border-radius: 8px;
+          border: 1px solid #ffd54f;
+        }
+
+        .note-icon {
+          font-size: 1rem;
+          flex-shrink: 0;
+        }
+
+        .note-text {
+          font-size: 0.8rem;
+          color: #f57c00;
+          font-weight: 600;
+          line-height: 1.4;
         }
 
         .card-storage {
@@ -265,19 +329,43 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
         }
 
         .btn-upgrade {
-          background: #667eea;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-upgrade::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+          transition: left 0.5s;
+        }
+
+        .btn-upgrade:hover:not(:disabled)::before {
+          left: 100%;
         }
 
         .btn-upgrade:hover:not(:disabled) {
-          background: #5568d3;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+          transform: translateY(-2px) scale(1.02);
+          box-shadow:
+            0 8px 20px rgba(102, 126, 234, 0.4),
+            0 0 0 1px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-upgrade:active:not(:disabled) {
+          transform: translateY(0) scale(0.98);
         }
 
         .btn-upgrade:disabled {
           background: #95a5a6;
           cursor: not-allowed;
+          opacity: 0.6;
         }
 
         .btn-downgrade {

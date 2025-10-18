@@ -73,7 +73,7 @@ export function SubscriptionUpgradeModal({
               </p>
 
               <div className="tiers-grid">
-                {([SubscriptionTier.Free, SubscriptionTier.Basic, SubscriptionTier.Premium, SubscriptionTier.Enterprise] as SubscriptionTier[]).map((tier) => (
+                {([SubscriptionTier.Free, SubscriptionTier.Basic, SubscriptionTier.Premium, SubscriptionTier.Pro] as SubscriptionTier[]).map((tier) => (
                   <SubscriptionCard
                     key={tier}
                     tier={tier}
