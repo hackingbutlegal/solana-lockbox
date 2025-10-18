@@ -15,11 +15,9 @@ pub struct UpgradeSubscription<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    /// CHECK: Fee receiver account - validated against program ID
-    #[account(
-        mut,
-        constraint = fee_receiver.key() == crate::ID @ crate::errors::LockboxError::Unauthorized
-    )]
+    /// CHECK: Fee receiver account - configurable treasury wallet
+    /// Can be any wallet address specified by the client SDK
+    #[account(mut)]
     pub fee_receiver: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
@@ -88,11 +86,9 @@ pub struct RenewSubscription<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    /// CHECK: Fee receiver account - validated against program ID
-    #[account(
-        mut,
-        constraint = fee_receiver.key() == crate::ID @ crate::errors::LockboxError::Unauthorized
-    )]
+    /// CHECK: Fee receiver account - configurable treasury wallet
+    /// Can be any wallet address specified by the client SDK
+    #[account(mut)]
     pub fee_receiver: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,

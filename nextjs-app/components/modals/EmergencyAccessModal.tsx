@@ -207,7 +207,7 @@ export default function EmergencyAccessModal({
             <div>
               <h2 className="text-2xl font-bold text-cyan-400">Emergency Access</h2>
               <p className="text-sm text-gray-400 mt-1">
-                Dead Man's Switch - Grant access after inactivity
+                Dead Man&apos;s Switch - Grant access after inactivity
               </p>
             </div>
             <button
@@ -244,7 +244,7 @@ export default function EmergencyAccessModal({
                 onClick={handleAliveClick}
                 className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors font-semibold"
               >
-                I'm Alive
+                I&apos;m Alive
               </button>
             </div>
 
@@ -286,7 +286,7 @@ export default function EmergencyAccessModal({
               <div className="p-8 bg-gray-800/50 border border-gray-700 rounded-lg text-center">
                 <p className="text-gray-400">No emergency contacts configured</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Add trusted contacts who can access your vault if you're inactive
+                  Add trusted contacts who can access your vault if you&apos;re inactive
                 </p>
               </div>
             ) : (
@@ -342,7 +342,7 @@ export default function EmergencyAccessModal({
           <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
             <h4 className="text-sm font-semibold text-cyan-300 mb-2">How Emergency Access Works</h4>
             <ul className="space-y-1 text-sm text-cyan-300/80">
-              <li>• Click "I'm Alive" regularly to reset the countdown</li>
+              <li>• Click &quot;I&apos;m Alive&quot; regularly to reset the countdown</li>
               <li>• If inactive for {formatDuration(config.inactivityPeriod)}, emergency contacts are notified</li>
               <li>• After {formatDuration(config.gracePeriod)} grace period, contacts can claim access</li>
               <li>• You can cancel any emergency access request during grace period</li>

@@ -366,37 +366,68 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       const changes = pendingChangesManager.getAllChanges();
       console.log(`[PasswordContext] Syncing ${changes.length} pending changes...`);
 
-      // Process each change sequentially for now
-      // TODO: Batch multiple instructions into one transaction
+      // Separate changes by type
+      const updates = changes.filter(c => c.type === 'update');
+      const deletes = changes.filter(c => c.type === 'delete');
+      const creates = changes.filter(c => c.type === 'create');
+
       let successCount = 0;
       let failCount = 0;
 
-      for (const change of changes) {
+      // BATCH UPDATES: Send all updates in a single transaction (max 10 per batch)
+      if (updates.length > 0) {
+        console.log(`📦 Batching ${updates.length} updates into single transaction(s)...`);
+
+        // Split into batches of 10 (Solana transaction size limit)
+        const updateBatches = [];
+        for (let i = 0; i < updates.length; i += 10) {
+          updateBatches.push(updates.slice(i, i + 10));
+        }
+
+        for (const batch of updateBatches) {
+          try {
+            const batchUpdates = batch
+              .filter(c => c.chunkIndex !== undefined && c.entryId !== undefined && c.entry)
+              .map(c => ({
+                chunkIndex: c.chunkIndex!,
+                entryId: c.entryId!,
+                updatedEntry: c.entry!,
+              }));
+
+            if (batchUpdates.length > 0) {
+              await client.batchUpdatePasswords(batchUpdates);
+              successCount += batchUpdates.length;
+              console.log(`✅ Batch of ${batchUpdates.length} updates succeeded`);
+            }
+          } catch (err) {
+            console.error(`[PasswordContext] Failed to sync batch of updates:`, err);
+            failCount += batch.length;
+          }
+        }
+      }
+
+      // DELETES: Process sequentially (can't batch deletes easily in one tx)
+      for (const change of deletes) {
         try {
-          switch (change.type) {
-            case 'update':
-              if (change.chunkIndex !== undefined && change.entryId !== undefined && change.entry) {
-                await client.updatePassword(change.chunkIndex, change.entryId, change.entry);
-                successCount++;
-              }
-              break;
-
-            case 'delete':
-              if (change.chunkIndex !== undefined && change.entryId !== undefined) {
-                await client.deletePassword(change.chunkIndex, change.entryId);
-                successCount++;
-              }
-              break;
-
-            case 'create':
-              if (change.entry) {
-                await client.storePassword(change.entry);
-                successCount++;
-              }
-              break;
+          if (change.chunkIndex !== undefined && change.entryId !== undefined) {
+            await client.deletePassword(change.chunkIndex, change.entryId);
+            successCount++;
           }
         } catch (err) {
-          console.error(`[PasswordContext] Failed to sync change ${change.id}:`, err);
+          console.error(`[PasswordContext] Failed to delete entry ${change.entryId}:`, err);
+          failCount++;
+        }
+      }
+
+      // CREATES: Process sequentially (each needs new chunk allocation check)
+      for (const change of creates) {
+        try {
+          if (change.entry) {
+            await client.storePassword(change.entry);
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`[PasswordContext] Failed to create entry:`, err);
           failCount++;
         }
       }

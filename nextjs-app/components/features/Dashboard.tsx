@@ -28,8 +28,14 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h2>Dashboard</h2>
-        <p className="dashboard-subtitle">At-a-glance insights for your password vault</p>
+        <div className="header-content">
+          <h2>Dashboard</h2>
+          <p className="dashboard-subtitle">Your security command center</p>
+        </div>
+        <div className="header-badge">
+          <span className="badge-label">Total Entries</span>
+          <span className="badge-value">{entries.length}</span>
+        </div>
       </div>
 
       <div className="dashboard-grid">
@@ -178,23 +184,72 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
           padding: 2rem;
           max-width: 1400px;
           margin: 0 auto;
+          animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .dashboard-header {
-          margin-bottom: 2rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2.5rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid #f3f4f6;
         }
 
-        .dashboard-header h2 {
+        .header-content h2 {
           margin: 0;
-          font-size: 2rem;
-          color: #2c3e50;
+          font-size: 2.25rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.03em;
           margin-bottom: 0.5rem;
         }
 
         .dashboard-subtitle {
           margin: 0;
-          color: #7f8c8d;
-          font-size: 1rem;
+          color: #6b7280;
+          font-size: 1.125rem;
+          font-weight: 500;
+        }
+
+        .header-badge {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          padding: 1rem 1.5rem;
+          border-radius: 16px;
+          box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+        }
+
+        .badge-label {
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: rgba(255, 255, 255, 0.8);
+          font-weight: 600;
+          margin-bottom: 0.25rem;
+        }
+
+        .badge-value {
+          font-size: 2rem;
+          font-weight: 800;
+          color: white;
+          line-height: 1;
         }
 
         .dashboard-grid {
@@ -209,33 +264,57 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
 
         .widget {
           background: white;
-          border-radius: 16px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06),
+                      0 0 0 1px rgba(0, 0, 0, 0.04);
           overflow: hidden;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid transparent;
+          position: relative;
+        }
+
+        .widget::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
         }
 
         .widget:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          transform: translateY(-4px);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12),
+                      0 0 0 1px rgba(102, 126, 234, 0.1);
+          border-color: rgba(102, 126, 234, 0.1);
+        }
+
+        .widget:hover::before {
+          opacity: 1;
         }
 
         .widget-header {
-          padding: 1.25rem;
-          border-bottom: 1px solid #e1e8ed;
+          padding: 1.5rem;
+          border-bottom: 1px solid #f3f4f6;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%);
         }
 
         .widget-header h3 {
           margin: 0;
           font-size: 1.125rem;
-          color: #2c3e50;
+          font-weight: 700;
+          color: #1f2937;
+          letter-spacing: -0.01em;
         }
 
         .widget-body {
-          padding: 1.25rem;
+          padding: 1.5rem;
         }
 
         .score-badge {
@@ -255,18 +334,37 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
           display: flex;
           align-items: baseline;
           gap: 0.5rem;
-          margin-bottom: 1.5rem;
+          margin-bottom: 2rem;
+          position: relative;
         }
 
         .score-value {
-          font-size: 3rem;
-          font-weight: 700;
-          color: #2c3e50;
+          font-size: 4rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          line-height: 1;
+          letter-spacing: -0.03em;
+          animation: countUp 0.6s ease-out;
+        }
+
+        @keyframes countUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .score-max {
-          font-size: 1.5rem;
-          color: #7f8c8d;
+          font-size: 1.75rem;
+          color: #9ca3af;
+          font-weight: 600;
         }
 
         .score-breakdown {
@@ -359,15 +457,37 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.75rem;
-          background: #f8f9fa;
-          border-radius: 8px;
+          padding: 1rem;
+          background: linear-gradient(135deg, #fafbfc 0%, #f8f9fa 100%);
+          border-radius: 12px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid transparent;
+          position: relative;
+        }
+
+        .password-item::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+          border-radius: 12px 0 0 12px;
+          opacity: 0;
+          transition: opacity 0.3s ease;
         }
 
         .password-item:hover {
-          background: #e1e8ed;
+          background: white;
+          border-color: rgba(239, 68, 68, 0.2);
+          transform: translateX(4px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .password-item:hover::before {
+          opacity: 1;
         }
 
         .password-info {
@@ -408,29 +528,57 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.5rem;
-          padding: 1.25rem;
-          background: #f8f9fa;
-          border: 2px solid transparent;
-          border-radius: 12px;
+          gap: 0.75rem;
+          padding: 1.5rem;
+          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+          border: 2px solid #e5e7eb;
+          border-radius: 16px;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .quick-action-btn::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
         }
 
         .quick-action-btn:hover {
-          background: white;
           border-color: #667eea;
-          transform: translateY(-2px);
+          transform: translateY(-4px) scale(1.02);
+          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .quick-action-btn:hover::before {
+          opacity: 0.05;
         }
 
         .action-icon {
-          font-size: 1.75rem;
+          font-size: 2rem;
+          position: relative;
+          z-index: 1;
+          transition: transform 0.3s ease;
+        }
+
+        .quick-action-btn:hover .action-icon {
+          transform: scale(1.1);
         }
 
         .action-label {
-          color: #2c3e50;
+          color: #1f2937;
           font-size: 0.875rem;
-          font-weight: 600;
+          font-weight: 700;
+          position: relative;
+          z-index: 1;
+          letter-spacing: -0.01em;
         }
 
         .stats-grid {
@@ -441,31 +589,48 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
 
         .stat-item {
           text-align: center;
-          padding: 1rem;
-          background: #f8f9fa;
-          border-radius: 8px;
+          padding: 1.25rem;
+          background: linear-gradient(135deg, #fafbfc 0%, #f8f9fa 100%);
+          border-radius: 12px;
+          border: 1px solid #e5e7eb;
+          transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          border-color: #d1d5db;
         }
 
         .stat-value {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #2c3e50;
-          margin-bottom: 0.25rem;
+          font-size: 2.25rem;
+          font-weight: 800;
+          color: #1f2937;
+          margin-bottom: 0.5rem;
+          line-height: 1;
+          letter-spacing: -0.02em;
         }
 
         .stat-value.stat-success {
-          color: #16a34a;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-value.stat-danger {
-          color: #dc2626;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .stat-label {
-          color: #7f8c8d;
+          color: #6b7280;
           font-size: 0.75rem;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.8px;
+          font-weight: 700;
         }
 
         .empty-state {
@@ -489,21 +654,55 @@ export function Dashboard({ entries, onEntryClick, onQuickAction }: DashboardPro
           }
         }
 
+        @media (max-width: 768px) {
+          .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+
+          .header-badge {
+            align-self: stretch;
+            align-items: center;
+          }
+
+          .features-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
         @media (max-width: 640px) {
           .dashboard {
             padding: 1rem;
           }
 
+          .header-content h2 {
+            font-size: 1.875rem;
+          }
+
+          .dashboard-subtitle {
+            font-size: 1rem;
+          }
+
           .dashboard-grid {
             grid-template-columns: 1fr;
+            gap: 1.25rem;
+          }
+
+          .widget-large {
+            grid-column: span 1;
           }
 
           .score-value {
-            font-size: 2.5rem;
+            font-size: 3rem;
           }
 
           .quick-actions-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .stat-value {
+            font-size: 1.875rem;
           }
         }
       `}</style>

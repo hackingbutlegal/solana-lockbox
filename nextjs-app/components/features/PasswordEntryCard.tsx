@@ -196,22 +196,53 @@ export function PasswordEntryCard({
       <style jsx>{`
         .password-card {
           position: relative;
-          background: white;
+          background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
           border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 16px;
+          border-radius: 20px;
+          padding: 20px;
           cursor: ${onClick ? 'pointer' : 'default'};
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 14px;
           height: 100%;
-          min-height: 180px;
+          min-height: 200px;
+          overflow: hidden;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03);
+        }
+
+        .password-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+          background-size: 200% 100%;
+          opacity: 0;
+          transition: opacity 0.4s ease;
+          animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
         }
 
         .password-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+          transform: translateY(-6px) scale(1.01);
+          box-shadow: 0 16px 32px rgba(102, 126, 234, 0.15), 0 0 0 2px rgba(102, 126, 234, 0.1);
+          border-color: #667eea;
+          background: white;
+        }
+
+        .password-card:hover::before {
+          opacity: 1;
         }
 
         .password-card:focus {
@@ -226,18 +257,29 @@ export function PasswordEntryCard({
         }
 
         .type-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 20px;
-          transition: transform 0.2s;
+          font-size: 22px;
+          transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          position: relative;
+        }
+
+        .type-icon::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 14px;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 100%);
+          pointer-events: none;
         }
 
         .password-card:hover .type-icon {
-          transform: scale(1.1);
+          transform: scale(1.15) rotate(-5deg);
         }
 
         .favorite-btn {
@@ -261,8 +303,8 @@ export function PasswordEntryCard({
 
         .card-title {
           margin: 0;
-          font-size: 16px;
-          font-weight: 600;
+          font-size: 17px;
+          font-weight: 700;
           color: #111827;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -270,7 +312,13 @@ export function PasswordEntryCard({
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           line-height: 1.4;
-          min-height: 44px;
+          min-height: 48px;
+          letter-spacing: -0.02em;
+          transition: color 0.3s ease;
+        }
+
+        .password-card:hover .card-title {
+          color: #667eea;
         }
 
         .card-details {
@@ -331,45 +379,53 @@ export function PasswordEntryCard({
 
         .quick-actions {
           position: absolute;
-          top: 12px;
-          right: 12px;
+          top: 16px;
+          right: 16px;
           display: flex;
-          gap: 6px;
-          background: white;
-          padding: 6px;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          animation: slideDown 0.2s ease;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(8px);
+          padding: 8px;
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+          animation: slideDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         @keyframes slideDown {
           from {
             opacity: 0;
-            transform: translateY(-8px);
+            transform: translateY(-12px) scale(0.9);
           }
           to {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) scale(1);
           }
         }
 
         .quick-action {
-          width: 32px;
-          height: 32px;
+          width: 36px;
+          height: 36px;
           border: none;
-          background: #f3f4f6;
-          border-radius: 6px;
+          background: linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%);
+          border-radius: 8px;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
-          transition: all 0.2s;
+          font-size: 15px;
+          transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
         }
 
         .quick-action:hover {
-          background: #e5e7eb;
-          transform: scale(1.1);
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          transform: scale(1.15) rotate(-5deg);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .quick-action:active {
+          transform: scale(1.05);
         }
 
         .archived-badge {

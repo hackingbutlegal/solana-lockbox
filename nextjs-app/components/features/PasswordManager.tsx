@@ -23,6 +23,8 @@ import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { KeyboardShortcutsHelp } from '../ui/KeyboardShortcutsHelp';
+import { SignaturePrompt } from '../ui/SignaturePrompt';
+import { BatchModeToggle } from '../ui/BatchModeToggle';
 import { SearchBar } from './SearchBar';
 import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
@@ -56,9 +58,9 @@ export function PasswordManager() {
   const { publicKey } = useWallet();
 
   // Use specialized context hooks
-  const { client, isSessionActive } = useAuth();
+  const { client, isSessionActive, initializeSession, loading: authLoading, error: authError } = useAuth();
   const { masterLockbox, error: lockboxError } = useLockbox();
-  const { entries, refreshEntries, createEntry, updateEntry, deleteEntry, loading, error } = usePassword();
+  const { entries, refreshEntries, createEntry, updateEntry, deleteEntry, queueUpdate, loading, error } = usePassword();
   const { upgradeSubscription } = useSubscription();
   const { categories, createCategory, updateCategory, deleteCategory, getCategoryName } = useCategory();
 
@@ -108,6 +110,7 @@ export function PasswordManager() {
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareEntry, setShareEntry] = useState<PasswordEntry | undefined>(undefined);
+  const [isBatchMode, setIsBatchMode] = useState(false); // Batch mode toggle
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
   // and handles session initialization as needed, so no manual trigger required here
@@ -239,27 +242,36 @@ export function PasswordManager() {
       // TODO: Get chunk index from entry metadata
       const chunkIndex = 0; // Placeholder - need to track this
 
-      const success = await updateEntry(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
-
-      if (success) {
+      if (isBatchMode) {
+        // BATCH MODE: Queue update locally
+        queueUpdate(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
         setShowEditModal(false);
         setSelectedEntry(null);
-        toast.showSuccess('Password updated successfully');
+        toast.showInfo(`Changes queued. Click "Sync to Blockchain" to save.`, { duration: 5000 });
+      } else {
+        // IMMEDIATE MODE: Save to blockchain now
+        const success = await updateEntry(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
 
-        // Log activity
-        logActivity(
-          ActivityType.UPDATE,
-          `Updated password entry: ${sanitized.title}`,
-          {
-            entryId: selectedEntry.id,
-            entryTitle: sanitized.title,
-            severity: 'info',
-          }
-        );
+        if (success) {
+          setShowEditModal(false);
+          setSelectedEntry(null);
+          toast.showSuccess('Password saved to blockchain');
+
+          // Log activity
+          logActivity(
+            ActivityType.UPDATE,
+            `Updated password entry: ${sanitized.title}`,
+            {
+              entryId: selectedEntry.id,
+              entryTitle: sanitized.title,
+              severity: 'info',
+            }
+          );
+        }
       }
     } catch (err) {
       console.error('Failed to update entry:', err);
-      // TODO: Show error notification
+      toast.showError('Failed to save password');
     }
   };
 
@@ -703,15 +715,45 @@ export function PasswordManager() {
 
         <div className="pm-connect-prompt">
           <div className="connect-card">
-            <h2>Welcome to Solana Lockbox</h2>
-            <p>Connect your wallet to access your password vault</p>
-            <ul className="feature-list">
-              <li>✅ Zero-knowledge encryption</li>
-              <li>✅ Blockchain-backed storage</li>
-              <li>✅ Multi-device sync</li>
-              <li>✅ Password health monitoring</li>
-            </ul>
-            <WalletMultiButton />
+            <div className="logo-container">
+              <div className="logo-icon">🔐</div>
+              <h2>Solana Lockbox</h2>
+            </div>
+            <p className="tagline">Your passwords, secured by Solana blockchain</p>
+            <div className="features-grid">
+              <div className="feature-item">
+                <span className="feature-icon">🔒</span>
+                <div className="feature-content">
+                  <h4>Zero-Knowledge Encryption</h4>
+                  <p>Your data is encrypted before it touches the blockchain</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">⚡</span>
+                <div className="feature-content">
+                  <h4>Lightning Fast</h4>
+                  <p>Instant sync across all your devices</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">🛡️</span>
+                <div className="feature-content">
+                  <h4>Blockchain Security</h4>
+                  <p>Immutable, auditable, and decentralized</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">📊</span>
+                <div className="feature-content">
+                  <h4>Health Monitoring</h4>
+                  <p>Track and improve password strength</p>
+                </div>
+              </div>
+            </div>
+            <div className="cta-section">
+              <WalletMultiButton />
+              <p className="privacy-note">No account needed • Your keys, your data</p>
+            </div>
           </div>
         </div>
 
@@ -752,34 +794,116 @@ export function PasswordManager() {
 
           .connect-card {
             background: white;
-            border-radius: 16px;
+            border-radius: 24px;
             padding: 3rem;
-            max-width: 500px;
+            max-width: 700px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            animation: slideInUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+
+          @keyframes slideInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          .logo-container {
             text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-          }
-
-          .connect-card h2 {
-            margin: 0 0 1rem 0;
-            color: #2c3e50;
-          }
-
-          .connect-card p {
-            color: #7f8c8d;
             margin-bottom: 2rem;
           }
 
-          .feature-list {
-            list-style: none;
-            padding: 0;
-            margin: 2rem 0;
-            text-align: left;
+          .logo-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: float 3s ease-in-out infinite;
           }
 
-          .feature-list li {
-            padding: 0.75rem 0;
-            color: #2c3e50;
-            font-size: 1.1rem;
+          @keyframes float {
+            0%, 100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-10px);
+            }
+          }
+
+          .logo-container h2 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.03em;
+          }
+
+          .tagline {
+            text-align: center;
+            color: #6b7280;
+            font-size: 1.125rem;
+            margin-bottom: 3rem;
+            font-weight: 500;
+          }
+
+          .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+          }
+
+          .feature-item {
+            display: flex;
+            gap: 1rem;
+            text-align: left;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #fafbfc 0%, #f8f9fa 100%);
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+
+          .feature-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            border-color: #d1d5db;
+          }
+
+          .feature-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+          }
+
+          .feature-content h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+            letter-spacing: -0.01em;
+          }
+
+          .feature-content p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+            line-height: 1.5;
+          }
+
+          .cta-section {
+            text-align: center;
+          }
+
+          .privacy-note {
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            color: #9ca3af;
+            font-weight: 500;
           }
 
           /* Mobile responsive */
@@ -793,7 +917,7 @@ export function PasswordManager() {
             }
 
             .pm-header h1 {
-              font-size: 1.2rem;
+              font-size: 1.375rem;
             }
 
             .pm-connect-prompt {
@@ -803,14 +927,40 @@ export function PasswordManager() {
             .connect-card {
               padding: 2rem 1.5rem;
               max-width: 100%;
+              border-radius: 16px;
             }
 
-            .connect-card h2 {
-              font-size: 1.5rem;
+            .logo-icon {
+              font-size: 3rem;
             }
 
-            .feature-list li {
+            .logo-container h2 {
+              font-size: 2rem;
+            }
+
+            .tagline {
               font-size: 1rem;
+            }
+
+            .features-grid {
+              grid-template-columns: 1fr;
+              gap: 1rem;
+            }
+
+            .feature-item {
+              padding: 1.25rem;
+            }
+
+            .feature-icon {
+              font-size: 1.75rem;
+            }
+
+            .feature-content h4 {
+              font-size: 0.9375rem;
+            }
+
+            .feature-content p {
+              font-size: 0.8125rem;
             }
           }
         `}</style>
@@ -1122,8 +1272,26 @@ export function PasswordManager() {
   // Main password manager UI
   const tierInfo = TIER_INFO[masterLockbox.subscriptionTier];
 
+  // Handle signature prompt retry
+  const handleSignatureRetry = async () => {
+    await initializeSession();
+  };
+
+  // Show signature prompt if:
+  // 1. Session is not active AND
+  // 2. Either there's an auth error OR we're trying to load auth
+  const showSignaturePrompt = !isSessionActive && (!!authError || authLoading);
+
   return (
     <div className="password-manager">
+      {/* Signature Prompt - Beautiful modal for sign requests */}
+      <SignaturePrompt
+        isOpen={showSignaturePrompt}
+        onRetry={handleSignatureRetry}
+        error={authError}
+        isLoading={authLoading}
+      />
+
       <header className="pm-header">
         <div className="pm-header-content">
           <h1>🔐 Password Manager</h1>
@@ -1179,6 +1347,14 @@ export function PasswordManager() {
           >
             + New Password
           </button>
+
+          {/* Batch Mode Toggle */}
+          <div className="sidebar-section batch-mode-section">
+            <BatchModeToggle
+              isBatchMode={isBatchMode}
+              onToggle={setIsBatchMode}
+            />
+          </div>
 
           <div className="sidebar-section">
             <h3>Tools</h3>
@@ -1481,12 +1657,30 @@ export function PasswordManager() {
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="empty-state">
-              <h2>No passwords found</h2>
+              <div className="empty-icon">🔍</div>
+              <h2>
+                {searchQuery || selectedType !== null || selectedCategory !== null
+                  ? 'No passwords match your search'
+                  : 'Your vault is empty'}
+              </h2>
               <p>
                 {searchQuery || selectedType !== null || selectedCategory !== null
-                  ? 'Try adjusting your filters'
-                  : 'Click "New Password" to add your first password'}
+                  ? 'Try adjusting your filters or search terms'
+                  : 'Start securing your digital life by adding your first password'}
               </p>
+              {!searchQuery && selectedType === null && selectedCategory === null && (
+                <button
+                  className="btn-add-first"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEntryModalMode('create');
+                    setSelectedEntry(null);
+                    setTimeout(() => setShowCreateModal(true), 0);
+                  }}
+                >
+                  Add Your First Password
+                </button>
+              )}
             </div>
           ) : isVirtualizedView ? (
             <VirtualizedPasswordList
@@ -1637,6 +1831,7 @@ export function PasswordManager() {
           onSave={handleUpdateEntry}
           entry={selectedEntry}
           mode="edit"
+          isBatchMode={isBatchMode}
         />
       )}
 
@@ -1905,12 +2100,14 @@ export function PasswordManager() {
         }
 
         .pm-header {
-          background: white;
-          border-bottom: 1px solid #e1e8ed;
+          background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+          border-bottom: 1px solid #e5e7eb;
           padding: 1rem;
           position: sticky;
           top: 0;
           z-index: 100;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          backdrop-filter: blur(8px);
         }
 
         .pm-header-content {
@@ -1924,8 +2121,13 @@ export function PasswordManager() {
 
         .pm-header h1 {
           margin: 0;
-          font-size: 1.5rem;
-          color: #2c3e50;
+          font-size: 1.625rem;
+          font-weight: 800;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.03em;
         }
 
         .header-actions {
@@ -2051,37 +2253,51 @@ export function PasswordManager() {
 
         .pm-sidebar {
           background: white;
-          border-radius: 12px;
+          border-radius: 16px;
           padding: 1.5rem;
           height: fit-content;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+          border: 1px solid #f3f4f6;
         }
 
         .btn-new-entry {
           width: 100%;
-          background: #667eea;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
           border: none;
-          border-radius: 8px;
-          padding: 0.75rem;
-          font-size: 1rem;
-          font-weight: 600;
+          border-radius: 12px;
+          padding: 1rem;
+          font-size: 1.0625rem;
+          font-weight: 700;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           margin-bottom: 1.5rem;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+          letter-spacing: -0.01em;
         }
 
         .btn-new-entry:hover:not(:disabled) {
-          background: #5568d3;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+        }
+
+        .btn-new-entry:active:not(:disabled) {
+          transform: translateY(0);
         }
 
         .btn-new-entry:disabled {
-          opacity: 0.5;
+          opacity: 0.6;
           cursor: not-allowed;
+          transform: none;
         }
 
         .sidebar-section {
           margin-bottom: 1.5rem;
+        }
+
+        .sidebar-section.batch-mode-section {
+          margin-bottom: 2rem;
+          padding: 0;
         }
 
         .sidebar-section h3 {
@@ -2252,11 +2468,64 @@ export function PasswordManager() {
           cursor: not-allowed;
         }
 
-        .loading-state,
+        .loading-state {
+          text-align: center;
+          padding: 6rem 2rem;
+          color: #6b7280;
+        }
+
+        .loading-state p {
+          font-size: 1.125rem;
+          font-weight: 500;
+          animation: pulse 2s ease-in-out infinite;
+        }
+
         .empty-state {
           text-align: center;
-          padding: 4rem 2rem;
-          color: #7f8c8d;
+          padding: 6rem 2rem;
+          max-width: 600px;
+          margin: 0 auto;
+          animation: fadeIn 0.4s ease-out;
+        }
+
+        .empty-icon {
+          font-size: 5rem;
+          margin-bottom: 1.5rem;
+          opacity: 0.5;
+          animation: float 3s ease-in-out infinite;
+        }
+
+        .empty-state h2 {
+          margin: 0 0 1rem 0;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: #1f2937;
+          letter-spacing: -0.02em;
+        }
+
+        .empty-state p {
+          margin: 0 0 2rem 0;
+          font-size: 1.125rem;
+          color: #6b7280;
+          line-height: 1.6;
+        }
+
+        .btn-add-first {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 1rem 2rem;
+          font-size: 1.125rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-add-first:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 28px rgba(102, 126, 234, 0.4);
         }
 
         .entry-list,
@@ -2297,16 +2566,35 @@ export function PasswordManager() {
 
         .entry-card {
           background: white;
-          border: 1px solid #e1e8ed;
-          border-radius: 8px;
-          padding: 1rem;
+          border: 2px solid #e5e7eb;
+          border-radius: 16px;
+          padding: 1.25rem;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .entry-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
         }
 
         .entry-card:hover {
           border-color: #667eea;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+          box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+          transform: translateY(-2px);
+        }
+
+        .entry-card:hover::before {
+          opacity: 1;
         }
 
         .entry-header {

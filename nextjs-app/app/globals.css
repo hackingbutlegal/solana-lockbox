@@ -1,3 +1,82 @@
+/* Design Tokens */
+:root {
+  /* Colors - Primary Palette */
+  --color-primary: #667eea;
+  --color-primary-dark: #5568d3;
+  --color-primary-light: #818cf8;
+  --color-secondary: #764ba2;
+
+  /* Colors - Neutrals */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f5f7fa;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+
+  /* Colors - Semantic */
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-info: #3b82f6;
+  --color-info-light: #dbeafe;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-cool: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  --gradient-subtle: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.15);
+  --shadow-2xl: 0 20px 60px rgba(0, 0, 0, 0.2);
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Typography */
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Z-index */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,14 +84,14 @@
 }
 
 html {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -21,8 +100,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   width: 100%;
-  background: #f5f7fa;
-  color: #2c3e50;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 #root {
@@ -38,13 +117,15 @@ body {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background: rgba(0, 0, 0, 0.75) !important;
+  background: rgba(15, 23, 42, 0.75) !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  z-index: 9999 !important;
-  backdrop-filter: blur(4px) !important;
+  z-index: var(--z-modal-backdrop) !important;
+  backdrop-filter: blur(8px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
   padding: 1rem !important;
+  animation: fadeIn 0.2s ease-out !important;
 }
 
 .modal-content,
@@ -60,23 +141,32 @@ body {
 .health-dashboard-modal-content,
 .category-modal,
 .category-manager-modal-content {
-  background: white !important;
-  border-radius: 16px !important;
+  background: var(--color-bg-primary) !important;
+  border-radius: var(--radius-xl) !important;
   max-width: 1000px !important;
   width: 90% !important;
   max-height: 90vh !important;
   overflow-y: auto !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: var(--shadow-2xl), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
   position: relative !important;
-  z-index: 10000 !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  animation: modalSlideIn 0.3s ease-out !important;
+  z-index: var(--z-modal) !important;
+  animation: modalSlideIn var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Modern Animation Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-20px) scale(0.95);
+    transform: translateY(-24px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -84,22 +174,89 @@ body {
   }
 }
 
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Standardized Modal Header */
 .modal-header {
-  padding: 1.5rem !important;
-  border-bottom: 2px solid #e1e8ed !important;
+  padding: var(--spacing-xl) !important;
+  border-bottom: 1px solid var(--color-border-light) !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
-  border-radius: 16px 16px 0 0 !important;
+  background: var(--gradient-subtle) !important;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
 }
 
 .modal-header h2 {
   margin: 0 !important;
   font-size: 1.5rem !important;
-  color: #2c3e50 !important;
   font-weight: 700 !important;
+  background: var(--gradient-primary) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  letter-spacing: -0.02em !important;
 }
 
 .modal-close,
@@ -107,23 +264,23 @@ body {
   background: transparent !important;
   border: none !important;
   font-size: 1.5rem !important;
-  color: #7f8c8d !important;
+  color: var(--color-text-tertiary) !important;
   cursor: pointer !important;
-  width: 32px !important;
-  height: 32px !important;
+  width: 36px !important;
+  height: 36px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 8px !important;
-  transition: all 0.2s !important;
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-base) !important;
   line-height: 1 !important;
 }
 
 .modal-close:hover,
 .btn-close:hover {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #2c3e50 !important;
-  transform: rotate(90deg) !important;
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-primary) !important;
+  transform: rotate(90deg) scale(1.1) !important;
 }
 
 /* Standardized Modal Body */

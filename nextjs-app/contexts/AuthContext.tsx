@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { LockboxV2Client } from '../sdk/src/client-v2';
@@ -50,9 +50,10 @@ export function useAuth() {
 interface AuthProviderProps {
   children: React.ReactNode;
   programId: string;
+  treasuryWallet?: PublicKey; // Optional treasury wallet for subscription fees
 }
 
-export function AuthProvider({ children, programId }: AuthProviderProps) {
+export function AuthProvider({ children, programId, treasuryWallet }: AuthProviderProps) {
   const wallet = useWallet();
   const { publicKey, signMessage, signTransaction } = wallet;
   const { connection } = useConnection();
@@ -99,6 +100,9 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialization lock to prevent multiple simultaneous sign requests
+  const initializationLock = useRef<Promise<boolean> | null>(null);
 
   // SECURITY FIX (C-3): Session timeout management
   // Track session creation time and last activity for timeout enforcement
@@ -191,12 +195,13 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
         connection,
         wallet: wallet as any,
         programId: new PublicKey(programId),
+        treasuryWallet: treasuryWallet, // Optional treasury wallet for fees
       });
     } catch (err) {
       console.error('Failed to create LockboxV2Client:', err);
       return null;
     }
-  }, [publicKey, connection, signTransaction, wallet, programId]);
+  }, [publicKey, connection, signTransaction, wallet, programId, treasuryWallet]);
 
   // Initialize session key from wallet signature
   const initializeSession = useCallback(async (): Promise<boolean> => {
@@ -211,37 +216,70 @@ export function AuthProvider({ children, programId }: AuthProviderProps) {
       return true; // Already initialized
     }
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Generate challenge and get signature
-      const challenge = generateChallenge(publicKey);
-      const signature = await signMessage(challenge);
-
-      // Derive session key
-      const { sessionKey: derivedKey } = await createSessionKeyFromSignature(
-        publicKey,
-        signature
-      );
-
-      // SECURITY FIX (C-2): Store in secure WeakMap storage
-      setSessionKey(derivedKey);
-      setIsSessionActive(true);
-
-      // SECURITY FIX (C-3): Set session timestamps
-      const now = Date.now();
-      setSessionStartTime(now);
-      setLastActivityTime(now);
-
-      return true;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to initialize session';
-      setError(errorMsg);
-      return false;
-    } finally {
-      setLoading(false);
+    // CRITICAL FIX: Prevent multiple simultaneous sign requests
+    // If initialization is already in progress, wait for it to complete
+    if (initializationLock.current) {
+      console.log('⏳ Session initialization already in progress, waiting...');
+      return await initializationLock.current;
     }
+
+    // Create the initialization promise
+    const initPromise = (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('🔐 Requesting wallet signature for session key...');
+
+        // Generate challenge and get signature
+        const challenge = generateChallenge(publicKey);
+        const signature = await signMessage(challenge);
+
+        console.log('✅ Signature received, deriving session key...');
+
+        // Derive session key
+        const { sessionKey: derivedKey } = await createSessionKeyFromSignature(
+          publicKey,
+          signature
+        );
+
+        // SECURITY FIX (C-2): Store in secure WeakMap storage
+        setSessionKey(derivedKey);
+        setIsSessionActive(true);
+
+        // SECURITY FIX (C-3): Set session timestamps
+        const now = Date.now();
+        setSessionStartTime(now);
+        setLastActivityTime(now);
+
+        console.log('✅ Session initialized successfully');
+        return true;
+      } catch (err) {
+        // Handle user rejection gracefully
+        const errorMsg = err instanceof Error ? err.message : 'Failed to initialize session';
+
+        // Check if user rejected the signature request
+        if (errorMsg.includes('User rejected') ||
+            errorMsg.includes('rejected the request') ||
+            errorMsg.includes('User denied')) {
+          console.log('ℹ️ User declined signature request');
+          setError('Signature required to decrypt your passwords. Please approve the request to continue.');
+        } else {
+          console.error('❌ Session initialization failed:', errorMsg);
+          setError(`Failed to initialize session: ${errorMsg}`);
+        }
+        return false;
+      } finally {
+        setLoading(false);
+        // Clear the lock when done
+        initializationLock.current = null;
+      }
+    })();
+
+    // Store the promise in the lock
+    initializationLock.current = initPromise;
+
+    return await initPromise;
   }, [publicKey, signMessage, getSessionKey, setSessionKey]);
 
   // SECURITY FIX (C-3): Automatic session timeout checking

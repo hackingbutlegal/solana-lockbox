@@ -295,7 +295,7 @@ function getIDL() {
 const IDL = getIDL();
 
 export const PROGRAM_ID = new PublicKey('7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB');
-export const FEE_RECEIVER = PROGRAM_ID;
+export const DEFAULT_TREASURY_WALLET = PROGRAM_ID; // Default: fees go to program ID
 
 // Instruction discriminators (first 8 bytes of SHA256 hash of "global:instruction_name")
 // Generated using: node scripts/generate-discriminators.js
@@ -319,14 +319,15 @@ export class LockboxV2Client {
   readonly program: Program;
   readonly connection: Connection;
   readonly wallet: any;
-  readonly feeReceiver: PublicKey;
+  readonly treasuryWallet: PublicKey;
   private sessionKey: Uint8Array | null = null;
   private pendingTransactions: Set<string> = new Set();
 
   constructor(options: LockboxV2ClientOptions) {
     this.connection = options.connection;
     this.wallet = options.wallet;
-    this.feeReceiver = options.feeReceiver || FEE_RECEIVER;
+    // Support both treasuryWallet (new) and feeReceiver (deprecated) for backward compatibility
+    this.treasuryWallet = options.treasuryWallet || options.feeReceiver || DEFAULT_TREASURY_WALLET;
 
     const provider = new AnchorProvider(
       this.connection,
@@ -1196,6 +1197,125 @@ export class LockboxV2Client {
   }
 
   /**
+   * Batch update multiple password entries in a SINGLE transaction
+   *
+   * This is much more efficient than calling updatePassword() multiple times:
+   * - 1 transaction fee instead of N
+   * - 1 signature request instead of N
+   * - Atomic: all updates succeed or all fail
+   *
+   * @param updates - Array of updates to apply
+   * @returns Transaction signature
+   *
+   * @example
+   * ```typescript
+   * await client.batchUpdatePasswords([
+   *   { chunkIndex: 0, entryId: 1, updatedEntry: { ...entry1, favorite: true } },
+   *   { chunkIndex: 0, entryId: 2, updatedEntry: { ...entry2, archived: true } },
+   *   { chunkIndex: 0, entryId: 3, updatedEntry: { ...entry3, category: 5 } },
+   * ]);
+   * ```
+   */
+  async batchUpdatePasswords(updates: Array<{
+    chunkIndex: number;
+    entryId: number;
+    updatedEntry: PasswordEntry;
+  }>): Promise<string> {
+    if (updates.length === 0) {
+      throw new Error('No updates provided');
+    }
+
+    if (updates.length > 10) {
+      throw new Error('Maximum 10 updates per batch transaction (to stay under transaction size limits)');
+    }
+
+    console.log(`🔄 Starting batch update of ${updates.length} password entries...`);
+
+    const sessionKey = await this.getSessionKey();
+    const transaction = new Transaction();
+    const [masterLockbox] = this.getMasterLockboxAddress();
+
+    // Build an update instruction for each entry
+    for (const { chunkIndex, entryId, updatedEntry } of updates) {
+      const { ciphertext, nonce } = this.encryptEntry(updatedEntry, sessionKey);
+      const combined = new Uint8Array(nonce.length + ciphertext.length);
+      combined.set(nonce);
+      combined.set(ciphertext, nonce.length);
+
+      const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+      // Build instruction data: discriminator + args
+      const argsBuffer = Buffer.alloc(2 + 8 + 4 + combined.length);
+      let offset = 0;
+
+      // chunk_index (u16)
+      argsBuffer.writeUInt16LE(chunkIndex, offset);
+      offset += 2;
+
+      // entry_id (u64)
+      argsBuffer.writeBigUInt64LE(BigInt(entryId), offset);
+      offset += 8;
+
+      // new_encrypted_data (vec<u8>)
+      argsBuffer.writeUInt32LE(combined.length, offset);
+      offset += 4;
+      combined.forEach((byte, i) => {
+        argsBuffer[offset + i] = byte;
+      });
+
+      const instructionData = Buffer.concat([
+        INSTRUCTION_DISCRIMINATORS.updatePasswordEntry,
+        argsBuffer,
+      ]);
+
+      const instruction = new TransactionInstruction({
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: masterLockbox, isSigner: false, isWritable: true },
+          { pubkey: storageChunk, isSigner: false, isWritable: true },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        ],
+        data: instructionData,
+      });
+
+      transaction.add(instruction);
+    }
+
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    console.log(`📦 Sending batch transaction with ${updates.length} update instructions...`);
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`✅ Batch update complete! Updated ${updates.length} entries in transaction ${signature.slice(0, 8)}...`);
+
+    return signature;
+  }
+
+  /**
    * Delete a password entry
    */
   async deletePassword(chunkIndex: number, entryId: number): Promise<string> {
@@ -1373,7 +1493,7 @@ export class LockboxV2Client {
       keys: [
         { pubkey: masterLockbox, isSigner: false, isWritable: true },
         { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: this.treasuryWallet, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: instructionData,
@@ -1426,7 +1546,7 @@ export class LockboxV2Client {
       keys: [
         { pubkey: masterLockbox, isSigner: false, isWritable: true },
         { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: this.feeReceiver, isSigner: false, isWritable: true },
+        { pubkey: this.treasuryWallet, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: instructionData,

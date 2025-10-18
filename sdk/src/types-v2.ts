@@ -331,7 +331,8 @@ export interface LockboxV2ClientOptions {
   connection: any; // Connection
   wallet: any; // Wallet adapter
   programId?: PublicKey;
-  feeReceiver?: PublicKey;
+  feeReceiver?: PublicKey; // DEPRECATED: Use treasuryWallet instead
+  treasuryWallet?: PublicKey; // Wallet address to receive subscription fees
 }
 
 /**

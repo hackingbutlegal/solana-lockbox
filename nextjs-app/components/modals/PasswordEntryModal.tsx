@@ -20,6 +20,7 @@ interface PasswordEntryModalProps {
   entry?: PasswordEntry | null;
   mode: 'create' | 'edit' | 'view';
   onDelete?: () => void;
+  isBatchMode?: boolean; // Whether batch mode is enabled
 }
 
 export function PasswordEntryModal({
@@ -29,6 +30,7 @@ export function PasswordEntryModal({
   entry,
   mode,
   onDelete,
+  isBatchMode = false,
 }: PasswordEntryModalProps) {
   const toast = useToast();
   const { categories } = useCategory();
@@ -1248,11 +1250,27 @@ export function PasswordEntryModal({
                     Cancel
                   </button>
                   <button type="submit" className="btn-primary">
-                    {mode === 'create' ? 'Create' : 'Save Changes'}
+                    <span className="btn-icon">{isBatchMode ? '📝' : '⛓️'}</span>
+                    {isBatchMode
+                      ? (mode === 'create' ? 'Queue for Batch Sync' : 'Queue Update')
+                      : (mode === 'create' ? 'Save to Blockchain' : 'Update on Blockchain')
+                    }
                   </button>
                 </>
               )}
             </div>
+
+            {mode !== 'view' && (
+              <div className={`blockchain-notice ${isBatchMode ? 'batch-notice' : ''}`}>
+                <span className="notice-icon">{isBatchMode ? '📦' : 'ℹ️'}</span>
+                <span className="notice-text">
+                  {isBatchMode
+                    ? 'This will queue your changes locally. Click "Sync to Blockchain" in the yellow bar to save all changes in one transaction.'
+                    : 'This will create a blockchain transaction that requires your signature and a small fee (~0.000005 SOL).'
+                  }
+                </span>
+              </div>
+            )}
           </form>
 
           <style jsx>{`
@@ -1582,14 +1600,55 @@ export function PasswordEntryModal({
             }
 
             .btn-primary {
-              background: #667eea;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
               color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.5rem;
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
             }
 
             .btn-primary:hover {
-              background: #5568d3;
-              transform: translateY(-1px);
-              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+              transform: translateY(-2px);
+              box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+            }
+
+            .btn-icon {
+              font-size: 1.125rem;
+            }
+
+            .blockchain-notice {
+              margin-top: 1rem;
+              padding: 1rem;
+              background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+              border: 1px solid #bfdbfe;
+              border-radius: 12px;
+              display: flex;
+              align-items: flex-start;
+              gap: 0.75rem;
+            }
+
+            .blockchain-notice.batch-notice {
+              background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+              border-color: #fbbf24;
+            }
+
+            .blockchain-notice.batch-notice .notice-text {
+              color: #78350f;
+            }
+
+            .notice-icon {
+              font-size: 1.25rem;
+              flex-shrink: 0;
+              margin-top: 2px;
+            }
+
+            .notice-text {
+              font-size: 0.875rem;
+              color: #1e40af;
+              line-height: 1.5;
+              font-weight: 500;
             }
 
             .btn-danger {

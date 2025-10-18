@@ -16,10 +16,22 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
   const isUpgrade = tier > currentTier;
   const isDowngrade = tier < currentTier;
 
-  // Format SOL amount
+  // SOL to USD conversion rate (configurable)
+  const SOL_TO_USD = 140; // $140 per SOL (update as needed)
+
+  // Format SOL amount with USD equivalent
   const formatSOL = (lamports: number): string => {
     if (lamports === 0) return 'Free';
-    return `${(lamports / 1_000_000_000).toFixed(3)} SOL/month`;
+    const sol = lamports / 1_000_000_000;
+    const usd = (sol * SOL_TO_USD).toFixed(2);
+    return `${sol.toFixed(3)} SOL/month`;
+  };
+
+  const formatUSD = (lamports: number): string => {
+    if (lamports === 0) return '';
+    const sol = lamports / 1_000_000_000;
+    const usd = (sol * SOL_TO_USD).toFixed(2);
+    return `~$${usd} USD`;
   };
 
   // Format storage size
@@ -44,11 +56,17 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
       <div className="card-header">
         <h3 className="tier-name">{info.name}</h3>
         {isCurrent && <span className="badge-current">Current Plan</span>}
-        {tier === SubscriptionTier.Premium && <span className="badge-popular">Popular</span>}
+        {tier === SubscriptionTier.Premium && !isCurrent && <span className="badge-popular">Most Popular</span>}
+        {tier === SubscriptionTier.Enterprise && !isCurrent && <span className="badge-best-value">Best Value</span>}
       </div>
 
       <div className="card-price">
         <span className="price-amount">{formatSOL(info.monthlyCost)}</span>
+        {info.monthlyCost > 0 && (
+          <span className="price-usd" title="Estimated based on current SOL price">
+            {formatUSD(info.monthlyCost)}
+          </span>
+        )}
       </div>
 
       <div className="card-storage">
@@ -142,14 +160,33 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
           text-transform: uppercase;
         }
 
+        .badge-best-value {
+          background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+          color: white;
+          padding: 0.25rem 0.75rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
         .card-price {
           margin-bottom: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
         }
 
         .price-amount {
           font-size: 2rem;
           font-weight: 700;
           color: #2c3e50;
+        }
+
+        .price-usd {
+          font-size: 0.9rem;
+          color: #7f8c8d;
+          font-weight: 500;
         }
 
         .card-storage {
