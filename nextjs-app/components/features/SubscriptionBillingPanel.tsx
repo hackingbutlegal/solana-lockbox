@@ -106,15 +106,14 @@ export function SubscriptionBillingPanel() {
               )}
             </p>
           </div>
-          <div className="plan-price">
-            {TIER_INFO[currentTier].monthlyCost === 0 ? (
-              <span className="price-free">Free</span>
-            ) : (
+          {/* Only show price on right side for paid tiers (Free tier already shows "Free" as tier name) */}
+          {TIER_INFO[currentTier].monthlyCost > 0 && (
+            <div className="plan-price">
               <span className="price-amount">
                 {(TIER_INFO[currentTier].monthlyCost / 1_000_000_000).toFixed(3)} SOL paid
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="plan-details">
