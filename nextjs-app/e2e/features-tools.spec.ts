@@ -18,9 +18,11 @@ import { TEST_TOTP_SECRETS, TEST_CATEGORIES } from './helpers/test-data';
 
 test.describe('Health Dashboard', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -114,9 +116,11 @@ test.describe('Health Dashboard', () => {
 
 test.describe('2FA / TOTP Manager', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -242,9 +246,11 @@ test.describe('2FA / TOTP Manager', () => {
 
 test.describe('Activity Log', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -344,9 +350,11 @@ test.describe('Activity Log', () => {
 
 test.describe('Password Rotation', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -424,9 +432,11 @@ test.describe('Password Rotation', () => {
 
 test.describe('Password Policies', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -539,9 +549,11 @@ test.describe('Password Policies', () => {
 
 test.describe('Categories', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -673,9 +685,11 @@ test.describe('Categories', () => {
 
 test.describe('Share Management', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -761,9 +775,11 @@ test.describe('Share Management', () => {
 
 test.describe('Settings', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 

@@ -9,9 +9,11 @@ import { mockWalletConnection } from './helpers/wallet-helpers';
 
 test.describe('Search Functionality', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -159,9 +161,11 @@ test.describe('Search Functionality', () => {
 
 test.describe('Filter Functionality', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -308,9 +312,11 @@ test.describe('Filter Functionality', () => {
 
 test.describe('Sort Functionality', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -426,9 +432,11 @@ test.describe('Sort Functionality', () => {
 
 test.describe('Favorites', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -578,9 +586,11 @@ test.describe('Favorites', () => {
 
 test.describe('View Modes', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 

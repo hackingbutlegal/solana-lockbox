@@ -14,9 +14,11 @@ import { mockWalletConnection } from './helpers/wallet-helpers';
 
 test.describe('Danger Zone - Account Reset', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -144,9 +146,11 @@ test.describe('Danger Zone - Account Reset', () => {
 
 test.describe('Data Export and Import', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -286,9 +290,11 @@ test.describe('Data Export and Import', () => {
 
 test.describe('Recovery and Emergency Access', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -381,9 +387,11 @@ test.describe('Recovery and Emergency Access', () => {
 
 test.describe('Subscription Management', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
@@ -543,9 +551,11 @@ test.describe('Subscription Management', () => {
 
 test.describe('Advanced Security Features', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
   });
 
