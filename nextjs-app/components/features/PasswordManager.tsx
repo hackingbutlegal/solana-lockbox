@@ -1267,7 +1267,9 @@ export function PasswordManager() {
         {/* Sidebar */}
         <aside className="pm-sidebar">
           <button
-            className="btn-new-entry"
+            className="btn-new-entry new-password-button"
+            aria-label="Create new password entry"
+            role="button"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

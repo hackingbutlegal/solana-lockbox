@@ -95,30 +95,72 @@ export async function signPhantomTransaction(
 
 /**
  * Mock wallet connection for headless testing (no real Phantom)
+ * Uses addInitScript to inject BEFORE page load for proper timing
  */
 export async function mockWalletConnection(page: Page): Promise<void> {
-  // Inject mock wallet provider into the page
-  await page.evaluate(() => {
-    // @ts-ignore
-    window.solana = {
-      isPhantom: true,
-      publicKey: {
-        toBase58: () => 'TestWallet1111111111111111111111111111111',
-        toString: () => 'TestWallet1111111111111111111111111111111',
-      },
-      connect: async () => ({
-        publicKey: {
-          toBase58: () => 'TestWallet1111111111111111111111111111111',
-          toString: () => 'TestWallet1111111111111111111111111111111',
-        },
-      }),
-      disconnect: async () => {},
-      signTransaction: async (tx: any) => tx,
-      signAllTransactions: async (txs: any[]) => txs,
-      signMessage: async (msg: Uint8Array) => ({ signature: new Uint8Array(64) }),
+  // Inject mock wallet provider BEFORE page loads using addInitScript
+  await page.addInitScript(() => {
+    // Create comprehensive mock Phantom wallet
+    const mockPublicKey = {
+      toBase58: () => 'TestWallet1111111111111111111111111111111',
+      toString: () => 'TestWallet1111111111111111111111111111111',
+      toBytes: () => new Uint8Array(32).fill(1),
+      toBuffer: () => Buffer.from(new Uint8Array(32).fill(1)),
     };
-    // Dispatch event to notify app
+
+    const mockWallet = {
+      isPhantom: true,
+      publicKey: mockPublicKey,
+
+      connect: async (opts?: any) => {
+        console.log('[MOCK WALLET] connect() called with opts:', opts);
+        mockWallet.isConnected = true;
+        return { publicKey: mockPublicKey };
+      },
+
+      disconnect: async () => {
+        console.log('[MOCK WALLET] disconnect() called');
+        mockWallet.isConnected = false;
+        mockWallet.publicKey = null;
+      },
+
+      signTransaction: async (tx: any) => {
+        console.log('[MOCK WALLET] signTransaction() called');
+        return tx; // Return transaction as-is (mock signed)
+      },
+
+      signAllTransactions: async (txs: any[]) => {
+        console.log('[MOCK WALLET] signAllTransactions() called with', txs.length, 'transactions');
+        return txs; // Return all transactions as-is (mock signed)
+      },
+
+      signMessage: async (message: Uint8Array) => {
+        console.log('[MOCK WALLET] signMessage() called');
+        return {
+          signature: new Uint8Array(64).fill(1),
+          publicKey: mockPublicKey
+        };
+      },
+
+      signAndSendTransaction: async (tx: any) => {
+        console.log('[MOCK WALLET] signAndSendTransaction() called');
+        return { signature: 'mock-signature-' + Date.now() };
+      },
+
+      isConnected: false,
+    };
+
+    // Inject into window
+    (window as any).solana = mockWallet;
+    (window as any).phantom = { solana: mockWallet };
+
+    // Dispatch initialization events that wallet adapters listen for
     window.dispatchEvent(new Event('solana#initialized'));
+    window.dispatchEvent(new CustomEvent('wallet-standard:register-wallet', {
+      detail: mockWallet,
+    }));
+
+    console.log('[MOCK WALLET] ✅ Injected successfully via addInitScript');
   });
 }
 

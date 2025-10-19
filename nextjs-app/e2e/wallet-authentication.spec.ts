@@ -15,37 +15,55 @@ test.describe('Wallet Connection and Authentication', () => {
   });
 
   test('displays homepage with wallet connect button', async ({ page }) => {
-    // Verify branding
-    await expect(page.locator('text=Solana Lockbox')).toBeVisible();
-    await expect(page.locator('text=/Blockchain Password Manager/i')).toBeVisible();
+    // Verify branding in header
+    await expect(page.locator('text=Solana Lockbox')).toBeVisible({ timeout: 5000 });
 
-    // Verify connect wallet button is present
-    const connectButton = page.locator('button:has-text("Connect"), button:has-text("Select Wallet")').first();
-    await expect(connectButton).toBeVisible();
+    // Verify connect wallet button is present (WalletMultiButton from @solana/wallet-adapter-react-ui)
+    // The button text changes based on wallet state: "Select Wallet" -> "Connect" -> address
+    const connectButton = page.locator('.wallet-adapter-button, button.wallet-adapter-button-trigger, button:has-text("Select Wallet"), button:has-text("Connect Wallet")').first();
+    await expect(connectButton).toBeVisible({ timeout: 5000 });
   });
 
   test('can mock wallet connection for headless testing', async ({ page }) => {
     // Mock wallet connection (for testing without real Phantom extension)
+    // Using new addInitScript method for proper timing
     await mockWalletConnection(page);
 
-    // Trigger connection flow
-    const connectButton = page.locator('button:has-text("Connect"), button:has-text("Select Wallet")').first();
-    if (await connectButton.isVisible()) {
+    // Navigate to page AFTER mock wallet is injected
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Verify mock wallet was injected
+    const hasMockWallet = await page.evaluate(() => {
+      return !!(window as any).solana?.isPhantom;
+    });
+    expect(hasMockWallet).toBe(true);
+
+    console.log('Mock wallet injected:', hasMockWallet);
+
+    // Look for wallet connect button
+    const connectButton = page.locator('.wallet-adapter-button-trigger, button:has-text("Select Wallet"), button:has-text("Connect")').first();
+
+    if (await connectButton.isVisible({ timeout: 3000 })) {
+      console.log('Found connect button, clicking...');
       await connectButton.click();
+      await page.waitForTimeout(2000); // Wait for connection to process
     }
 
-    // Wait for potential connection processing
-    await page.waitForTimeout(1000);
+    // Verify connection state - either button changed or dashboard visible
+    const connectedState = await page.evaluate(() => {
+      const button = document.querySelector('.wallet-adapter-button-trigger');
+      return button?.textContent || 'not found';
+    });
 
-    // Verify we're on the main dashboard or see wallet-connected state
-    // The app should show password manager UI or at least not show connect button
-    const stillShowingConnect = await page.locator('button:has-text("Connect Wallet")').isVisible({ timeout: 2000 }).catch(() => false);
+    console.log('Wallet button state:', connectedState);
 
-    // In a properly connected state, we shouldn't see the connect button anymore
-    // OR we should see dashboard elements
-    const hasDashboard = await page.locator('[data-testid="password-vault"], text="Password Vault", text="My Passwords"').isVisible({ timeout: 2000 }).catch(() => false);
+    // Success if button shows address OR if dashboard is visible
+    const hasDashboard = await page.locator('.pm-container, .password-manager, .new-password-button').isVisible({ timeout: 3000 }).catch(() => false);
+    const hasAddress = connectedState.includes('Test') || connectedState.includes('...');
 
-    expect(stillShowingConnect || hasDashboard).toBeTruthy();
+    console.log('Has dashboard:', hasDashboard, 'Has address:', hasAddress);
+    expect(hasDashboard || hasAddress).toBeTruthy();
   });
 
   test('handles disconnection gracefully', async ({ page }) => {

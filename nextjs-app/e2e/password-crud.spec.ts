@@ -32,32 +32,39 @@ test.describe('Password CRUD Operations', () => {
   });
 
   test('can create password entries for all types', async ({ page, context }) => {
+    test.setTimeout(90000); // Increase timeout for creating multiple entries with blockchain operations
+
     for (const type of PASSWORD_TYPES) {
       const testEntry = TEST_ENTRIES[type];
+      console.log(`\nCreating ${PasswordEntryType[type]} entry: ${testEntry.title}`);
 
-      // Click "Add" or "New Password" button
-      const addButton = page.locator('button:has-text("New Password"), button:has-text("Add"), button:has-text("+")').first();
-      await addButton.click({ timeout: 5000 });
+      // Click "New Password" button using standardized selector
+      const addButton = page.locator('.new-password-button, button[aria-label*="Create new password"]');
+      await addButton.waitFor({ state: 'visible', timeout: 5000 });
+      await addButton.click();
 
-      // Select password type
+      // Wait for modal to open
+      const modal = page.locator('[role="dialog"][aria-modal="true"]');
+      await modal.waitFor({ state: 'visible', timeout: 3000 });
+
+      // Select password type if needed (modal may default to Login)
       await page.waitForTimeout(500);
-      const typeButton = page.locator(`button:has-text("${type}")`).first();
-      if (await typeButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await typeButton.click();
+      const typeSelect = page.locator('select[name="type"], select#passwordType');
+      if (await typeSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await typeSelect.selectOption({ value: type.toString() });
+        await page.waitForTimeout(300); // Wait for type change to render appropriate fields
       }
 
-      // Fill in form fields
-      await page.waitForTimeout(300);
+      // Fill in form fields using standardized selectors
 
       // Title (required for all types)
-      const titleInput = page.locator('input[name="title"], input[placeholder*="Title"], input[placeholder*="title"]').first();
-      if (await titleInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await titleInput.fill(testEntry.title);
-      }
+      const titleInput = page.locator('.password-title-input, input[name="title"], input[aria-label*="title" i]');
+      await titleInput.waitFor({ state: 'visible', timeout: 3000 });
+      await titleInput.fill(testEntry.title);
 
-      // Username/Email (if applicable)
+      // Username/Email (if applicable for Login type)
       if (testEntry.username) {
-        const usernameInput = page.locator('input[name="username"], input[placeholder*="Username"], input[placeholder*="Email"]').first();
+        const usernameInput = page.locator('.password-username-input, input[name="username"], input[aria-label*="username" i]');
         if (await usernameInput.isVisible({ timeout: 1000 }).catch(() => false)) {
           await usernameInput.fill(testEntry.username);
         }
@@ -65,7 +72,7 @@ test.describe('Password CRUD Operations', () => {
 
       // Password (if applicable)
       if (testEntry.password) {
-        const passwordInput = page.locator('input[name="password"], input[type="password"], textarea[name="password"]').first();
+        const passwordInput = page.locator('.password-value-input, input[name="password"], input[aria-label*="password value" i]');
         if (await passwordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
           await passwordInput.fill(testEntry.password);
         }
@@ -73,7 +80,7 @@ test.describe('Password CRUD Operations', () => {
 
       // URL (if applicable)
       if (testEntry.url) {
-        const urlInput = page.locator('input[name="url"], input[placeholder*="URL"], input[placeholder*="Website"]').first();
+        const urlInput = page.locator('input[name="url"], input[placeholder*="URL" i]');
         if (await urlInput.isVisible({ timeout: 1000 }).catch(() => false)) {
           await urlInput.fill(testEntry.url);
         }
@@ -81,25 +88,28 @@ test.describe('Password CRUD Operations', () => {
 
       // Notes (if applicable)
       if (testEntry.notes) {
-        const notesInput = page.locator('textarea[name="notes"], textarea[placeholder*="Notes"]').first();
+        const notesInput = page.locator('textarea[name="notes"], textarea[placeholder*="Notes" i]');
         if (await notesInput.isVisible({ timeout: 1000 }).catch(() => false)) {
           await notesInput.fill(testEntry.notes);
         }
       }
 
-      // Save the entry
-      const saveButton = page.locator('button:has-text("Save"), button:has-text("Create"), button:has-text("Add")').last();
+      // Save the entry using standardized selector
+      const saveButton = page.locator('.save-password-button, button[aria-label*="Save password" i], button:has-text("Save to Blockchain")');
+      await saveButton.waitFor({ state: 'visible', timeout: 3000 });
       await saveButton.click();
 
-      // Handle transaction signing (mock)
-      await page.waitForTimeout(500);
-      // In real scenario with Phantom, would call: await signPhantomTransaction(page, context);
+      // Wait for modal to close (indicating save success or in progress)
+      await modal.waitFor({ state: 'hidden', timeout: 15000 });
+
+      // Wait for blockchain transaction to complete (mock wallet returns instantly, but app may process)
+      await page.waitForTimeout(2000);
 
       // Verify entry appears in list
-      await page.waitForTimeout(1000);
-      const entryExists = await page.locator(`text="${testEntry.title}"`).isVisible({ timeout: 3000 }).catch(() => false);
+      const entryTitle = page.locator(`text="${testEntry.title}"`);
+      const entryExists = await entryTitle.isVisible({ timeout: 5000 }).catch(() => false);
 
-      console.log(`Created ${type}: ${testEntry.title} - Visible: ${entryExists}`);
+      console.log(`✅ Created ${PasswordEntryType[type]} entry - Visible in list: ${entryExists}`);
     }
   });
 

@@ -516,9 +516,15 @@ export function PasswordEntryModal({
         padding: '1rem',
         overflowY: 'auto'
       }}>
-        <div className="modal-content password-entry-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-content password-entry-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="password-entry-modal-title"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-header">
-            <h2>
+            <h2 id="password-entry-modal-title">
               {mode === 'create' && '🔐 New Password'}
               {mode === 'edit' && '✏️ Edit Password'}
               {mode === 'view' && '👁️ View Password'}
@@ -553,9 +559,14 @@ export function PasswordEntryModal({
 
               {/* Title */}
               <div className="form-group">
-                <label>Title *</label>
+                <label htmlFor="password-entry-title">Title *</label>
                 <input
+                  id="password-entry-title"
+                  className="password-title-input"
                   type="text"
+                  name="title"
+                  aria-label="Password entry title"
+                  aria-required="true"
                   value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., GitHub Account"
@@ -568,10 +579,14 @@ export function PasswordEntryModal({
               {formData.type === PasswordEntryType.Login && (
                 <>
                   <div className="form-group">
-                    <label>Username</label>
+                    <label htmlFor="password-entry-username">Username</label>
                     <div className="input-with-action">
                       <input
+                        id="password-entry-username"
+                        className="password-username-input"
                         type="text"
+                        name="username"
+                        aria-label="Username or email"
                         value={formAny.username || ''}
                         onChange={(e) => setFormData({ ...formData, username: e.target.value } as any)}
                         placeholder="username or email"
@@ -590,10 +605,15 @@ export function PasswordEntryModal({
                   </div>
 
                   <div className="form-group">
-                    <label>Password *</label>
+                    <label htmlFor="password-entry-password">Password *</label>
                     <div className="password-input-group">
                       <input
+                        id="password-entry-password"
+                        className="password-value-input"
                         type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        aria-label="Password value"
+                        aria-required="true"
                         value={formAny.password || ''}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value } as any)}
                         placeholder="Enter password"
@@ -1256,7 +1276,11 @@ export function PasswordEntryModal({
                   {/* For CREATE mode: Only allow immediate save (security: never store plaintext passwords) */}
                   {mode === 'create' && (
                     <>
-                      <button type="submit" className="btn-primary">
+                      <button
+                        type="submit"
+                        className="btn-primary save-password-button"
+                        aria-label="Save password to blockchain"
+                      >
                         <span className="btn-icon">⛓️</span>
                         Save to Blockchain
                       </button>
