@@ -23,12 +23,26 @@ const PASSWORD_TYPES: PasswordEntryType[] = [
 
 test.describe('Password CRUD Operations', () => {
   test.beforeEach(async ({ page, context }) => {
+    // CRITICAL: mockWalletConnection() MUST be called BEFORE page.goto()
+    // because addInitScript() only affects future page loads, not current one
+    await mockWalletConnection(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-
-    // Mock wallet connection for all tests
-    await mockWalletConnection(page);
     await page.waitForTimeout(1000);
+
+    // Click the "Select Wallet" button to trigger wallet connection
+    const connectButton = page.locator('.wallet-adapter-button-trigger, button:has-text("Select Wallet")').first();
+    if (await connectButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await connectButton.click();
+      await page.waitForTimeout(500);
+
+      // Handle wallet selection modal - click first available wallet option
+      const walletOption = page.locator('button:has-text("Phantom"), button:has-text("Solflare"), [role="dialog"] button').first();
+      if (await walletOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await walletOption.click();
+        await page.waitForTimeout(2000); // Wait for wallet to connect and password manager to load
+      }
+    }
   });
 
   test('can create password entries for all types', async ({ page, context }) => {

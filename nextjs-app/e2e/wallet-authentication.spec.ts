@@ -16,7 +16,7 @@ test.describe('Wallet Connection and Authentication', () => {
 
   test('displays homepage with wallet connect button', async ({ page }) => {
     // Verify branding in header
-    await expect(page.locator('text=Solana Lockbox')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Solana Lockbox').first()).toBeVisible({ timeout: 5000 });
 
     // Verify connect wallet button is present (WalletMultiButton from @solana/wallet-adapter-react-ui)
     // The button text changes based on wallet state: "Select Wallet" -> "Connect" -> address
@@ -47,6 +47,15 @@ test.describe('Wallet Connection and Authentication', () => {
     if (await connectButton.isVisible({ timeout: 3000 })) {
       console.log('Found connect button, clicking...');
       await connectButton.click();
+      await page.waitForTimeout(500);
+
+      // Handle wallet selection modal - click first available wallet option
+      const walletOption = page.locator('button:has-text("Phantom"), button:has-text("Solflare"), [role="dialog"] button').first();
+      if (await walletOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Found wallet option in modal, clicking...');
+        await walletOption.click();
+      }
+
       await page.waitForTimeout(2000); // Wait for connection to process
     }
 
@@ -206,7 +215,7 @@ test.describe('Wallet Connection and Authentication', () => {
     }
 
     // App should still be functional
-    await expect(page.locator('text=Solana Lockbox')).toBeVisible();
+    await expect(page.locator('text=Solana Lockbox').first()).toBeVisible();
   });
 });
 
@@ -297,6 +306,6 @@ test.describe('Session and State Management', () => {
     await page.waitForLoadState('networkidle');
 
     // App should load normally
-    await expect(page.locator('text=Solana Lockbox')).toBeVisible();
+    await expect(page.locator('text=Solana Lockbox').first()).toBeVisible();
   });
 });

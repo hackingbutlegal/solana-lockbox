@@ -411,7 +411,7 @@ test.describe('Error Handling', () => {
 
     // App should be functional again
     await page.waitForTimeout(500);
-    const isResponsive = await page.locator('text=Solana Lockbox').isVisible();
+    const isResponsive = await page.locator('text=Solana Lockbox').first().isVisible();
     expect(isResponsive).toBeTruthy();
   });
 
@@ -488,7 +488,7 @@ test.describe('Error Handling', () => {
     await page.waitForLoadState('networkidle');
 
     // App should still load
-    await expect(page.locator('text=Solana Lockbox')).toBeVisible();
+    await expect(page.locator('text=Solana Lockbox').first()).toBeVisible();
 
     // Check console for unhandled errors
     const errors: string[] = [];
