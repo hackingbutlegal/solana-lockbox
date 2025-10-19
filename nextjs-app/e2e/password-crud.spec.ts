@@ -9,6 +9,7 @@ import { test, expect, Page } from '@playwright/test';
 import { mockWalletConnection, signPhantomTransaction } from './helpers/wallet-helpers';
 import { TEST_ENTRIES, generateBulkEntries } from './helpers/test-data';
 import { PasswordEntryType } from '../sdk/src/types-v2';
+import { initializeTestVault, waitForVaultReady } from './helpers/initialize-test-vault';
 
 // All supported password entry types
 const PASSWORD_TYPES: PasswordEntryType[] = [
@@ -40,9 +41,18 @@ test.describe('Password CRUD Operations', () => {
       const walletOption = page.locator('button:has-text("Phantom"), button:has-text("Solflare"), [role="dialog"] button').first();
       if (await walletOption.isVisible({ timeout: 2000 }).catch(() => false)) {
         await walletOption.click();
-        await page.waitForTimeout(2000); // Wait for wallet to connect and password manager to load
+        await page.waitForTimeout(2000); // Wait for wallet to connect
       }
     }
+
+    // Initialize vault if not already initialized
+    const vaultInitialized = await initializeTestVault(page);
+    if (!vaultInitialized) {
+      console.warn('⚠️ Vault may not be fully initialized - tests may fail');
+    }
+
+    // Wait for vault to be ready
+    await waitForVaultReady(page, 10000);
   });
 
   test('can create password entries for all types', async ({ page, context }) => {
