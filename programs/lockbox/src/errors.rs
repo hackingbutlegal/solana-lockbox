@@ -191,4 +191,8 @@ pub enum LockboxError {
     // General security errors
     #[msg("Arithmetic overflow detected")]
     Overflow,
+
+    // SECURITY FIX (Phase 3): Rate limiting
+    #[msg("Recovery rate limit exceeded: please wait before initiating another recovery")]
+    RecoveryRateLimitExceeded,
 }

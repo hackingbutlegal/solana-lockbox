@@ -167,6 +167,13 @@ pub fn initiate_recovery_v2_handler(
         LockboxError::NotActiveGuardian
     );
 
+    // SECURITY FIX (Phase 3): Check recovery rate limit (1 hour cooldown)
+    const RECOVERY_COOLDOWN: i64 = 3600; // 1 hour in seconds
+    require!(
+        recovery_config.check_recovery_rate_limit(clock.unix_timestamp, RECOVERY_COOLDOWN),
+        LockboxError::RecoveryRateLimitExceeded
+    );
+
     // SECURITY FIX (VULN-003): Generate request_id atomically on-chain
     // This prevents replay attacks and race conditions
     let request_id = recovery_config.last_request_id
@@ -175,6 +182,9 @@ pub fn initiate_recovery_v2_handler(
 
     // Update last_request_id BEFORE creating request (atomic operation)
     recovery_config.last_request_id = request_id;
+
+    // Update last_recovery_attempt timestamp for rate limiting
+    recovery_config.last_recovery_attempt = clock.unix_timestamp;
 
     // Validate challenge format (80 bytes: 24 nonce + 32 ciphertext + 16 tag)
     require!(

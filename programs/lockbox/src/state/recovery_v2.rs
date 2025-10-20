@@ -170,6 +170,10 @@ pub struct RecoveryConfigV2 {
     /// SHA256(master_secret) - used to verify challenge encryption
     pub master_secret_hash: [u8; 32],
 
+    /// SECURITY FIX (Phase 3): Rate limiting for recovery attempts
+    /// Unix timestamp of last recovery initiation attempt
+    pub last_recovery_attempt: i64,
+
     /// PDA bump seed
     pub bump: u8,
 }
@@ -208,5 +212,14 @@ impl RecoveryConfigV2 {
         self.guardians
             .iter()
             .any(|g| &g.guardian_pubkey == pubkey && g.status == crate::state::GuardianStatus::Active)
+    }
+
+    /// SECURITY FIX (Phase 3): Check recovery rate limit
+    /// Prevents spam/DoS by limiting recovery attempts to 1 per hour
+    pub fn check_recovery_rate_limit(&self, current_time: i64, cooldown_seconds: i64) -> bool {
+        if self.last_recovery_attempt == 0 {
+            return true; // First attempt
+        }
+        current_time - self.last_recovery_attempt >= cooldown_seconds
     }
 }
