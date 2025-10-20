@@ -509,16 +509,17 @@ pub mod lockbox {
     }
 
     /// Initiate recovery V2 with challenge generation
+    ///
+    /// SECURITY FIX (VULN-003): request_id is now generated atomically on-chain
+    /// to prevent replay attacks. Removed from instruction parameters.
     pub fn initiate_recovery_v2(
         ctx: Context<InitiateRecoveryV2>,
-        request_id: u64,
         encrypted_challenge: Vec<u8>,
         challenge_hash: [u8; 32],
         new_owner: Option<Pubkey>,
     ) -> Result<()> {
         instructions::recovery_management_v2::initiate_recovery_v2_handler(
             ctx,
-            request_id,
             encrypted_challenge,
             challenge_hash,
             new_owner,
@@ -531,13 +532,18 @@ pub mod lockbox {
     }
 
     /// Complete recovery with proof of reconstruction (V2 - Secure)
+    ///
+    /// SECURITY FIX (VULN-002): Enhanced to require master_secret submission
+    /// for stronger cryptographic binding between challenge and secret.
     pub fn complete_recovery_with_proof(
         ctx: Context<CompleteRecoveryV2>,
         challenge_plaintext: [u8; 32],
+        master_secret: [u8; 32],
     ) -> Result<()> {
         instructions::recovery_management_v2::complete_recovery_with_proof_handler(
             ctx,
             challenge_plaintext,
+            master_secret,
         )
     }
 

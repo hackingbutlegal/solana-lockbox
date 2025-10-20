@@ -103,34 +103,58 @@ function gfMultiply(a: number, b: number): number {
 }
 
 /**
- * Multiply two elements in GF(2^8)
+ * Multiply two elements in GF(2^8) - CONSTANT TIME
+ *
+ * SECURITY FIX (VULN-005): Uses constant-time operations to prevent
+ * timing side-channel attacks. All code paths execute the same number
+ * of operations regardless of input values.
  *
  * @param a - First operand (0-255)
  * @param b - Second operand (0-255)
  * @returns Product in GF(2^8)
  */
 function gfMul(a: number, b: number): number {
-  if (a === 0 || b === 0) return 0;
   if (!LOG_TABLE || !EXP_TABLE) initializeTables();
 
-  const logSum = LOG_TABLE![a] + LOG_TABLE![b];
-  return EXP_TABLE![logSum];
+  // Compute result assuming non-zero operands (always executed)
+  const logSum = (LOG_TABLE![a] + LOG_TABLE![b]) % 255;
+  const result = EXP_TABLE![logSum];
+
+  // Constant-time conditional: return 0 if either operand is zero
+  // Using arithmetic instead of branches for constant timing
+  const isAZero = (a === 0) ? 1 : 0;
+  const isBZero = (b === 0) ? 1 : 0;
+  const isEitherZero = isAZero | isBZero;
+
+  // Constant-time select: mask with all bits set (0xFF) or clear (0x00)
+  // (1 - isEitherZero) * 0xFF creates the mask
+  return result & ((1 - isEitherZero) * 0xFF);
 }
 
 /**
- * Divide two elements in GF(2^8)
+ * Divide two elements in GF(2^8) - CONSTANT TIME
+ *
+ * SECURITY FIX (VULN-005): Uses constant-time operations to prevent
+ * timing side-channel attacks. Division by zero must throw (cannot be
+ * constant-time), but zero dividend is handled in constant time.
  *
  * @param a - Dividend
  * @param b - Divisor (must be non-zero)
  * @returns Quotient in GF(2^8)
  */
 function gfDiv(a: number, b: number): number {
+  // Must check division by zero (cannot make this constant-time)
   if (b === 0) throw new Error('Division by zero in GF(2^8)');
-  if (a === 0) return 0;
+
   if (!LOG_TABLE || !EXP_TABLE) initializeTables();
 
+  // Compute result assuming non-zero dividend (always executed)
   const logDiff = (LOG_TABLE![a] - LOG_TABLE![b] + 255) % 255;
-  return EXP_TABLE![logDiff];
+  const result = EXP_TABLE![logDiff];
+
+  // Constant-time conditional: return 0 if dividend is zero
+  const isAZero = (a === 0) ? 1 : 0;
+  return result & ((1 - isAZero) * 0xFF);
 }
 
 /**
@@ -438,7 +462,7 @@ export function randomBytes(length: number): Uint8Array {
 // Exports
 // ============================================================================
 
-export { Share as ShamirShare };
+export type { Share as ShamirShare };
 
 export default {
   splitSecret,

@@ -122,6 +122,10 @@ function defaultShouldRetry(error: Error, attemptNumber: number): boolean {
 
 /**
  * Calculate backoff delay with exponential backoff and jitter
+ *
+ * SECURITY FIX (VULN-001): Uses cryptographically secure random for jitter
+ * to prevent timing analysis attacks. Previously used Math.random() which
+ * is predictable and could leak information about retry patterns.
  */
 function calculateBackoff(
   attemptNumber: number,
@@ -132,8 +136,14 @@ function calculateBackoff(
   const exponentialDelay = initialBackoff * Math.pow(backoffMultiplier, attemptNumber - 1);
   const cappedDelay = Math.min(exponentialDelay, maxBackoff);
 
+  // SECURITY: Use cryptographically secure random for jitter
+  // Generate 2 random bytes for higher precision (0-65535 range)
+  const randomBytes = new Uint8Array(2);
+  crypto.getRandomValues(randomBytes);
+  const randomValue = (randomBytes[0] << 8 | randomBytes[1]) / 65535; // 0.0 to 1.0
+
   // Add jitter (±25% random variation)
-  const jitter = cappedDelay * 0.25 * (Math.random() * 2 - 1);
+  const jitter = cappedDelay * 0.25 * (randomValue * 2 - 1);
   return Math.floor(cappedDelay + jitter);
 }
 

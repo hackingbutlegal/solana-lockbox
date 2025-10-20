@@ -220,12 +220,23 @@ pub fn remove_guardian_handler(
         .position(|g| g.guardian_pubkey == guardian_pubkey)
         .ok_or(LockboxError::GuardianNotFound)?;
 
-    // SECURITY: Ensure remaining guardians >= threshold after removal
+    // SECURITY FIX (VULN-004): Prevent removal below threshold (user foot-gun)
+    // Ensure remaining guardians >= threshold after removal
     let remaining_guardians = recovery_config.guardians.len() - 1;
     require!(
         remaining_guardians as u8 >= recovery_config.threshold,
-        LockboxError::InsufficientGuardians
+        LockboxError::InsufficientGuardiansRemaining
     );
+
+    // Additional safety check: Warn if getting close to threshold
+    if remaining_guardians as u8 == recovery_config.threshold {
+        msg!(
+            "⚠️  WARNING: Removing this guardian leaves EXACTLY {} guardians (threshold = {}). \
+            All remaining guardians must cooperate for recovery!",
+            remaining_guardians,
+            recovery_config.threshold
+        );
+    }
 
     // Remove guardian
     recovery_config.guardians.remove(guardian_index);

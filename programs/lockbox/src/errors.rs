@@ -166,4 +166,29 @@ pub enum LockboxError {
 
     #[msg("Recovery request expired")]
     RecoveryExpired,
+
+    // SECURITY FIX (VULN-003): Request ID validation
+    #[msg("Invalid request ID (must be monotonically increasing)")]
+    InvalidRequestId,
+
+    #[msg("Request ID overflow")]
+    RequestIdOverflow,
+
+    // SECURITY FIX (VULN-004): Guardian threshold validation
+    #[msg("Cannot remove guardian: would leave fewer guardians than threshold")]
+    InsufficientGuardiansRemaining,
+
+    // SECURITY FIX (VULN-002): Challenge verification
+    #[msg("Invalid master secret provided")]
+    InvalidMasterSecret,
+
+    #[msg("Invalid recovery proof (challenge verification failed)")]
+    InvalidProof,
+
+    #[msg("Invalid challenge format")]
+    InvalidChallengeFormat,
+
+    // General security errors
+    #[msg("Arithmetic overflow detected")]
+    Overflow,
 }
