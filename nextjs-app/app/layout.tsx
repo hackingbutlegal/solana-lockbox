@@ -17,6 +17,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Solana Lockbox - Blockchain Password Manager",
   description: "Open-source password manager with blockchain storage on Solana. Client-side encryption, wallet-only access. Built by Web3 Studios LLC.",
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Solana Lockbox',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#6366f1',
 };
 
 export default function RootLayout({

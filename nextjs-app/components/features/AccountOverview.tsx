@@ -52,21 +52,18 @@ export function AccountOverview() {
             <h4>Wallet Address</h4>
             <div className="address-container">
               <code className="address-text">
-                {publicKey ? formatAddress(publicKey.toBase58()) : 'Not connected'}
+                {publicKey ? publicKey.toBase58() : 'Not connected'}
               </code>
               {publicKey && (
                 <button
                   className="btn-copy"
                   onClick={() => copyToClipboard(publicKey.toBase58())}
-                  title="Copy full address"
+                  title="Copy address"
                 >
                   📋
                 </button>
               )}
             </div>
-            {publicKey && (
-              <p className="full-address">{publicKey.toBase58()}</p>
-            )}
           </div>
         </div>
 

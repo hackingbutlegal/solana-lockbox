@@ -17,6 +17,7 @@ import { ErrorBoundary, ContextErrorBoundary } from '../ui';
 import { ToastProvider } from '../ui/Toast';
 import { ConfirmProvider } from '../ui/ConfirmDialog';
 import { AppHeader } from './AppHeader';
+import { MobileWalletProvider } from '../providers/MobileWalletProvider';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -54,37 +55,41 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
 
   return (
     <ErrorBoundary>
-      <ConnectionProvider endpoint={endpoint}>
-        <WalletProvider wallets={wallets} autoConnect>
-          <WalletModalProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                <ContextErrorBoundary onError={(error, errorInfo) => {
-                  console.error('Context initialization error:', error, errorInfo);
-                }}>
-                  <AuthProvider programId={PROGRAM_ID} treasuryWallet={TREASURY_WALLET}>
-                    <LockboxProvider>
-                      <CategoryProvider>
-                        <PasswordProvider>
-                          <SubscriptionProvider>
-                            <RecoveryProvider>
-                              <ErrorBoundary>
-                                <AppWithProviders>
-                                  {children}
-                                </AppWithProviders>
-                              </ErrorBoundary>
-                            </RecoveryProvider>
-                          </SubscriptionProvider>
-                        </PasswordProvider>
-                      </CategoryProvider>
-                    </LockboxProvider>
-                  </AuthProvider>
-                </ContextErrorBoundary>
-              </ConfirmProvider>
-            </ToastProvider>
-          </WalletModalProvider>
-        </WalletProvider>
-      </ConnectionProvider>
+      <MobileWalletProvider>
+        <ConnectionProvider endpoint={endpoint}>
+          <WalletProvider wallets={wallets} autoConnect>
+            <WalletModalProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <ContextErrorBoundary onError={(error, errorInfo) => {
+                    if (process.env.NODE_ENV === 'development') {
+                      console.error('Context initialization error:', error, errorInfo);
+                    }
+                  }}>
+                    <AuthProvider programId={PROGRAM_ID} treasuryWallet={TREASURY_WALLET}>
+                      <LockboxProvider>
+                        <CategoryProvider>
+                          <PasswordProvider>
+                            <SubscriptionProvider>
+                              <RecoveryProvider>
+                                <ErrorBoundary>
+                                  <AppWithProviders>
+                                    {children}
+                                  </AppWithProviders>
+                                </ErrorBoundary>
+                              </RecoveryProvider>
+                            </SubscriptionProvider>
+                          </PasswordProvider>
+                        </CategoryProvider>
+                      </LockboxProvider>
+                    </AuthProvider>
+                  </ContextErrorBoundary>
+                </ConfirmProvider>
+              </ToastProvider>
+            </WalletModalProvider>
+          </WalletProvider>
+        </ConnectionProvider>
+      </MobileWalletProvider>
     </ErrorBoundary>
   );
 };

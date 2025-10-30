@@ -104,11 +104,16 @@ export function PasswordEntryModal({
   const [urlError, setUrlError] = useState<string>('');
   const [totpQRCode, setTotpQRCode] = useState<string>('');
   const [showTotpQR, setShowTotpQR] = useState(false);
+  const [draftNotificationShown, setDraftNotificationShown] = useState(false);
 
   // Initialize form data when entry changes
   useEffect(() => {
     // Only run when modal is opened (not when already open)
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Reset notification flag when modal closes
+      setDraftNotificationShown(false);
+      return;
+    }
 
     if (entry) {
       // Type-safe spreading - handle password field for LoginEntry
@@ -128,7 +133,11 @@ export function PasswordEntryModal({
           const draftAge = Date.now() - draft.timestamp;
           if (draftAge < 3600000) { // 1 hour
             setFormData(draft.data);
-            toast.showSuccess('Draft restored from previous session');
+            // Only show notification once per draft session
+            if (!draftNotificationShown) {
+              toast.showSuccess('Draft restored from previous session');
+              setDraftNotificationShown(true);
+            }
             return;
           } else {
             // Clear old draft
@@ -136,7 +145,7 @@ export function PasswordEntryModal({
           }
         }
       } catch (err) {
-        console.error('Failed to restore draft:', err);
+        // Silent fail - don't show errors for draft restoration
       }
 
       setFormData({
@@ -153,7 +162,7 @@ export function PasswordEntryModal({
       });
     }
     setIsEditing(mode === 'create' || mode === 'edit');
-  }, [entry, mode, isOpen, toast]);
+  }, [entry, mode, isOpen, toast, draftNotificationShown]);
 
   // Auto-save draft when creating new entry
   useEffect(() => {
@@ -215,16 +224,16 @@ export function PasswordEntryModal({
           return;
         }
 
-        // Validate password against policy
+        // Show password strength indicator but don't block weak passwords
         const policy = loadPasswordPolicy();
         if (policy.enabled) {
           const policyResult = validatePasswordPolicy(formAny.password, policy);
           if (!policyResult.isValid) {
             const errorMessages = policyResult.errors.join('\n• ');
-            toast.showError(`Password does not meet policy requirements:\n• ${errorMessages}`, {
-              duration: 8000,
+            toast.showWarning(`Weak password detected:\n• ${errorMessages}\n\nConsider using a stronger password for better security.`, {
+              duration: 6000,
             });
-            return;
+            // Don't return - allow saving with weak password
           }
         }
 

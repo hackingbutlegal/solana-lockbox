@@ -22,17 +22,17 @@ import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { KeyboardShortcutsHelp } from '../ui/KeyboardShortcutsHelp';
 import { SignaturePrompt } from '../ui/SignaturePrompt';
-import { BatchModeToggle } from '../ui/BatchModeToggle';
+// import { BatchModeToggle } from '../ui/BatchModeToggle'; // REMOVED: Batch mode feature
 import { SearchBar } from './SearchBar';
 import { FilterPanel } from './FilterPanel';
 import { VirtualizedPasswordList } from './VirtualizedPasswordList';
-import { BatchOperationsToolbar } from './BatchOperationsToolbar';
+// import { BatchOperationsToolbar } from './BatchOperationsToolbar'; // REMOVED: Batch mode feature
 import { FavoritesSidebar } from './FavoritesSidebar';
 import { FAQ } from '../layout/FAQ';
 import { Dashboard } from './Dashboard';
 import { ShareManagementModal } from '../modals/ShareManagementModal';
-import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations';
-import { BatchProgressModal } from '../modals/BatchProgressModal';
+// import { BatchUpdateOperations, BatchUpdateProgress } from '../../lib/batch-update-operations'; // REMOVED: Batch mode feature
+// import { BatchProgressModal } from '../modals/BatchProgressModal'; // REMOVED: Batch mode feature
 import { useHotkeys } from 'react-hotkeys-hook';
 import { logActivity, ActivityType } from '../../lib/activity-logger';
 
@@ -78,17 +78,17 @@ export function PasswordManager() {
   const [showArchived, setShowArchived] = useState(false);
   const [showOldPasswords, setShowOldPasswords] = useState(false);
 
-  // Batch operations state
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
-  const [isVirtualizedView, setIsVirtualizedView] = useState(false);
+  // Batch operations state - REMOVED: Feature deemed functionally useless
+  // const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
+  // const [isVirtualizedView, setIsVirtualizedView] = useState(false);
 
-  // Batch progress modal state
-  const [showBatchProgress, setShowBatchProgress] = useState(false);
-  const [batchOperation, setBatchOperation] = useState<string>('');
-  const [batchProgress, setBatchProgress] = useState<BatchUpdateProgress | null>(null);
-  const [batchTotalItems, setBatchTotalItems] = useState(0);
-  const [batchSuccessCount, setBatchSuccessCount] = useState(0);
-  const [batchFailureCount, setBatchFailureCount] = useState(0);
+  // Batch progress modal state - REMOVED: Feature deemed functionally useless
+  // const [showBatchProgress, setShowBatchProgress] = useState(false);
+  // const [batchOperation, setBatchOperation] = useState<string>('');
+  // const [batchProgress, setBatchProgress] = useState<BatchUpdateProgress | null>(null);
+  // const [batchTotalItems, setBatchTotalItems] = useState(0);
+  // const [batchSuccessCount, setBatchSuccessCount] = useState(0);
+  // const [batchFailureCount, setBatchFailureCount] = useState(0);
 
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -109,7 +109,7 @@ export function PasswordManager() {
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareEntry, setShareEntry] = useState<PasswordEntry | undefined>(undefined);
-  const [isBatchMode, setIsBatchMode] = useState(false); // Batch mode toggle
+  // const [isBatchMode, setIsBatchMode] = useState(false); // Batch mode toggle - REMOVED: Feature deemed functionally useless
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
   // and handles session initialization as needed, so no manual trigger required here
@@ -241,32 +241,24 @@ export function PasswordManager() {
       // TODO: Get chunk index from entry metadata
       const chunkIndex = 0; // Placeholder - need to track this
 
-      if (isBatchMode) {
-        // BATCH MODE: Queue update locally
-        queueUpdate(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
+      // Batch mode removed - always save immediately to blockchain
+      const success = await updateEntry(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
+
+      if (success) {
         setShowEditModal(false);
         setSelectedEntry(null);
-        toast.showInfo(`Changes queued. Click "Sync to Blockchain" to save.`, { duration: 5000 });
-      } else {
-        // IMMEDIATE MODE: Save to blockchain now
-        const success = await updateEntry(chunkIndex, selectedEntry.id, sanitized as PasswordEntry);
+        toast.showSuccess('Password saved to blockchain');
 
-        if (success) {
-          setShowEditModal(false);
-          setSelectedEntry(null);
-          toast.showSuccess('Password saved to blockchain');
-
-          // Log activity
-          logActivity(
-            ActivityType.UPDATE,
-            `Updated password entry: ${sanitized.title}`,
-            {
-              entryId: selectedEntry.id,
-              entryTitle: sanitized.title,
-              severity: 'info',
-            }
-          );
-        }
+        // Log activity
+        logActivity(
+          ActivityType.UPDATE,
+          `Updated password entry: ${sanitized.title}`,
+          {
+            entryId: selectedEntry.id,
+            entryTitle: sanitized.title,
+            severity: 'info',
+          }
+        );
       }
     } catch (err) {
       console.error('Failed to update entry:', err);
@@ -1290,13 +1282,13 @@ export function PasswordManager() {
             + New Password
           </button>
 
-          {/* Batch Mode Toggle */}
-          <div className="sidebar-section batch-mode-section">
+          {/* Batch Mode Toggle - REMOVED: Feature deemed functionally useless */}
+          {/* <div className="sidebar-section batch-mode-section">
             <BatchModeToggle
               isBatchMode={isBatchMode}
               onToggle={setIsBatchMode}
             />
-          </div>
+          </div> */}
 
           <div className="sidebar-section">
             <h3>Tools</h3>
@@ -1705,8 +1697,8 @@ export function PasswordManager() {
             </div>
           )}
 
-          {/* Batch Operations Toolbar */}
-          <BatchOperationsToolbar
+          {/* Batch Operations Toolbar - REMOVED: Feature deemed functionally useless */}
+          {/* <BatchOperationsToolbar
             selectedEntries={selectedEntries}
             totalEntries={filteredEntries.length}
             onSelectAll={handleSelectAll}
@@ -1719,7 +1711,7 @@ export function PasswordManager() {
             onAssignCategory={handleAssignCategory}
             onExportSelected={handleExportSelected}
             categories={categories.map(cat => ({ id: cat.id, name: cat.name }))}
-          />
+          /> */}
             </>
           )}
         </main>
@@ -2012,8 +2004,8 @@ export function PasswordManager() {
         </div>
       )}
 
-      {/* Batch Progress Modal */}
-      <BatchProgressModal
+      {/* Batch Progress Modal - REMOVED: Feature deemed functionally useless */}
+      {/* <BatchProgressModal
         isOpen={showBatchProgress}
         operation={batchOperation}
         progress={batchProgress}
@@ -2022,7 +2014,7 @@ export function PasswordManager() {
         failureCount={batchFailureCount}
         onClose={() => setShowBatchProgress(false)}
         canCancel={false}
-      />
+      /> */}
 
       {/* Keyboard Shortcuts Help */}
       <KeyboardShortcutsHelp />

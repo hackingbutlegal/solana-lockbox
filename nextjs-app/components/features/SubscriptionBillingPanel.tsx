@@ -153,7 +153,8 @@ export function SubscriptionBillingPanel() {
         Need more space? Expand your storage capacity with our flexible slider. One-time payment includes refundable account rent plus a service fee to support platform development.
       </p>
 
-      <div className="expansion-cta">
+      {/* Storage Expansion - HIDDEN: Backend not implemented */}
+      {/* <div className="expansion-cta">
         <div className="cta-content">
           <div className="cta-icon">📦</div>
           <div className="cta-text">
@@ -169,16 +170,16 @@ export function SubscriptionBillingPanel() {
         >
           {!connected ? 'Connect Wallet First' : 'Open Storage Slider'}
         </button>
-      </div>
+      </div> */}
 
-      {/* Storage Slider Modal */}
-      <StorageSliderModal
+      {/* Storage Slider Modal - HIDDEN: Backend not implemented */}
+      {/* <StorageSliderModal
         isOpen={showSliderModal}
         onClose={() => setShowSliderModal(false)}
         currentCapacity={storageLimit}
         currentTier={currentTier}
         onConfirm={handleStorageExpansion}
-      />
+      /> */}
 
       {/* Billing History Section */}
       <h3>Billing History</h3>

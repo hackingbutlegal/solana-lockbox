@@ -10,6 +10,8 @@ import {
   exportToJSON,
   detectImportFormat,
 } from '../../lib/import-export';
+import { useToast } from '../ui/Toast';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 /**
  * ImportExportPanel Component
@@ -43,6 +45,8 @@ export function ImportExportPanel({ entries, onImport, className = '' }: ImportE
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+  const { confirm } = useConfirm();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,7 +102,20 @@ export function ImportExportPanel({ entries, onImport, className = '' }: ImportE
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // Show warning for plaintext exports
+    const confirmed = await confirm({
+      title: '⚠️ Security Warning',
+      message: exportFormat === 'csv'
+        ? 'CSV exports contain your passwords in PLAINTEXT. Anyone who accesses this file can read your passwords. Only export to secure, encrypted storage. Continue?'
+        : 'JSON exports contain your passwords in PLAINTEXT. Anyone who accesses this file can read your passwords. Only export to secure, encrypted storage. Continue?',
+      confirmText: 'Export Anyway',
+      cancelText: 'Cancel',
+      danger: true
+    });
+
+    if (!confirmed) return;
+
     let content: string;
     let filename: string;
     let mimeType: string;
@@ -123,6 +140,8 @@ export function ImportExportPanel({ entries, onImport, className = '' }: ImportE
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    toast.showWarning('Export complete. Remember to store this file securely!', { duration: 8000 });
   };
 
   return (
