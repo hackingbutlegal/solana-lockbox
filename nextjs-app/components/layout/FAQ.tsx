@@ -204,14 +204,6 @@ export function FAQ() {
           >
             GitHub repository
           </a>
-          {' '}or reach out to{' '}
-          <a
-            href="https://x.com/0xgraffito"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            @0xgraffito
-          </a>
         </p>
       </div>
     </div>
