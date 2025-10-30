@@ -339,6 +339,7 @@ const INSTRUCTION_DISCRIMINATORS = {
   renewSubscription: Buffer.from([0x2d, 0x4b, 0x9a, 0xc2, 0xa0, 0x0a, 0x6f, 0xb7]),
   downgradeSubscription: Buffer.from([0x39, 0x12, 0x7b, 0x76, 0xcb, 0x07, 0xc1, 0x25]),
   closeStorageChunk: Buffer.from([0x79, 0xb6, 0xfd, 0x51, 0x67, 0xd2, 0x2e, 0xe9]),
+  expandChunk: Buffer.from([0xa1, 0x4e, 0xa3, 0xae, 0x28, 0x5d, 0xe8, 0xf1]),
 };
 
 /**
@@ -1670,6 +1671,164 @@ export class LockboxV2Client {
     console.log('✅ Subscription downgraded to Free tier');
 
     return signature;
+  }
+
+  /**
+   * Expand an existing storage chunk
+   *
+   * @param chunkIndex - Index of the chunk to expand
+   * @param additionalBytes - Number of bytes to add (max 10,240 per call)
+   * @returns Transaction signature
+   *
+   * Constraints:
+   * - Max expansion per call: 10KB (MAX_REALLOC_INCREMENT = 10240)
+   * - Total chunk size cannot exceed 10KB (MAX_CHUNK_SIZE = 10240)
+   * - Automatically calculates and transfers additional rent
+   *
+   * Example:
+   * ```typescript
+   * // Expand chunk 0 by 5KB
+   * await client.expandStorageChunk(0, 5120);
+   * ```
+   */
+  async expandStorageChunk(chunkIndex: number, additionalBytes: number): Promise<string> {
+    if (additionalBytes <= 0) {
+      throw new Error('Additional bytes must be positive');
+    }
+
+    if (additionalBytes > 10240) {
+      throw new Error('Maximum 10KB (10,240 bytes) expansion per transaction. Call multiple times for larger expansions.');
+    }
+
+    const [masterLockbox] = this.getMasterLockboxAddress();
+    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+    // Verify chunk exists
+    const chunkAccount = await this.connection.getAccountInfo(storageChunk);
+    if (!chunkAccount) {
+      throw new Error(`Storage chunk ${chunkIndex} does not exist at ${storageChunk.toBase58()}`);
+    }
+
+    // Build instruction data: discriminator + additional_size (u32)
+    const argsBuffer = Buffer.alloc(4);
+    argsBuffer.writeUInt32LE(additionalBytes, 0);
+
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.expandChunk,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: masterLockbox, isSigner: false, isWritable: true },
+        { pubkey: storageChunk, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false }, // owner (validates ownership)
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },  // payer (pays rent)
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`✅ Storage chunk ${chunkIndex} expanded by ${additionalBytes} bytes`);
+
+    return signature;
+  }
+
+  /**
+   * Smart storage expansion - automatically expand existing chunks or create new ones
+   *
+   * @param targetCapacity - Target total capacity in bytes
+   * @returns Array of transaction signatures
+   *
+   * This method intelligently:
+   * 1. Calculates how many bytes are needed
+   * 2. Expands existing chunks that aren't maxed out (10KB max per chunk)
+   * 3. Creates new chunks if needed
+   * 4. Handles multi-transaction expansions (max 10KB per transaction)
+   *
+   * Example:
+   * ```typescript
+   * // Expand from 1KB to 15KB total
+   * const signatures = await client.expandStorageToCapacity(15360);
+   * console.log(`Completed ${signatures.length} transactions`);
+   * ```
+   */
+  async expandStorageToCapacity(targetCapacity: number): Promise<string[]> {
+    const master = await this.getMasterLockbox();
+    const currentCapacity = Number(master.totalCapacity);
+
+    if (targetCapacity <= currentCapacity) {
+      throw new Error(`Target capacity (${targetCapacity}) must be greater than current capacity (${currentCapacity})`);
+    }
+
+    const bytesNeeded = targetCapacity - currentCapacity;
+    const signatures: string[] = [];
+
+    console.log(`📦 Expanding storage from ${currentCapacity} to ${targetCapacity} bytes (+${bytesNeeded} bytes)`);
+
+    let remainingBytes = bytesNeeded;
+
+    // Try to expand existing chunks first
+    for (const chunk of master.storageChunks) {
+      if (remainingBytes <= 0) break;
+
+      const MAX_CHUNK_SIZE = 10240;
+      const chunkAvailable = MAX_CHUNK_SIZE - chunk.maxCapacity;
+
+      if (chunkAvailable > 0) {
+        const expandBy = Math.min(remainingBytes, chunkAvailable);
+        console.log(`  Expanding chunk ${chunk.chunkIndex} by ${expandBy} bytes (${chunk.maxCapacity} -> ${chunk.maxCapacity + expandBy})`);
+
+        const sig = await this.expandStorageChunk(chunk.chunkIndex, expandBy);
+        signatures.push(sig);
+        remainingBytes -= expandBy;
+      }
+    }
+
+    // Create new chunks if still needed
+    while (remainingBytes > 0) {
+      const chunkSize = Math.min(remainingBytes, 10240);
+      console.log(`  Creating new chunk ${master.storageChunksCount + signatures.length - master.storageChunks.length} with ${chunkSize} bytes`);
+
+      const sig = await this.initializeStorageChunk(master.storageChunksCount + signatures.length - master.storageChunks.length, chunkSize);
+      if (sig !== 'chunk-already-exists') {
+        signatures.push(sig);
+      }
+      remainingBytes -= chunkSize;
+    }
+
+    console.log(`✅ Storage expanded successfully (${signatures.length} transactions)`);
+
+    return signatures;
   }
 
   // ============================================================================

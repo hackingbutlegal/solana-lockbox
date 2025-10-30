@@ -49,34 +49,27 @@ export function SubscriptionBillingPanel() {
   };
 
   const handleStorageExpansion = async (targetBytes: number) => {
-    // CRITICAL: Verify wallet is connected before proceeding
-    if (!connected) {
+    // Verify wallet is connected before proceeding
+    if (!connected || !client) {
       alert('Please connect your wallet first to expand storage.');
       return;
     }
 
-    console.log('handleStorageExpansion called with target:', targetBytes);
-
-    // Determine which tier covers this capacity
-    let targetTier = SubscriptionTier.Free;
-    if (targetBytes > 102400) {
-      targetTier = SubscriptionTier.Pro;
-    } else if (targetBytes > 10240) {
-      targetTier = SubscriptionTier.Premium;
-    } else if (targetBytes > 1024) {
-      targetTier = SubscriptionTier.Basic;
-    }
-
-    console.log('Calculated target tier:', SubscriptionTier[targetTier]);
-
     try {
       setUpgrading(true);
-      await upgradeSubscription(targetTier);
-      // Success toast would go here
-      console.log('Storage expansion successful!');
+
+      // Use the smart expansion method that handles chunks automatically
+      const signatures = await client.expandStorageToCapacity(targetBytes);
+
+      console.log(`✅ Storage expanded successfully! ${signatures.length} transaction(s) completed.`);
+      alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
+
+      // Refresh the subscription data to show new capacity
+      // The context should automatically refetch, but we can trigger it explicitly
+      window.location.reload(); // Simple refresh to show updated stats
+
     } catch (error) {
       console.error('Failed to expand storage:', error);
-      // Error toast would go here
       alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     } finally {
@@ -153,33 +146,33 @@ export function SubscriptionBillingPanel() {
         Need more space? Expand your storage capacity with our flexible slider. One-time payment includes refundable account rent plus a service fee to support platform development.
       </p>
 
-      {/* Storage Expansion - HIDDEN: Backend not implemented */}
-      {/* <div className="expansion-cta">
+      {/* Storage Expansion */}
+      <div className="expansion-cta">
         <div className="cta-content">
           <div className="cta-icon">📦</div>
           <div className="cta-text">
             <h4>Expand Your Capacity</h4>
-            <p>Choose exactly how much storage you need • Starting at 0.003 SOL (~$0.42)</p>
+            <p>Choose exactly how much storage you need • Pay only for what you use</p>
           </div>
         </div>
         <button
           className="btn-expand"
           onClick={() => setShowSliderModal(true)}
-          disabled={!connected || loading}
+          disabled={!connected || loading || upgrading}
           title={!connected ? 'Connect your wallet first' : ''}
         >
-          {!connected ? 'Connect Wallet First' : 'Open Storage Slider'}
+          {!connected ? 'Connect Wallet First' : upgrading ? 'Expanding...' : 'Open Storage Slider'}
         </button>
-      </div> */}
+      </div>
 
-      {/* Storage Slider Modal - HIDDEN: Backend not implemented */}
-      {/* <StorageSliderModal
+      {/* Storage Slider Modal */}
+      <StorageSliderModal
         isOpen={showSliderModal}
         onClose={() => setShowSliderModal(false)}
         currentCapacity={storageLimit}
         currentTier={currentTier}
         onConfirm={handleStorageExpansion}
-      /> */}
+      />
 
       {/* Billing History Section */}
       <h3>Billing History</h3>
