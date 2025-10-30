@@ -17,16 +17,26 @@
 
 ## What is Solana Lockbox?
 
-**The password manager you can't lose.**
+**The password manager you can't lose. That you only pay for once.**
 
 Solana Lockbox stores your encrypted passwords on the Solana blockchain, giving you the recoverability of cloud managers (LastPass, 1Password) with the trustlessness of local managers (KeePass, local vaults) - **without the downsides of either**.
 
-### The Hidden Problem: What Happens When You Lose Your Device?
+### Two Hidden Problems with Password Managers
 
+**Problem 1: What Happens When You Lose Your Device?**
 - **Cloud managers**: You're locked into trusting the company. If they get hacked (LastPass 2022), your encrypted vault can be stolen.
 - **Local managers**: Lose your .kdbx file → lose everything. Forgot to backup to Dropbox? Gone forever.
 
-**Solana Lockbox**: Drop your phone in a lake → buy new phone → connect wallet → **all passwords restored**. No company to trust, no file to lose.
+**Problem 2: Subscription Trap**
+- **LastPass**: $3/month = **$360 over 10 years**
+- **1Password**: $2.99/month = **$358.80 over 10 years**
+- **Dashlane**: $4.99/month = **$598.80 over 10 years**
+
+### Solana Lockbox Solution
+
+**🔑 Permanent Recoverability:** Drop your phone in a lake → buy new phone → connect wallet → **all passwords restored**. No company to trust, no file to lose.
+
+**💰 Pay Once, Own Forever:** ~$10 one-time blockchain rent (recoverable). **10-year cost: Still $10**. Save $350+ vs LastPass.
 
 **🔐 Your wallet is your master key. Your passwords are on-chain forever.**
 
