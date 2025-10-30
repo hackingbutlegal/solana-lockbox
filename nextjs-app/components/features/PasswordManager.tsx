@@ -79,7 +79,8 @@ export function PasswordManager() {
   const [showOldPasswords, setShowOldPasswords] = useState(false);
 
   // Batch operations state - REMOVED: Feature deemed functionally useless
-  // const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
+  // Keeping state defined to prevent runtime errors, but UI components removed
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
   // const [isVirtualizedView, setIsVirtualizedView] = useState(false);
 
   // Batch progress modal state - REMOVED: Feature deemed functionally useless
@@ -322,7 +323,8 @@ export function PasswordManager() {
     }
   };
 
-  // Batch operation handlers
+  // Batch operation handlers - REMOVED: Batch mode feature from UI
+  // Keeping handlers defined to prevent runtime errors
   const selectedEntries = useMemo(() => {
     return filteredEntries.filter(e => e.id && selectedEntryIds.has(e.id));
   }, [filteredEntries, selectedEntryIds]);
@@ -336,7 +338,8 @@ export function PasswordManager() {
     setSelectedEntryIds(new Set());
   };
 
-  // Keyboard shortcuts for batch operations
+  // Keyboard shortcuts for batch operations - REMOVED: Batch mode UI
+  // Keeping shortcuts functional but hidden (no UI to trigger)
   useHotkeys('ctrl+a, meta+a', (e) => {
     e.preventDefault();
     if (selectedEntries.length === filteredEntries.length) {
@@ -1616,6 +1619,7 @@ export function PasswordManager() {
                 setEntryModalMode('view');
                 setShowDetailsModal(true);
               }}
+              // Batch mode UI removed but keeping props to prevent errors
               onEntrySelect={(entry) => {
                 const id = entry.id;
                 if (!id) return;
