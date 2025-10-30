@@ -35,5 +35,9 @@ export type { SearchContextType } from './SearchContext';
 export { RecoveryProvider, useRecovery } from './RecoveryContext';
 export type { RecoveryContextType, Guardian, RecoveryConfig, RecoveryRequest } from './RecoveryContext';
 
+// Lock Context
+export { LockProvider, useLock } from './LockContext';
+export type { LockContextType } from './LockContext';
+
 // Legacy context (kept for backward compatibility during migration)
 export { LockboxV2Provider, useLockboxV2 } from './LockboxV2Context';

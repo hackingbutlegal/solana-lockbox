@@ -173,6 +173,16 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
     // SECURITY FIX (C-3): Clear session timestamps
     setSessionStartTime(null);
     setLastActivityTime(null);
+
+    // FULL LOGOUT: Clear all session and local storage
+    if (typeof window !== 'undefined') {
+      // Clear session storage (temporary data)
+      sessionStorage.clear();
+
+      // Note: We intentionally preserve preferences and backup codes
+      // as they're not security-sensitive and improve UX on reconnect
+      // To fully reset everything, user should use "Close Account" in Danger Zone
+    }
   }, [sessionKeyStore]);
 
   // SECURITY: Immediate session timeout check for sensitive operations

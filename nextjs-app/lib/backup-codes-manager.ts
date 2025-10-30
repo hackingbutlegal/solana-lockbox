@@ -27,6 +27,8 @@ export interface BackupCodesData {
   codes: BackupCode[];
   generatedAt: string;
   version: number;
+  hasRecoveryPassword: boolean; // Whether recovery password is required
+  recoveryKeyVersion?: number; // Version of recovery key system
 }
 
 const STORAGE_KEY = 'lockbox_backup_codes';
@@ -37,10 +39,21 @@ const CODE_LENGTH = 8;
 /**
  * Generate new backup codes
  *
- * @param count - Number of codes to generate (default: 10)
+ * IMPORTANT: For security, backup codes should now be generated WITH a recovery password.
+ * This provides 2-factor security: backup code + recovery password required for access.
+ *
+ * @param options - Generation options
+ * @param options.count - Number of codes to generate (default: 10)
+ * @param options.hasRecoveryPassword - Whether a recovery password has been set
  * @returns Array of backup codes
  */
-export function generateBackupCodes(count: number = CODE_COUNT): BackupCodesData {
+export function generateBackupCodes(options?: {
+  count?: number;
+  hasRecoveryPassword?: boolean;
+}): BackupCodesData {
+  const count = options?.count || CODE_COUNT;
+  const hasRecoveryPassword = options?.hasRecoveryPassword ?? false;
+
   const rawCodes = BackupCodesGenerator.generate(count, CODE_LENGTH);
   const formattedCodes = BackupCodesGenerator.format(rawCodes, '-', 4);
 
@@ -54,6 +67,8 @@ export function generateBackupCodes(count: number = CODE_COUNT): BackupCodesData
     codes,
     generatedAt: new Date().toISOString(),
     version: CODES_VERSION,
+    hasRecoveryPassword,
+    recoveryKeyVersion: hasRecoveryPassword ? 1 : undefined,
   };
 }
 
@@ -229,10 +244,14 @@ export function clearBackupCodes(): void {
 /**
  * Regenerate backup codes (invalidates all existing codes)
  *
+ * @param options - Generation options
+ * @param options.hasRecoveryPassword - Whether a recovery password has been set
  * @returns New backup codes data
  */
-export function regenerateBackupCodes(): BackupCodesData {
-  const newCodes = generateBackupCodes();
+export function regenerateBackupCodes(options?: {
+  hasRecoveryPassword?: boolean;
+}): BackupCodesData {
+  const newCodes = generateBackupCodes(options);
   saveBackupCodes(newCodes);
   return newCodes;
 }
@@ -330,4 +349,42 @@ export function areBackupCodesStale(): boolean {
   const days = getDaysSinceGeneration();
   if (days === null) return false;
   return days > 90;
+}
+
+/**
+ * Check if backup codes need migration to new security model
+ * (old codes without recovery password are insecure)
+ *
+ * @returns true if codes need to be regenerated with recovery password
+ */
+export function needsSecurityMigration(): boolean {
+  const data = loadBackupCodes();
+  if (!data) return false;
+
+  // Check if codes were generated without recovery password
+  return !data.hasRecoveryPassword;
+}
+
+/**
+ * Check if backup codes are using the secure model
+ * (generated with recovery password)
+ *
+ * @returns true if codes use recovery password
+ */
+export function areBackupCodesSecure(): boolean {
+  const data = loadBackupCodes();
+  if (!data) return false;
+
+  return data.hasRecoveryPassword === true;
+}
+
+/**
+ * Get migration status message for user
+ *
+ * @returns User-friendly message explaining migration need
+ */
+export function getMigrationMessage(): string | null {
+  if (!needsSecurityMigration()) return null;
+
+  return 'Security Update Required: Your backup codes were generated with an older, less secure system. Please regenerate them with a recovery password to improve security. With the new system, backup codes require both the code AND a recovery password, providing 2-factor protection.';
 }

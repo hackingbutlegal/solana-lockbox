@@ -105,7 +105,6 @@ export function PasswordManager() {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [showResetModal, setShowResetModal] = useState(false);
   const [showFavoritesSidebar, setShowFavoritesSidebar] = useState(false);
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1428,16 +1427,6 @@ export function PasswordManager() {
               </div>
             </div>
           )}
-
-          <div className="sidebar-section danger-zone">
-            <h3>Danger Zone</h3>
-            <button
-              className="btn-danger"
-              onClick={() => setShowResetModal(true)}
-            >
-              ⚠️ Reset Account
-            </button>
-          </div>
         </aside>
 
         {/* Main Content */}
@@ -1871,141 +1860,6 @@ export function PasswordManager() {
           currentTier={masterLockbox.subscriptionTier}
           onUpgrade={handleUpgradeSubscription}
         />
-      )}
-
-      {/* Reset Account Modal */}
-      {showResetModal && (
-        <div className="modal-overlay" onClick={() => setShowResetModal(false)}>
-          <div className="modal-content reset-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>⚠️ Reset Account</h2>
-              <button className="modal-close" onClick={() => setShowResetModal(false)}>×</button>
-            </div>
-
-            <div className="modal-body">
-              <div className="warning-box">
-                <h3>🚨 Warning: Permanent Data Loss</h3>
-                <p>
-                  Resetting your account will permanently delete all stored passwords and cannot be undone.
-                  Make sure you have backed up any important passwords before proceeding.
-                </p>
-              </div>
-
-              <div className="account-info">
-                <h3>Your Master Lockbox PDA</h3>
-                <div className="pda-address-box">
-                  <code className="pda-address">
-                    {client?.masterLockboxPDA?.toString() || 'Not available'}
-                  </code>
-                  <button
-                    className="btn-copy"
-                    onClick={() => {
-                      if (client?.masterLockboxPDA) {
-                        navigator.clipboard.writeText(client.masterLockboxPDA.toString());
-                        toast.showSuccess('PDA address copied to clipboard!');
-                      }
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-
-              <div className="instructions-box">
-                <h3>Option 1: Permanent Account Closure</h3>
-                <p>Permanently close your account and reclaim all rent (irreversible):</p>
-                <button
-                  className="btn-danger-action"
-                  onClick={async () => {
-                    if (!client) return;
-
-                    const confirmed = await confirm({
-                      title: 'Close Account',
-                      message: 'WARNING: This will permanently delete ALL passwords and cannot be undone!\n\nAre you absolutely sure you want to close your account and reclaim rent?',
-                      confirmText: 'Close Account',
-                      cancelText: 'Cancel',
-                      danger: true
-                    });
-
-                    if (!confirmed) return;
-
-                    try {
-                      setShowResetModal(false);
-
-                      const signature = await client.closeMasterLockbox();
-
-                      toast.showSuccess(`Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet. The page will now reload.`);
-
-                      // Clear session and reload
-                      sessionStorage.clear();
-                      setTimeout(() => window.location.reload(), 1000);
-                    } catch (error: any) {
-                      console.error('Failed to close account:', error);
-
-                      // Check if error is due to already processed transaction
-                      if (error.message?.includes('already been processed') ||
-                          error.message?.includes('AlreadyProcessed')) {
-                        toast.showInfo('Your account may have already been closed. The page will reload to reflect the current state.');
-                        sessionStorage.clear();
-                        setTimeout(() => window.location.reload(), 1000);
-                      } else if (error.message?.includes('AccountNotFound') ||
-                                 error.message?.includes('not found')) {
-                        toast.showInfo('Account is already closed. The page will reload.');
-                        sessionStorage.clear();
-                        setTimeout(() => window.location.reload(), 1000);
-                      } else {
-                        toast.showError(`Failed to close account: ${error.message || 'Unknown error'}. Please try refreshing the page.`);
-                      }
-                    }
-                  }}
-                >
-                  ⚠️ Close Account & Reclaim Rent
-                </button>
-
-                <h3 style={{ marginTop: '1.5rem' }}>Option 2: Quick Reset (Session Only)</h3>
-                <p>Clear your local session and start fresh (account remains on-chain):</p>
-                <button
-                  className="btn-reset"
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: 'Clear Session',
-                      message: 'Clear local session and reload? Your on-chain data will remain intact.',
-                      confirmText: 'Clear & Reload',
-                      cancelText: 'Cancel',
-                      danger: false
-                    });
-
-                    if (confirmed) {
-                      // Clear session storage
-                      sessionStorage.clear();
-                      // Reload page
-                      window.location.reload();
-                    }
-                  }}
-                >
-                  Clear Session & Reload
-                </button>
-              </div>
-
-              <div className="explorer-link">
-                <a
-                  href={`https://explorer.solana.com/address/${client?.masterLockboxPDA?.toString()}?cluster=devnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-explorer"
-                >
-                  View on Solana Explorer ↗
-                </a>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowResetModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Batch Progress Modal - REMOVED: Feature deemed functionally useless */}

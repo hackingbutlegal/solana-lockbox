@@ -9,8 +9,17 @@ import {
   downloadBackupCodes,
   exportBackupCodes,
   BackupCodesData,
+  needsSecurityMigration,
+  getMigrationMessage,
+  saveBackupCodes,
 } from '../../lib/backup-codes-manager';
+import {
+  generateRecoveryKey,
+  validateRecoveryPassword,
+  hasRecoveryKey,
+} from '../../lib/recovery-key-manager';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../contexts';
 
 interface BackupCodesModalProps {
   isOpen: boolean;
@@ -18,50 +27,96 @@ interface BackupCodesModalProps {
   isFirstTime?: boolean; // true if this is initial setup
 }
 
+type ModalStep = 'password' | 'codes' | 'manage';
+
 export function BackupCodesModal({
   isOpen,
   onClose,
   isFirstTime = false,
 }: BackupCodesModalProps) {
   const toast = useToast();
+  const { client } = useAuth();
+  const [step, setStep] = useState<ModalStep>('manage');
   const [backupCodes, setBackupCodes] = useState<BackupCodesData | null>(null);
   const [hasConfirmedSave, setHasConfirmedSave] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
 
+  // Recovery password state
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showMigrationWarning, setShowMigrationWarning] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       const existing = loadBackupCodes();
-      if (existing) {
+
+      // Check if codes need migration
+      if (existing && needsSecurityMigration()) {
+        setShowMigrationWarning(true);
+        setBackupCodes(existing);
+        setStep('manage');
+      } else if (existing) {
         setBackupCodes(existing);
         setShowCodes(false);
-        setHasConfirmedSave(true); // Already saved
+        setHasConfirmedSave(true);
+        setStep('manage');
       } else if (isFirstTime) {
-        // Generate new codes for first-time setup
-        handleGenerateCodes();
+        // First time: go to password step
+        setStep('password');
+      } else {
+        setStep('password');
       }
     }
   }, [isOpen, isFirstTime]);
 
-  const handleGenerateCodes = () => {
-    const newCodes = generateBackupCodes();
-    setBackupCodes(newCodes);
-    setShowCodes(true);
-    setHasConfirmedSave(false);
-    toast.showSuccess('Backup codes generated successfully');
+  // Validate password strength
+  const passwordValidation = validateRecoveryPassword(recoveryPassword);
+  const passwordsMatch = recoveryPassword === confirmPassword && recoveryPassword.length > 0;
+  const canProceed = passwordValidation.valid && passwordsMatch;
+
+  const handleGenerateCodes = async () => {
+    if (!canProceed) {
+      toast.showError('Please enter a valid recovery password');
+      return;
+    }
+
+    try {
+      // For now, we'll use a placeholder session key
+      // In production, this should come from the authenticated session
+      // TODO: Get actual session key from AuthContext
+      const placeholderSessionKey = crypto.getRandomValues(new Uint8Array(32));
+
+      // Generate recovery key encrypted with recovery password
+      await generateRecoveryKey(recoveryPassword, placeholderSessionKey);
+
+      // Generate backup codes with recovery password flag
+      const newCodes = generateBackupCodes({ hasRecoveryPassword: true });
+      saveBackupCodes(newCodes);
+
+      setBackupCodes(newCodes);
+      setShowCodes(true);
+      setHasConfirmedSave(false);
+      setStep('codes');
+      toast.showSuccess('Backup codes generated successfully');
+    } catch (error: any) {
+      console.error('Failed to generate backup codes:', error);
+      toast.showError(`Failed to generate backup codes: ${error.message}`);
+    }
   };
 
-  const handleRegenerateCodes = () => {
+  const handleRegenerateCodes = async () => {
     const confirmed = window.confirm(
       'Regenerating backup codes will invalidate all existing codes. Are you sure?'
     );
 
     if (!confirmed) return;
 
-    const newCodes = regenerateBackupCodes();
-    setBackupCodes(newCodes);
-    setShowCodes(true);
-    setHasConfirmedSave(false);
-    toast.showSuccess('New backup codes generated. Old codes are now invalid.');
+    // Go to password step for regeneration
+    setRecoveryPassword('');
+    setConfirmPassword('');
+    setShowMigrationWarning(false);
+    setStep('password');
   };
 
   const handleDownloadCodes = () => {
@@ -115,18 +170,118 @@ export function BackupCodesModal({
         </div>
 
         <div className="modal-body">
-          {isFirstTime && !hasConfirmedSave && (
-            <div className="first-time-notice">
-              <div className="notice-icon">⚠️</div>
-              <div className="notice-content">
-                <h3>Critical: Save Your Backup Codes</h3>
-                <p>
-                  These codes are your only way to recover your account if you lose access to your
-                  Solana wallet. <strong>Each code can only be used once.</strong>
-                </p>
+          {/* Migration Warning */}
+          {showMigrationWarning && step === 'manage' && (
+            <div className="migration-warning">
+              <div className="warning-icon">🔒</div>
+              <div className="warning-content">
+                <h3>Security Update Required</h3>
+                <p>{getMigrationMessage()}</p>
+                <button className="btn-upgrade-security" onClick={handleRegenerateCodes}>
+                  Upgrade to Secure Backup Codes
+                </button>
               </div>
             </div>
           )}
+
+          {/* Step 1: Recovery Password Creation */}
+          {step === 'password' && (
+            <div className="password-step">
+              <div className="step-header">
+                <div className="step-icon">🔐</div>
+                <div>
+                  <h3>Create Recovery Password</h3>
+                  <p>This password will be required along with your backup codes for account recovery.</p>
+                </div>
+              </div>
+
+              <div className="password-form">
+                <div className="form-group">
+                  <label htmlFor="recoveryPassword">Recovery Password</label>
+                  <div className="password-input-group">
+                    <input
+                      id="recoveryPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      value={recoveryPassword}
+                      onChange={(e) => setRecoveryPassword(e.target.value)}
+                      placeholder="Enter a strong recovery password"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="btn-toggle-password"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="confirmPassword">Confirm Recovery Password</label>
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter your recovery password"
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                {/* Password Requirements */}
+                <div className="password-requirements">
+                  <h4>Password Requirements:</h4>
+                  <ul>
+                    <li className={recoveryPassword.length >= 12 ? 'valid' : ''}>
+                      {recoveryPassword.length >= 12 ? '✓' : '○'} At least 12 characters
+                    </li>
+                    <li className={/[A-Z]/.test(recoveryPassword) ? 'valid' : ''}>
+                      {/[A-Z]/.test(recoveryPassword) ? '✓' : '○'} One uppercase letter
+                    </li>
+                    <li className={/[a-z]/.test(recoveryPassword) ? 'valid' : ''}>
+                      {/[a-z]/.test(recoveryPassword) ? '✓' : '○'} One lowercase letter
+                    </li>
+                    <li className={/[0-9]/.test(recoveryPassword) ? 'valid' : ''}>
+                      {/[0-9]/.test(recoveryPassword) ? '✓' : '○'} One number
+                    </li>
+                    <li className={/[^A-Za-z0-9]/.test(recoveryPassword) ? 'valid' : ''}>
+                      {/[^A-Za-z0-9]/.test(recoveryPassword) ? '✓' : '○'} One special character
+                    </li>
+                    <li className={passwordsMatch ? 'valid' : ''}>
+                      {passwordsMatch ? '✓' : '○'} Passwords match
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="security-notice">
+                  <h4>⚠️ Important Security Information</h4>
+                  <ul>
+                    <li>Your recovery password is required along with backup codes for account recovery</li>
+                    <li>Store this password separately from your backup codes</li>
+                    <li>We cannot reset or recover this password if you lose it</li>
+                    <li>Consider using a password manager to store it securely</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 & 3: Display Codes or Manage */}
+          {(step === 'codes' || step === 'manage') && (
+            <>
+              {isFirstTime && !hasConfirmedSave && (
+                <div className="first-time-notice">
+                  <div className="notice-icon">⚠️</div>
+                  <div className="notice-content">
+                    <h3>Critical: Save Your Backup Codes AND Recovery Password</h3>
+                    <p>
+                      You need BOTH your backup codes AND recovery password to recover your account.
+                      <strong> Each code can only be used once.</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
 
           {stats && (
             <div className="codes-stats">
@@ -216,10 +371,30 @@ export function BackupCodesModal({
               </p>
             </div>
           )}
+            </>
+          )}
         </div>
 
         <div className="modal-footer backup-codes-footer">
-          {backupCodes && showCodes && (
+          {/* Password Step Footer */}
+          {step === 'password' && (
+            <>
+              <button onClick={handleClose} className="btn-cancel">
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateCodes}
+                className="btn-create-codes"
+                disabled={!canProceed}
+                title={!canProceed ? 'Please meet all password requirements' : ''}
+              >
+                Create Backup Codes →
+              </button>
+            </>
+          )}
+
+          {/* Codes Step Footer */}
+          {step === 'codes' && backupCodes && showCodes && (
             <>
               <button onClick={handleDownloadCodes} className="btn-download">
                 📥 Download
@@ -227,28 +402,47 @@ export function BackupCodesModal({
               <button onClick={handleCopyToClipboard} className="btn-copy">
                 📋 Copy
               </button>
+              {!hasConfirmedSave && (
+                <button
+                  onClick={handleConfirmSaved}
+                  className="btn-confirm"
+                  disabled={!hasConfirmedSave}
+                >
+                  I've Saved These Securely
+                </button>
+              )}
+              <button onClick={handleClose} className="btn-close">
+                {hasConfirmedSave ? 'Close' : 'Skip (Not Recommended)'}
+              </button>
             </>
           )}
 
-          {backupCodes && !showCodes && (
-            <button onClick={() => setShowCodes(true)} className="btn-view">
-              👁️ View Codes
-            </button>
+          {/* Manage Step Footer */}
+          {step === 'manage' && (
+            <>
+              {backupCodes && !showCodes && (
+                <button onClick={() => setShowCodes(true)} className="btn-view">
+                  👁️ View Codes
+                </button>
+              )}
+              {backupCodes && showCodes && (
+                <>
+                  <button onClick={handleDownloadCodes} className="btn-download">
+                    📥 Download
+                  </button>
+                  <button onClick={handleCopyToClipboard} className="btn-copy">
+                    📋 Copy
+                  </button>
+                </>
+              )}
+              <button onClick={handleRegenerateCodes} className="btn-regenerate">
+                🔄 Regenerate Codes
+              </button>
+              <button onClick={handleClose} className="btn-close">
+                Close
+              </button>
+            </>
           )}
-
-          {backupCodes ? (
-            <button onClick={handleRegenerateCodes} className="btn-regenerate">
-              🔄 Regenerate Codes
-            </button>
-          ) : (
-            <button onClick={handleGenerateCodes} className="btn-generate">
-              ✨ Generate Codes
-            </button>
-          )}
-
-          <button onClick={handleClose} className="btn-close">
-            {hasConfirmedSave || !isFirstTime ? 'Close' : 'Skip (Not Recommended)'}
-          </button>
         </div>
 
         <style jsx>{`

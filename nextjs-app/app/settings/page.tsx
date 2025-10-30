@@ -7,6 +7,7 @@ import { SubscriptionBillingPanel } from '../../components/features/Subscription
 import { SecuritySettingsPanel } from '../../components/features/SecuritySettingsPanel';
 import { PreferencesPanel } from '../../components/features/PreferencesPanel';
 import { ImportExportPanel } from '../../components/features/ImportExportPanel';
+import { DangerZonePanel } from '../../components/features/DangerZonePanel';
 import { usePassword } from '../../contexts';
 import { PasswordEntry } from '../../sdk/src/types-v2';
 
@@ -20,9 +21,10 @@ import { PasswordEntry } from '../../sdk/src/types-v2';
  * 4. Security - Recovery codes, security settings
  * 5. Import/Export - Bulk password operations
  * 6. Preferences - Display settings, theme
+ * 7. Danger Zone - Account reset, closure
  */
 
-type SettingsTab = 'account' | 'subscription' | 'usage' | 'security' | 'import-export' | 'preferences';
+type SettingsTab = 'account' | 'subscription' | 'usage' | 'security' | 'import-export' | 'preferences' | 'danger-zone';
 
 function SettingsContent() {
   const router = useRouter();
@@ -36,7 +38,7 @@ function SettingsContent() {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as SettingsTab;
-    if (tabParam && ['account', 'subscription', 'usage', 'security', 'import-export', 'preferences'].includes(tabParam)) {
+    if (tabParam && ['account', 'subscription', 'usage', 'security', 'import-export', 'preferences', 'danger-zone'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -121,6 +123,13 @@ function SettingsContent() {
             <span className="tab-icon">⚙️</span>
             <span className="tab-label">Preferences</span>
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'danger-zone' ? 'active' : ''}`}
+            onClick={() => handleTabChange('danger-zone')}
+          >
+            <span className="tab-icon">⚠️</span>
+            <span className="tab-label">Danger Zone</span>
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -145,6 +154,7 @@ function SettingsContent() {
             </div>
           )}
           {activeTab === 'preferences' && <PreferencesPanel />}
+          {activeTab === 'danger-zone' && <DangerZonePanel />}
         </div>
       </div>
 

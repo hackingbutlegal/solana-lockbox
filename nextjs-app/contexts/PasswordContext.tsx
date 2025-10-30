@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import { useLockbox } from './LockboxContext';
 import { PasswordEntry } from '../sdk/src/types-v2';
 import { PendingChangesManager, PendingChange, ChangeStats } from '../lib/pending-changes-manager';
+import { withConflictHandling, isConflictError, getConflictMessage } from '../lib/conflict-handler';
 
 /**
  * Password Context - Password Operations
@@ -192,13 +193,25 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       setLoading(true);
       setError(null);
 
-      const result = await client.storePassword(entry);
+      // Wrap with conflict handling and auto-retry
+      const result = await withConflictHandling(
+        () => client.storePassword(entry),
+        refreshEntries, // Auto-refresh on conflict
+        3 // Max 3 retries
+      );
 
       // Refresh entries after creation
       await refreshEntries();
 
       return result.entryId;
     } catch (err) {
+      // Check if it's a conflict error
+      if (isConflictError(err)) {
+        const conflictMsg = getConflictMessage(err as any);
+        setError(conflictMsg);
+        throw new Error(conflictMsg);
+      }
+
       const errorMsg = err instanceof Error ? err.message : 'Failed to create entry';
       setError(errorMsg);
       // Re-throw error so calling component can handle it with UI feedback
@@ -232,13 +245,25 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       setLoading(true);
       setError(null);
 
-      await client.updatePassword(chunkIndex, entryId, entry);
+      // Wrap with conflict handling and auto-retry
+      await withConflictHandling(
+        () => client.updatePassword(chunkIndex, entryId, entry),
+        refreshEntries, // Auto-refresh on conflict
+        3 // Max 3 retries
+      );
 
       // Refresh entries after update
       await refreshEntries();
 
       return true;
     } catch (err) {
+      // Check if it's a conflict error
+      if (isConflictError(err)) {
+        const conflictMsg = getConflictMessage(err as any);
+        setError(conflictMsg);
+        return false;
+      }
+
       const errorMsg = err instanceof Error ? err.message : 'Failed to update entry';
       setError(errorMsg);
       return false;
@@ -270,13 +295,25 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       setLoading(true);
       setError(null);
 
-      await client.deletePassword(chunkIndex, entryId);
+      // Wrap with conflict handling and auto-retry
+      await withConflictHandling(
+        () => client.deletePassword(chunkIndex, entryId),
+        refreshEntries, // Auto-refresh on conflict
+        3 // Max 3 retries
+      );
 
       // Refresh entries after deletion
       await refreshEntries();
 
       return true;
     } catch (err) {
+      // Check if it's a conflict error
+      if (isConflictError(err)) {
+        const conflictMsg = getConflictMessage(err as any);
+        setError(conflictMsg);
+        return false;
+      }
+
       const errorMsg = err instanceof Error ? err.message : 'Failed to delete entry';
       setError(errorMsg);
       return false;

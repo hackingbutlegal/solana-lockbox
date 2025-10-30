@@ -13,10 +13,13 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider, CategoryProvider, RecoveryProvider } from '../../contexts';
+import { LockProvider, useLock } from '../../contexts/LockContext';
 import { ErrorBoundary, ContextErrorBoundary } from '../ui';
 import { ToastProvider } from '../ui/Toast';
 import { ConfirmProvider } from '../ui/ConfirmDialog';
 import { AppHeader } from './AppHeader';
+import { Footer } from './Footer';
+import { LockScreen } from '../ui/LockScreen';
 import { MobileWalletProvider } from '../providers/MobileWalletProvider';
 
 // Import wallet adapter styles
@@ -28,15 +31,24 @@ const TREASURY_WALLET = new PublicKey('465Av5qxktim1iN9p54k41MbRGPe2nqCfyVYwB2EF
 // Inner component that safely renders AppHeader after contexts are ready
 function AppWithProviders({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = React.useState(false);
+  const { isLocked } = useLock();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Show lock screen if app is locked
+  if (mounted && isLocked) {
+    return <LockScreen />;
+  }
+
   return (
     <>
       {mounted && <AppHeader />}
-      {children}
+      <div style={{ minHeight: 'calc(100vh - 180px)' }}>
+        {children}
+      </div>
+      {mounted && <Footer />}
     </>
   );
 }
@@ -67,21 +79,23 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
                     }
                   }}>
                     <AuthProvider programId={PROGRAM_ID} treasuryWallet={TREASURY_WALLET}>
-                      <LockboxProvider>
-                        <CategoryProvider>
-                          <PasswordProvider>
-                            <SubscriptionProvider>
-                              <RecoveryProvider>
-                                <ErrorBoundary>
-                                  <AppWithProviders>
-                                    {children}
-                                  </AppWithProviders>
-                                </ErrorBoundary>
-                              </RecoveryProvider>
-                            </SubscriptionProvider>
-                          </PasswordProvider>
-                        </CategoryProvider>
-                      </LockboxProvider>
+                      <LockProvider>
+                        <LockboxProvider>
+                          <CategoryProvider>
+                            <PasswordProvider>
+                              <SubscriptionProvider>
+                                <RecoveryProvider>
+                                  <ErrorBoundary>
+                                    <AppWithProviders>
+                                      {children}
+                                    </AppWithProviders>
+                                  </ErrorBoundary>
+                                </RecoveryProvider>
+                              </SubscriptionProvider>
+                            </PasswordProvider>
+                          </CategoryProvider>
+                        </LockboxProvider>
+                      </LockProvider>
                     </AuthProvider>
                   </ContextErrorBoundary>
                 </ConfirmProvider>
