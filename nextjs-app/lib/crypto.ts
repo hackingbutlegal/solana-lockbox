@@ -31,7 +31,7 @@ export function ed25519ToCurve25519PublicKey(_ed25519PublicKey: Uint8Array): nev
   throw new Error(
     'SECURITY: ed25519ToCurve25519PublicKey is unsafe and has been removed. ' +
     'Use signature-based key derivation with createSessionKeyFromSignature() instead. ' +
-    'See SECURITY_AUDIT_TRAIL_OF_BITS.md for details.'
+    'See SECURITY_AUDIT.md for details.'
   );
 }
 
@@ -54,7 +54,7 @@ export function ed25519ToCurve25519SecretKey(_ed25519SecretKey: Uint8Array): nev
   throw new Error(
     'SECURITY: ed25519ToCurve25519SecretKey is unsafe and has been removed. ' +
     'Use signature-based key derivation with createSessionKeyFromSignature() instead. ' +
-    'See SECURITY_AUDIT_TRAIL_OF_BITS.md for details.'
+    'See SECURITY_AUDIT.md for details.'
   );
 }
 

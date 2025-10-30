@@ -22,7 +22,7 @@ Deployment guides for various environments.
 ### `/security`
 Security model, audit reports, and security fixes.
 - `SECURITY.md` - Security model and best practices
-- `SECURITY_AUDIT_TRAIL_OF_BITS.md` - Trail of Bits audit findings
+- `SECURITY_AUDIT.md` - Security audit findings
 - Security fix test plans
 
 ### `/technical`
@@ -85,7 +85,7 @@ The following documents remain in the project root for easy access:
 
 **For Security Researchers**:
 - Security model: `docs/security/`
-- Audit reports: `docs/security/SECURITY_AUDIT_TRAIL_OF_BITS.md`
+- Audit reports: `docs/security/`
 
 ## Documentation Standards
 

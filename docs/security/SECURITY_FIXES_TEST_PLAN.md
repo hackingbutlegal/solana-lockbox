@@ -1,7 +1,7 @@
 # Security Fixes Test Plan
 ## Critical Security Fixes - October 2025
 
-This document outlines the test plan for verifying the three Critical security fixes implemented based on the Trail of Bits security audit.
+This document outlines the test plan for verifying the three Critical security fixes implemented based on the internal security audit.
 
 ---
 

@@ -593,7 +593,7 @@ If issues are discovered after deployment:
 
 - Security Audit Report: `SECURITY_AUDIT_COMPREHENSIVE_2025.md`
 - Original Phase 5 Audit: `SECURITY_AUDIT_REPORT.md`
-- Trail of Bits Audit: `SECURITY_AUDIT_TRAIL_OF_BITS.md`
+- Internal Security Audit: `SECURITY_AUDIT.md`
 
 ---
 

@@ -530,7 +530,7 @@ const KEY_SIZE = 32;        // 256 bits
 - Result: No critical vulnerabilities found
 
 **Third-Party Audit:** *Pending*
-- Recommended auditors: Trail of Bits, Kudelski Security, NCC Group
+- Recommended auditors: Kudelski Security, NCC Group, OtterSec
 - Scope: Smart contracts + cryptographic implementation
 
 ### Known Limitations
