@@ -898,7 +898,7 @@ We welcome contributions from the Solana community!
 **Ways to Contribute:**
 - 🐛 Report bugs (GitHub Issues)
 - 💡 Suggest features (GitHub Discussions)
-- 🔐 Security research (see [SECURITY.md](./docs/security/SECURITY.md))
+- 🔐 Security research (see [SECURITY.md](./SECURITY.md))
 - 📝 Improve documentation
 - 🧪 Add tests
 - 🎨 Design improvements
@@ -932,21 +932,22 @@ We welcome contributions from the Solana community!
 
 **Responsible Disclosure:**
 
-If you discover a security vulnerability, please follow responsible disclosure:
+If you discover a security vulnerability, please follow our security policy:
 
-1. **Email:** [security@web3stud.io] (or your contact)
-2. **Include:** Description, reproduction steps, potential impact
-3. **Do NOT:** Open public GitHub issues for security bugs
-4. **Response Time:** We will respond within 48 hours
+1. **Review:** [SECURITY.md](./SECURITY.md) for full disclosure guidelines
+2. **Contact:** security@web3stud.io
+3. **Include:** Description, reproduction steps, potential impact, severity
+4. **Do NOT:** Open public GitHub issues for security vulnerabilities
+5. **Response Time:** We will acknowledge within 48 hours
 
-**Bug Bounty:** (Post-Mainnet)
-- Critical: $10k-100k
-- High: $5k-10k
-- Medium: $1k-5k
-- Low: $100-1k
+**Bug Bounty:** (Planned Post-Mainnet - Q2 2026)
+- Critical: Recognition + priority in future bug bounty program
+- High: Recognition in security advisories
+- Medium/Low: Credit in release notes
 
 **Security Documentation:**
-- [SECURITY.md](./docs/security/SECURITY.md) - Current security posture
+- [SECURITY.md](./SECURITY.md) - **Vulnerability reporting policy**
+- [Security Posture](./docs/security/SECURITY.md) - Current security status
 - [CRYPTOGRAPHY.md](./docs/CRYPTOGRAPHY.md) - Cryptographic implementation
 - [Audit Reports](./docs/security/) - Security audit history
 
