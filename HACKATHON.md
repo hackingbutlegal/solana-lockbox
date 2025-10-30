@@ -214,13 +214,15 @@ Imagine if Phantom, Solflare, and Backpack wallets had a **built-in password man
 
 ### 4. Educational Value
 
-**Teaches Solana Developers:**
-- How to implement PDA-based access control
-- Client-side encryption best practices
-- Dynamic account sizing (storage expansion)
-- Rate limiting on-chain
-- Recovery mechanisms
-- Anchor 0.30+ patterns
+**What's Actually Novel for Solana Developers:**
+- **Large encrypted data storage patterns**: Chunking strategy for >10KB data (most examples are tiny accounts)
+- **Client-side crypto + blockchain combo**: Specific tradeoffs and implementation details
+- **User-facing rent economics**: Showing storage costs upfront in a consumer app
+
+**Standard Solana patterns used well:**
+- PDA-based access control (Solana 101, but implemented correctly)
+- On-chain rate limiting with Clock (basic, but often forgotten)
+- Account reallocation (expand_chunk using Anchor's realloc patterns)
 
 **Comprehensive Documentation:**
 - [CRYPTOGRAPHY.md](docs/CRYPTOGRAPHY.md) - Proof-level cryptographic details
@@ -345,7 +347,7 @@ const entries = await client.retrievePasswordEntries(0);
    - No manual backups needed (blockchain = automatic backup)
    - Multi-device sync without iCloud/Dropbox/Google Drive
    - **Scenario**: Drop phone in ocean → Buy new phone → Connect wallet → All passwords restored
-   - **This has never been possible before** without trusting a company
+   - **This is the first time** automatic recoverability doesn't require **either** trusting a company **or** self-hosting infrastructure
 
 2. **Wallet-Based Identity**
    - No separate account creation
