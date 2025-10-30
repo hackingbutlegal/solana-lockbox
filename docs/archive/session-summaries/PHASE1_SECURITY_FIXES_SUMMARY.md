@@ -335,7 +335,7 @@ All fixes include:
 
 ### Reference Documents:
 - `SECURITY_AUDIT_REPORT.md` - Original Phase 5 audit
-- `SECURITY_AUDIT_TRAIL_OF_BITS.md` - Internal security methodology
+- `SECURITY_AUDIT.md` - Internal security methodology
 - `RECOVERY_V2_DESIGN.md` - Recovery V2 architecture
 
 ---

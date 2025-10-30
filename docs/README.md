@@ -22,7 +22,7 @@ Deployment guides for various environments.
 ### `/security`
 Security model, audit reports, and security fixes.
 - `SECURITY.md` - Security model and best practices
-- `SECURITY_AUDIT_TRAIL_OF_BITS.md` - Trail of Bits audit findings
+- `SECURITY_AUDIT.md` - Security audit findings
 - Security fix test plans
 
 ### `/technical`
