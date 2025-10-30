@@ -85,7 +85,7 @@ The following documents remain in the project root for easy access:
 
 **For Security Researchers**:
 - Security model: `docs/security/`
-- Audit reports: `docs/security/SECURITY_AUDIT_TRAIL_OF_BITS.md`
+- Audit reports: `docs/security/`
 
 ## Documentation Standards
 

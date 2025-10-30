@@ -1,6 +1,6 @@
 # Solana Lockbox v2.0 - Cryptographic Security Analysis
 
-**Auditor**: Trail of Bits (Simulated Expert Review)
+**Auditor**: Internal Security Review
 **Date**: October 13, 2025
 **Version**: v2.0.0-devnet
 **Scope**: Client-side cryptographic implementation
@@ -933,6 +933,6 @@ The Solana Lockbox v2.0 cryptographic implementation demonstrates **good securit
 
 ---
 
-**Auditor**: Trail of Bits (Simulated)
+**Auditor**: Internal Security Team
 **Next Review**: After critical fixes implemented
-**Contact**: security@trailofbits.com (for actual audit)
+**Contact**: security@web3stud.io

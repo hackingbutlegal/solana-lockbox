@@ -551,7 +551,7 @@ test('complete password lifecycle with security checks', async ({ page }) => {
 
 ### Mainnet Readiness Checklist
 
-- [ ] **Third-party security audit** (Trail of Bits, Kudelski, or NCC Group)
+- [ ] **Third-party security audit** (Recommended firms: Kudelski, NCC Group, or similar)
 - [ ] **Bug bounty program** (via Immunefi or HackerOne)
 - [ ] **Formal verification** of critical functions (optional but recommended)
 - [ ] **Penetration testing** of web application
