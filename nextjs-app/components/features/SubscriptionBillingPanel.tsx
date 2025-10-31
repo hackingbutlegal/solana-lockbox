@@ -36,6 +36,7 @@ export function SubscriptionBillingPanel() {
 
   const [upgrading, setUpgrading] = useState(false);
   const [showSliderModal, setShowSliderModal] = useState(false);
+  const [optimisticCapacity, setOptimisticCapacity] = useState<number | null>(null);
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -61,34 +62,55 @@ export function SubscriptionBillingPanel() {
       return;
     }
 
-    try {
-      setUpgrading(true);
+    // Optimistic update - immediately show new capacity in UI
+    setOptimisticCapacity(targetBytes);
+    setUpgrading(true);
 
+    try {
       await clientInstance.expandStorageToCapacity(targetBytes);
 
-      // Always refresh regardless of errors
+      // Transaction sent, wait for confirmation
+      await new Promise(resolve => setTimeout(resolve, 2000));
       await lockbox.refreshLockbox();
 
-      alert(`Storage expanded to ${targetBytes} bytes!`);
+      // Verify it worked
+      const master = await clientInstance.getMasterLockbox();
+      const actualCapacity = Number(master.totalCapacity);
+
+      if (actualCapacity >= targetBytes) {
+        // Success! Keep optimistic update
+        alert(`Storage expanded to ${formatBytes(actualCapacity)}!`);
+      } else {
+        // Failed - rollback optimistic update
+        setOptimisticCapacity(null);
+        alert(`Expansion incomplete. Current: ${formatBytes(actualCapacity)}`);
+      }
     } catch (error: any) {
-      // Check if it actually worked despite error
+      // Error - check if it actually worked
       try {
         await new Promise(resolve => setTimeout(resolve, 2000));
         await lockbox.refreshLockbox();
 
         const master = await clientInstance.getMasterLockbox();
-        const newCapacity = Number(master.totalCapacity);
+        const actualCapacity = Number(master.totalCapacity);
 
-        if (newCapacity >= targetBytes) {
-          alert(`Storage expanded successfully to ${newCapacity} bytes!`);
+        if (actualCapacity >= targetBytes) {
+          // Worked despite error!
+          alert(`Storage expanded to ${formatBytes(actualCapacity)}!`);
         } else {
+          // Actually failed - rollback
+          setOptimisticCapacity(null);
           alert(`Expansion failed: ${error.message || 'Unknown error'}`);
         }
       } catch {
-        alert(`Error: ${error.message || 'Unknown error'}. Please refresh to see current storage.`);
+        // Can't verify - rollback optimistic update
+        setOptimisticCapacity(null);
+        alert(`Error: ${error.message || 'Unknown error'}. Refresh to see current storage.`);
       }
     } finally {
       setUpgrading(false);
+      // Clear optimistic update after refresh completes
+      setTimeout(() => setOptimisticCapacity(null), 3000);
     }
   };
 
@@ -97,6 +119,12 @@ export function SubscriptionBillingPanel() {
     if (storagePercentage >= 70) return '#f39c12';
     return '#27ae60';
   };
+
+  // Use optimistic capacity if set, otherwise use real value
+  const displayCapacity = optimisticCapacity !== null ? optimisticCapacity : storageLimit;
+  const displayPercentage = optimisticCapacity !== null
+    ? Math.round((storageUsed / optimisticCapacity) * 100)
+    : storagePercentage;
 
   return (
     <div className="subscription-billing-panel">
@@ -125,17 +153,23 @@ export function SubscriptionBillingPanel() {
 
         <div className="plan-details">
           <div className="detail-item">
-            <span className="detail-label">Storage Used</span>
+            <span className="detail-label">
+              Storage Used
+              {upgrading && <span style={{ marginLeft: '8px', fontSize: '0.9em', opacity: 0.7 }}>Expanding...</span>}
+            </span>
             <span className="detail-value">
-              {formatBytes(storageUsed)} / {formatBytes(storageLimit)} ({storagePercentage}%)
+              {formatBytes(storageUsed)} / {formatBytes(displayCapacity)} ({displayPercentage}%)
+              {optimisticCapacity !== null && <span style={{ marginLeft: '4px', opacity: 0.7 }}>⏳</span>}
             </span>
           </div>
           <div className="storage-bar">
             <div
               className="storage-bar-fill"
               style={{
-                width: `${storagePercentage}%`,
-                background: getStorageColor()
+                width: `${displayPercentage}%`,
+                background: getStorageColor(),
+                opacity: optimisticCapacity !== null ? 0.7 : 1,
+                transition: 'all 0.3s ease'
               }}
             />
           </div>
