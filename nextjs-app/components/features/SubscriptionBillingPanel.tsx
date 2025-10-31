@@ -91,31 +91,45 @@ export function SubscriptionBillingPanel() {
       alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
 
     } catch (error) {
-      console.error('Failed to expand storage:', error);
+      console.error('[handleStorageExpansion] Failed to expand storage:', error);
 
       // Even if expansion threw an error, check if it actually succeeded on-chain
       // The wallet might throw errors even when the transaction succeeds
-      console.log('Checking if storage was actually expanded despite error...');
+      console.log('[handleStorageExpansion] Checking if storage was actually expanded despite error...');
 
       try {
         if (!client) {
           throw new Error('Client is not available for verification');
         }
 
+        // Wait a moment for RPC to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         const updatedMaster = await client.getMasterLockbox();
         const newCapacity = Number(updatedMaster.totalCapacity);
+        const currentCapacity = Number(storageLimit);
 
-        if (newCapacity >= targetBytes) {
-          console.log(`✅ Storage expansion succeeded on-chain! New capacity: ${newCapacity} bytes`);
+        console.log('[handleStorageExpansion] Capacity check:', {
+          currentCapacity,
+          newCapacity,
+          targetBytes,
+          wasExpanded: newCapacity > currentCapacity
+        });
+
+        if (newCapacity >= targetBytes || newCapacity > currentCapacity) {
+          console.log(`[handleStorageExpansion] ✅ Storage expansion succeeded on-chain! New capacity: ${newCapacity} bytes`);
           expandSucceeded = true;
           alert(`Storage expanded successfully to ${newCapacity} bytes!\n\nNote: Wallet reported an error but the transaction succeeded on the blockchain.`);
         } else {
-          alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[handleStorageExpansion] Transaction actually failed:', errorMsg);
+          alert(`Failed to expand storage: ${errorMsg}\n\nThe transaction did not succeed on the blockchain. Please check your wallet balance and try again.`);
           throw error;
         }
       } catch (checkError) {
-        console.error('Failed to verify storage expansion:', checkError);
-        alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('[handleStorageExpansion] Failed to verify storage expansion:', checkError);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Failed to expand storage: ${errorMsg}\n\nCould not verify if the transaction succeeded. Please refresh the page to see your current storage capacity.`);
         throw error;
       }
     } finally {

@@ -755,16 +755,31 @@ export class LockboxV2Client {
         return signature;
       } catch (error: any) {
         console.warn(`[initializeStorageChunk] Error during send/confirm:`, error?.message || error);
+        console.warn(`[initializeStorageChunk] Full error details:`, {
+          name: error?.name,
+          message: error?.message,
+          code: error?.code,
+          logs: error?.logs,
+          err: error?.err,
+          stack: error?.stack?.split('\n').slice(0, 3).join('\n')
+        });
         sendError = error;
 
         // Transaction may have succeeded despite wallet error
         // Check if chunk was actually created on-chain
+        console.log(`[initializeStorageChunk] Waiting 2s then checking if chunk ${chunkIndex} was created at ${storageChunk.toBase58()}...`);
         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s for RPC to update
 
         try {
           const chunkAccount = await this.connection.getAccountInfo(storageChunk);
+          console.log(`[initializeStorageChunk] Chunk account check result:`, {
+            exists: !!chunkAccount,
+            owner: chunkAccount?.owner?.toBase58(),
+            isProgramOwned: chunkAccount?.owner.equals(PROGRAM_ID)
+          });
+
           if (chunkAccount && chunkAccount.owner.equals(PROGRAM_ID)) {
-            console.log(`[initializeStorageChunk] Transaction succeeded on-chain despite wallet error!`);
+            console.log(`[initializeStorageChunk] ✅ Transaction succeeded on-chain despite wallet error!`);
             // Chunk was created successfully - find the transaction signature
             const signatures = await this.connection.getSignaturesForAddress(storageChunk, { limit: 5 });
             if (signatures.length > 0) {
@@ -772,12 +787,15 @@ export class LockboxV2Client {
               return signatures[0].signature;
             }
             return 'success-no-signature-found';
+          } else {
+            console.error(`[initializeStorageChunk] ❌ Chunk was NOT created on-chain. Transaction actually failed.`);
           }
         } catch (checkError) {
           console.warn(`[initializeStorageChunk] Error checking chunk existence:`, checkError);
         }
 
         // Chunk wasn't created - this is a real error
+        console.error(`[initializeStorageChunk] Transaction failed. Re-throwing error.`);
         throw sendError;
       }
     } catch (error: any) {
