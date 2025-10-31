@@ -331,13 +331,14 @@ export function LockProvider({ children }: LockProviderProps) {
 
   /**
    * Auto-lock when session becomes inactive
+   * Only lock if wallet is connected (to avoid locking on initial page load)
    */
   useEffect(() => {
-    if (!isSessionActive && !isLocked) {
+    if (!isSessionActive && !isLocked && wallet) {
       console.log('🔒 Session expired, locking app');
       setIsLocked(true);
     }
-  }, [isSessionActive, isLocked]);
+  }, [isSessionActive, isLocked, wallet]);
 
   const value: LockContextType = {
     isLocked,
