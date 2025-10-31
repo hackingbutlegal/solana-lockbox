@@ -58,7 +58,6 @@ export function LockScreen() {
       <div className="lock-content">
         <div className="lock-icon">🔒</div>
         <h1>Vault Locked</h1>
-        <p>Your vault is locked for security. Please unlock to continue.</p>
 
         {error && (
           <div className="error-message">
@@ -89,8 +88,7 @@ export function LockScreen() {
 
         <div className="lock-info">
           <p>
-            💡 Your session expired or you manually locked the app.
-            Unlock using your connected wallet signature.
+            💡 Unlock using your connected wallet signature.
           </p>
         </div>
       </div>
@@ -117,8 +115,8 @@ export function LockScreen() {
         }
 
         .lock-icon {
-          font-size: 5rem;
-          margin-bottom: 1.5rem;
+          font-size: 4rem;
+          margin-bottom: 2rem;
           animation: pulse 2s infinite;
         }
 
@@ -132,8 +130,8 @@ export function LockScreen() {
         }
 
         h1 {
-          margin: 0 0 1rem 0;
-          font-size: 2.5rem;
+          margin: 0 0 2rem 0;
+          font-size: 2rem;
           font-weight: 800;
           color: white;
           text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
@@ -141,7 +139,7 @@ export function LockScreen() {
 
         p {
           margin: 0 0 2rem 0;
-          font-size: 1.1rem;
+          font-size: 1rem;
           color: rgba(255, 255, 255, 0.95);
         }
 
@@ -149,18 +147,19 @@ export function LockScreen() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
-          padding: 1rem;
-          margin-bottom: 1.5rem;
+          gap: 0.75rem;
+          padding: 1rem 1.5rem;
+          margin-bottom: 2rem;
           background: rgba(255, 255, 255, 0.15);
           border: 2px solid rgba(255, 255, 255, 0.3);
-          border-radius: 8px;
+          border-radius: 12px;
           color: white;
           font-weight: 600;
+          font-size: 1rem;
         }
 
         .error-icon {
-          font-size: 1.5rem;
+          font-size: 1.25rem;
         }
 
         .unlock-actions {
@@ -177,7 +176,7 @@ export function LockScreen() {
           color: #667eea;
           border: none;
           border-radius: 12px;
-          font-size: 1.1rem;
+          font-size: 1rem;
           font-weight: 700;
           cursor: pointer;
           transition: all 0.2s;
@@ -206,12 +205,12 @@ export function LockScreen() {
           background: rgba(255, 255, 255, 0.1);
           border: 2px solid rgba(255, 255, 255, 0.2);
           border-radius: 12px;
-          padding: 1.5rem;
+          padding: 1rem 1.5rem;
         }
 
         .lock-info p {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 1rem;
           color: rgba(255, 255, 255, 0.9);
         }
 
@@ -221,11 +220,17 @@ export function LockScreen() {
           }
 
           h1 {
-            font-size: 2rem;
+            font-size: 1.75rem;
           }
 
           .lock-icon {
-            font-size: 4rem;
+            font-size: 3rem;
+          }
+
+          .btn-unlock-wallet,
+          .btn-unlock-biometric {
+            font-size: 0.95rem;
+            padding: 0.875rem 1.5rem;
           }
         }
       `}</style>

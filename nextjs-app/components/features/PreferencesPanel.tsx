@@ -130,21 +130,7 @@ export function PreferencesPanel() {
             </select>
           </label>
         </div>
-        <div className="setting-item">
-          <label>
-            Theme:
-            <select value={preferences.theme} onChange={handleThemeChange}>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="system">System</option>
-            </select>
-          </label>
-          <p className="setting-description">
-            {preferences.theme === 'system'
-              ? 'Theme will match your system preferences'
-              : `Using ${preferences.theme} theme`}
-          </p>
-        </div>
+        {/* Theme feature removed - not working */}
         <div className="setting-item">
           <label>
             <input

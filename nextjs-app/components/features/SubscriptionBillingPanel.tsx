@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useSubscription } from '../../contexts';
+import { useSubscription, useLockbox } from '../../contexts';
 import { SubscriptionTier, TIER_INFO } from '../../sdk/src/types-v2';
 import { SubscriptionCard } from './SubscriptionCard';
 import { StorageSliderModal } from '../modals/StorageSliderModal';
@@ -18,6 +18,7 @@ import { StorageSliderModal } from '../modals/StorageSliderModal';
 
 export function SubscriptionBillingPanel() {
   const { connected } = useWallet();
+  const { client } = useLockbox();
   const {
     currentTier,
     storageUsed,
@@ -86,7 +87,6 @@ export function SubscriptionBillingPanel() {
   return (
     <div className="subscription-billing-panel">
       {/* Current Plan Section */}
-      <h3>Current Plan</h3>
       <div className="current-plan-card">
         <div className="plan-header">
           <div>
@@ -141,12 +141,10 @@ export function SubscriptionBillingPanel() {
       </div>
 
       {/* Storage Expansion */}
-      <h3>Expand Storage</h3>
       <p className="upgrade-description">
         Need more space? Expand your storage capacity with our flexible slider. One-time payment includes refundable account rent plus a service fee to support platform development.
       </p>
 
-      {/* Storage Expansion */}
       <div className="expansion-cta">
         <div className="cta-content">
           <div className="cta-icon">📦</div>
@@ -174,14 +172,13 @@ export function SubscriptionBillingPanel() {
         onConfirm={handleStorageExpansion}
       />
 
-      {/* Billing History Section */}
-      <h3>Billing History</h3>
+      {/* Billing History Section - HIDDEN: Non-functional */}
+      {/* <h3>Billing History</h3>
       <div className="billing-history">
         <p className="empty-state">
           📜 Billing history will appear here once you make your first subscription payment.
         </p>
-        {/* Future: Transaction table with Solana Explorer links */}
-      </div>
+      </div> */}
 
       <style jsx>{`
         .subscription-billing-panel h3 {

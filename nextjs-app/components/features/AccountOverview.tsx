@@ -42,8 +42,6 @@ export function AccountOverview() {
 
   return (
     <div className="account-overview">
-      <h3>Account Information</h3>
-
       <div className="account-cards">
         {/* Wallet Address Card */}
         <div className="info-card">
@@ -150,8 +148,10 @@ export function AccountOverview() {
         .card-value {
           margin: 0;
           color: #2c3e50;
-          font-size: 1.25rem;
+          font-size: 1rem;
           font-weight: 700;
+          word-break: break-word;
+          overflow-wrap: break-word;
         }
 
         .address-container {
@@ -166,9 +166,11 @@ export function AccountOverview() {
           padding: 0.5rem 0.75rem;
           border-radius: 6px;
           font-family: 'Courier New', monospace;
-          font-size: 0.95rem;
+          font-size: 0.8rem;
           color: #667eea;
           font-weight: 600;
+          word-break: break-all;
+          overflow-wrap: break-word;
         }
 
         .btn-copy {

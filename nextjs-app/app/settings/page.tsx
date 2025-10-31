@@ -24,7 +24,7 @@ import { PasswordEntry } from '../../sdk/src/types-v2';
  * 7. Danger Zone - Account reset, closure
  */
 
-type SettingsTab = 'account' | 'subscription' | 'usage' | 'security' | 'import-export' | 'preferences' | 'danger-zone';
+type SettingsTab = 'account' | 'storage' | 'import-export' | 'preferences' | 'danger-zone';
 
 function SettingsContent() {
   const router = useRouter();
@@ -38,7 +38,7 @@ function SettingsContent() {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as SettingsTab;
-    if (tabParam && ['account', 'subscription', 'usage', 'security', 'import-export', 'preferences', 'danger-zone'].includes(tabParam)) {
+    if (tabParam && ['account', 'storage', 'import-export', 'preferences', 'danger-zone'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -64,21 +64,6 @@ function SettingsContent() {
     <div className="settings-page">
 
       <div className="settings-container">
-        {/* Breadcrumb */}
-        <div className="breadcrumb">
-          <button onClick={() => router.push('/')} className="breadcrumb-link">
-            Dashboard
-          </button>
-          <span className="breadcrumb-separator">→</span>
-          <span className="breadcrumb-current">Settings</span>
-        </div>
-
-        {/* Page Header */}
-        <div className="page-header">
-          <h1>Settings</h1>
-          <p>Manage your account, subscription, and preferences</p>
-        </div>
-
         {/* Tab Navigation */}
         <div className="tabs-nav">
           <button
@@ -89,25 +74,11 @@ function SettingsContent() {
             <span className="tab-label">Account</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'subscription' ? 'active' : ''}`}
-            onClick={() => handleTabChange('subscription')}
+            className={`tab-btn ${activeTab === 'storage' ? 'active' : ''}`}
+            onClick={() => handleTabChange('storage')}
           >
-            <span className="tab-icon">💳</span>
-            <span className="tab-label">Subscription</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'usage' ? 'active' : ''}`}
-            onClick={() => handleTabChange('usage')}
-          >
-            <span className="tab-icon">📊</span>
-            <span className="tab-label">Usage</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => handleTabChange('security')}
-          >
-            <span className="tab-icon">🔐</span>
-            <span className="tab-label">Security</span>
+            <span className="tab-icon">💾</span>
+            <span className="tab-label">Storage</span>
           </button>
           <button
             className={`tab-btn ${activeTab === 'import-export' ? 'active' : ''}`}
@@ -135,16 +106,7 @@ function SettingsContent() {
         {/* Tab Content */}
         <div className="tab-content">
           {activeTab === 'account' && <AccountOverview />}
-          {activeTab === 'subscription' && <SubscriptionBillingPanel />}
-          {activeTab === 'usage' && (
-            <div className="usage-panel">
-              <h3>Usage & Storage</h3>
-              <p className="coming-soon">
-                📊 Detailed usage analytics and storage breakdown coming soon!
-              </p>
-            </div>
-          )}
-          {activeTab === 'security' && <SecuritySettingsPanel />}
+          {activeTab === 'storage' && <SubscriptionBillingPanel />}
           {activeTab === 'import-export' && (
             <div className="import-export-panel">
               <ImportExportPanel
