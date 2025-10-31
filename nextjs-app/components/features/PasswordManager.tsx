@@ -24,6 +24,7 @@ import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { KeyboardShortcutsHelp } from '../ui/KeyboardShortcutsHelp';
 import { SignaturePrompt } from '../ui/SignaturePrompt';
+import { LoadingState } from '../ui/LoadingState';
 // import { BatchModeToggle } from '../ui/BatchModeToggle'; // REMOVED: Batch mode feature
 import { SearchBar } from './SearchBar';
 import { FilterPanel } from './FilterPanel';
@@ -761,6 +762,21 @@ export function PasswordManager() {
     setShowArchived(false);
     setShowOldPasswords(false);
   };
+
+  // Show loading state while checking authentication or vault status
+  if (lockboxLoading && publicKey) {
+    return (
+      <div className="password-manager" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      }}>
+        <LoadingState variant="pulse" size="lg" />
+      </div>
+    );
+  }
 
   // If wallet not connected
   if (!publicKey) {
