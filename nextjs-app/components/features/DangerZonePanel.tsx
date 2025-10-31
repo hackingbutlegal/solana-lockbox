@@ -53,11 +53,13 @@ export function DangerZonePanel() {
       const signature = await client.closeMasterLockbox();
 
       toast.showSuccess(
-        `Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet. The page will now reload.`
+        `Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet. Redirecting to home page...`
       );
 
       sessionStorage.clear();
-      setTimeout(() => window.location.reload(), 1000);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
     } catch (error: any) {
       console.error('Failed to close account:', error);
 
@@ -66,17 +68,21 @@ export function DangerZonePanel() {
         error.message?.includes('AlreadyProcessed')
       ) {
         toast.showInfo(
-          'Your account may have already been closed. The page will reload to reflect the current state.'
+          'Your account may have already been closed. Redirecting to home page...'
         );
         sessionStorage.clear();
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       } else if (
         error.message?.includes('AccountNotFound') ||
         error.message?.includes('not found')
       ) {
-        toast.showInfo('Account is already closed. The page will reload.');
+        toast.showInfo('Account is already closed. Redirecting to home page...');
         sessionStorage.clear();
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       } else {
         toast.showError(
           `Failed to close account: ${error.message || 'Unknown error'}. Please try refreshing the page.`
