@@ -18,7 +18,8 @@ import { StorageSliderModal } from '../modals/StorageSliderModal';
 
 export function SubscriptionBillingPanel() {
   const { connected } = useWallet();
-  const { client } = useAuth();
+  const authContext = useAuth();
+  const client = authContext?.client;
   const { refreshLockbox } = useLockbox();
   const {
     currentTier,
@@ -34,6 +35,14 @@ export function SubscriptionBillingPanel() {
 
   const [upgrading, setUpgrading] = useState(false);
   const [showSliderModal, setShowSliderModal] = useState(false);
+
+  // Debug logging
+  console.log('[SubscriptionBillingPanel] Render:', {
+    connected,
+    hasAuthContext: !!authContext,
+    hasClient: !!client,
+    clientType: client?.constructor?.name
+  });
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -51,9 +60,20 @@ export function SubscriptionBillingPanel() {
   };
 
   const handleStorageExpansion = async (targetBytes: number) => {
+    console.log('[handleStorageExpansion] Starting expansion:', {
+      targetBytes,
+      connected,
+      hasClient: !!client,
+      clientType: client?.constructor?.name
+    });
+
     // Verify wallet is connected before proceeding
     if (!connected || !client) {
-      alert('Please connect your wallet first to expand storage.');
+      const errorMsg = !connected
+        ? 'Please connect your wallet first to expand storage.'
+        : 'Client not initialized. Please refresh the page and try again.';
+      alert(errorMsg);
+      console.error('[handleStorageExpansion] Validation failed:', { connected, hasClient: !!client });
       return;
     }
 
@@ -78,6 +98,10 @@ export function SubscriptionBillingPanel() {
       console.log('Checking if storage was actually expanded despite error...');
 
       try {
+        if (!client) {
+          throw new Error('Client is not available for verification');
+        }
+
         const updatedMaster = await client.getMasterLockbox();
         const newCapacity = Number(updatedMaster.totalCapacity);
 
