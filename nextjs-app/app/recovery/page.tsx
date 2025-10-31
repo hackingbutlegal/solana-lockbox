@@ -137,12 +137,26 @@ export default function RecoveryPage() {
 
       setPasswords(entries);
 
-      if (errors.length > 0) {
+      if (entries.length === 0 && errors.length === 0) {
+        setFetchError('Your vault exists but contains no passwords. Nothing to recover.');
+      } else if (errors.length > 0) {
         setFetchError(`Successfully decrypted ${entries.length} passwords, but ${errors.length} entries had errors.`);
       }
     } catch (err) {
       console.error('Failed to fetch passwords:', err);
-      setFetchError(err instanceof Error ? err.message : 'Failed to fetch passwords from blockchain.');
+
+      // Handle specific error cases
+      if (err instanceof Error) {
+        if (err.message.includes('buffer length') || err.message.includes('RangeError')) {
+          setFetchError('Your vault exists but contains no passwords. Nothing to recover.');
+        } else if (err.message.includes('not found') || err.message.includes('not been initialized')) {
+          setFetchError('No vault found for this wallet address. Please check the address and try again.');
+        } else {
+          setFetchError(err.message);
+        }
+      } else {
+        setFetchError('Failed to fetch passwords from blockchain.');
+      }
     } finally {
       setFetchLoading(false);
     }

@@ -98,60 +98,73 @@ export class RecoveryClient {
     // Deserialize master lockbox data (Borsh format)
     const data = accountInfo.data;
 
-    // Skip discriminator (8 bytes)
-    let offset = 8;
-
-    // Read owner (32 bytes)
-    const owner = new PublicKey(data.slice(offset, offset + 32));
-    offset += 32;
-
-    // Read subscription tier (1 byte)
-    const subscriptionTier = data[offset];
-    offset += 1;
-
-    // Read subscription expiry (8 bytes, i64)
-    const subscriptionExpiry = Number(data.readBigInt64LE(offset));
-    offset += 8;
-
-    // Read storage_chunks length (4 bytes, u32)
-    const storageChunksLength = data.readUInt32LE(offset);
-    offset += 4;
-
-    // Read storage chunks
-    const storageChunks = [];
-    for (let i = 0; i < storageChunksLength; i++) {
-      const chunkIndex = data.readUInt16LE(offset);
-      offset += 2;
-      const chunkAddress = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      storageChunks.push({ chunkIndex, chunkAddress });
+    // Check if buffer has minimum required size
+    const minSize = 8 + 32 + 1 + 8 + 4; // discriminator + owner + tier + expiry + chunks_len
+    if (data.length < minSize) {
+      throw new Error('Invalid master lockbox data: buffer too small');
     }
 
-    // Read next entry id (8 bytes, u64)
-    const nextEntryId = Number(data.readBigUInt64LE(offset));
-    offset += 8;
+    try {
+      // Skip discriminator (8 bytes)
+      let offset = 8;
 
-    // Read total entries (8 bytes, u64)
-    const totalEntries = Number(data.readBigUInt64LE(offset));
-    offset += 8;
+      // Read owner (32 bytes)
+      const owner = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
 
-    // Read created_at (8 bytes, i64)
-    const createdAt = Number(data.readBigInt64LE(offset));
-    offset += 8;
+      // Read subscription tier (1 byte)
+      const subscriptionTier = data[offset];
+      offset += 1;
 
-    // Read last_accessed (8 bytes, i64)
-    const lastAccessed = Number(data.readBigInt64LE(offset));
+      // Read subscription expiry (8 bytes, i64)
+      const subscriptionExpiry = Number(data.readBigInt64LE(offset));
+      offset += 8;
 
-    return {
-      owner,
-      subscriptionTier,
-      subscriptionExpiry,
-      storageChunks,
-      nextEntryId,
-      totalEntries,
-      createdAt,
-      lastAccessed,
-    };
+      // Read storage_chunks length (4 bytes, u32)
+      const storageChunksLength = data.readUInt32LE(offset);
+      offset += 4;
+
+      // Read storage chunks
+      const storageChunks = [];
+      for (let i = 0; i < storageChunksLength; i++) {
+        const chunkIndex = data.readUInt16LE(offset);
+        offset += 2;
+        const chunkAddress = new PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+        storageChunks.push({ chunkIndex, chunkAddress });
+      }
+
+      // Read next entry id (8 bytes, u64)
+      const nextEntryId = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read total entries (8 bytes, u64)
+      const totalEntries = Number(data.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read created_at (8 bytes, i64)
+      const createdAt = Number(data.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read last_accessed (8 bytes, i64)
+      const lastAccessed = Number(data.readBigInt64LE(offset));
+
+      return {
+        owner,
+        subscriptionTier,
+        subscriptionExpiry,
+        storageChunks,
+        nextEntryId,
+        totalEntries,
+        createdAt,
+        lastAccessed,
+      };
+    } catch (error) {
+      if (error instanceof RangeError) {
+        throw new Error('Unable to deserialize master lockbox. This may indicate an empty vault or incompatible data format.');
+      }
+      throw error;
+    }
   }
 
   /**
