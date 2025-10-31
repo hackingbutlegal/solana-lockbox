@@ -86,12 +86,6 @@ export function LockScreen() {
             </button>
           )}
         </div>
-
-        <div className="lock-info">
-          <p>
-            💡 Unlock using your connected wallet signature.
-          </p>
-        </div>
       </div>
 
       <style jsx>{`
