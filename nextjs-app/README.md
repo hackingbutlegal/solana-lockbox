@@ -36,8 +36,8 @@ Solana Lockbox is a secure, decentralized password manager that stores encrypted
 - **Frontend**: Next.js 15.5.4 (React 19, TypeScript)
 - **Blockchain**: Solana (Devnet), Anchor Framework
 - **Wallet**: Solana Wallet Adapter (Phantom, Solflare, etc.)
-- **Encryption**: AES-256-GCM via Web Crypto API
-- **Key Derivation**: HKDF with wallet signatures
+- **Encryption**: XChaCha20-Poly1305 via TweetNaCl
+- **Key Derivation**: HKDF-SHA256 from wallet signatures
 - **Testing**: Jest 29+ with React Testing Library
 - **Styling**: Tailwind CSS
 
@@ -54,8 +54,8 @@ Solana Lockbox is a secure, decentralized password manager that stores encrypted
 - ✅ TOTP 2FA code generation
 
 #### Security Features
-- ✅ Client-side AES-256-GCM encryption
-- ✅ HKDF key derivation from wallet signatures
+- ✅ Client-side XChaCha20-Poly1305 AEAD encryption
+- ✅ HKDF-SHA256 key derivation from wallet signatures
 - ✅ Domain separation (session keys vs search keys)
 - ✅ CSV injection protection on export
 - ✅ Session timeout enforcement
@@ -506,7 +506,7 @@ vercel --prod
    - Wallet signature never leaves client
 
 2. **Encryption**
-   - Algorithm: AES-256-GCM
+   - Algorithm: XChaCha20-Poly1305 (AEAD via TweetNaCl)
    - Key derivation: HKDF-SHA256
    - Session keys: Derived from wallet signature
    - Search keys: Separate domain (HKDF with different info string)

@@ -158,7 +158,7 @@ The following components are within scope for security research:
 
 ✅**Client-Side Cryptography**
 - Encryption/decryption implementation
-- Key derivation (HKDF, PBKDF2)
+- Key derivation (HKDF-SHA256 from wallet signatures)
 - Nonce generation
 - Session management
 
@@ -319,10 +319,10 @@ While researchers focus on finding vulnerabilities, users should follow these be
 ### Current Security Measures
 
 ✅ **Cryptographic Standards**
-- XChaCha20-Poly1305 AEAD encryption
-- HKDF-SHA256 key derivation
+- XChaCha20-Poly1305 AEAD encryption (via TweetNaCl)
+- HKDF-SHA256 key derivation from wallet signatures
 - 192-bit nonces (collision-resistant)
-- 100,000 PBKDF2 iterations (OWASP 2023)
+- Session-based key management (15-min timeout)
 
 ✅ **Development Practices**
 - Security-first design approach

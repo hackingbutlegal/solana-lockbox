@@ -40,8 +40,8 @@ Last Updated: December 29, 2024
 | **Frontend** | https://lockbox.web3stud.io |
 | **Max Storage** | 1 MB per vault (expandable) |
 | **Max Entries** | ~250 passwords (4 KB average) |
-| **Encryption** | AES-256-GCM (authenticated) |
-| **Key Derivation** | PBKDF2-HMAC-SHA256 (100k iterations) |
+| **Encryption** | XChaCha20-Poly1305 (AEAD) |
+| **Key Derivation** | HKDF-SHA256 (from wallet signatures) |
 
 ---
 
@@ -58,7 +58,7 @@ Last Updated: December 29, 2024
 │  └─────┬─────┘  │
 │        │        │
 │  ┌─────▼──────┐ │
-│  │  Encrypt   │ │  ← AES-256-GCM with wallet-derived key
+│  │  Encrypt   │ │  ← XChaCha20-Poly1305 with wallet-derived key
 │  └─────┬──────┘ │
 │        │        │
 │  ┌─────▼──────┐ │
@@ -143,8 +143,8 @@ Client → RPC Provider → Solana Blockchain
 │          │                       │                      │
 │          ▼                       ▼                      │
 │  ┌────────────────┐  ┌─────────────────────────────┐  │
-│  │  Lockbox SDK   │  │   Web Crypto API            │  │
-│  │  (TypeScript)  │  │   (PBKDF2, AES-256-GCM)     │  │
+│  │  Lockbox SDK   │  │   Crypto Libraries          │  │
+│  │  (TypeScript)  │  │   (HKDF, XChaCha20-Poly1305)│  │
 │  └───────┬────────┘  └──────────┬──────────────────┘  │
 │          │                       │                      │
 └──────────┼───────────────────────┼──────────────────────┘
@@ -307,16 +307,15 @@ pub fn downgrade_subscription(ctx: Context<DowngradeSubscription>, new_tier: Sub
 ```
 1. User enters password in browser
    ↓
-2. SDK derives master key
-   - wallet.secretKey + masterPassword
-   - PBKDF2(password, salt=publicKey, iterations=100k)
-   - Output: 32-byte AES-256 key
+2. SDK derives session key
+   - wallet.signMessage(challenge)
+   - HKDF-SHA256(signature, salt, info)
+   - Output: 32-byte encryption key
    ↓
 3. SDK encrypts entry
    - Plaintext: JSON.stringify(entry)
-   - Nonce: crypto.randomBytes(12) // 96-bit nonce
-   - AAD: wallet.publicKey // Additional Authenticated Data
-   - Algorithm: AES-256-GCM
+   - Nonce: crypto.randomBytes(24) // 192-bit nonce
+   - Algorithm: XChaCha20-Poly1305 (AEAD)
    - Output: ciphertext || authTag (16 bytes)
    ↓
 4. SDK builds transaction
@@ -361,12 +360,12 @@ pub fn downgrade_subscription(ctx: Context<DowngradeSubscription>, new_tier: Sub
    - Extract encrypted_data field (Vec<u8>)
    ↓
 4. SDK decrypts entry
-   - Derive master key (same PBKDF2 process)
+   - Derive session key (same HKDF-SHA256 process)
    - Parse ciphertext structure:
-     * Nonce (12 bytes)
+     * Nonce (24 bytes)
      * Ciphertext (variable)
      * Auth tag (16 bytes)
-   - AES-256-GCM decrypt with AAD verification
+   - XChaCha20-Poly1305 decrypt with authentication
    - Output: plaintext JSON
    ↓
 5. SDK parses entry
@@ -387,10 +386,10 @@ pub fn downgrade_subscription(ctx: Context<DowngradeSubscription>, new_tier: Sub
 ### Defense in Depth
 
 **Layer 1: Client-Side Encryption**
-- AES-256-GCM (authenticated encryption)
-- PBKDF2 key derivation (100k iterations)
-- Unique nonces (collision-resistant)
-- AAD binding (prevents ciphertext reuse)
+- XChaCha20-Poly1305 (AEAD encryption via TweetNaCl)
+- HKDF-SHA256 key derivation (from wallet signatures)
+- Unique 192-bit nonces (collision-resistant)
+- Authenticated encryption (prevents tampering)
 
 **Layer 2: Wallet-Based Authentication**
 - Ed25519 signatures (Solana consensus requirement)
