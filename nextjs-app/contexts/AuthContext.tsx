@@ -21,6 +21,7 @@ import { generateChallenge, createSessionKeyFromSignature, wipeSensitiveData } f
 export interface AuthContextType {
   // Client
   client: LockboxV2Client | null;
+  wallet: any; // Wallet adapter instance
 
   // Session State
   isSessionActive: boolean;
@@ -338,6 +339,7 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
 
   const contextValue: AuthContextType = {
     client,
+    wallet,
     isSessionActive,
     sessionTimeRemaining,
     initializeSession,
