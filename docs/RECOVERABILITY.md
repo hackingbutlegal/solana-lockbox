@@ -67,8 +67,8 @@ Solana Lockbox:
 
 **The encryption is:**
 - **Client-side** - Passwords are encrypted in your browser before touching the blockchain
-- **Wallet-based** - Your Solana wallet's private key is used to derive the encryption key
-- **Military-grade** - AES-256-GCM with PBKDF2 (100,000 iterations)
+- **Wallet-based** - Your Solana wallet signature is used to derive the encryption key
+- **Industry-standard** - XChaCha20-Poly1305 AEAD with HKDF-SHA256 key derivation
 
 ## Real-World Scenarios
 
@@ -137,11 +137,11 @@ Solana Lockbox:
 ### Storage Architecture
 
 ```
-Your Solana Wallet (private key)
+Your Solana Wallet (signs challenge)
     ↓
-Derives encryption key via PBKDF2
+Derives session key via HKDF-SHA256
     ↓
-Encrypts passwords with AES-256-GCM (client-side)
+Encrypts passwords with XChaCha20-Poly1305 (client-side)
     ↓
 Uploads encrypted blob to Solana blockchain
     ↓

@@ -379,11 +379,11 @@ pub fn delete_password_entry(
 ## Current Security Controls
 
 ### Cryptography
-✅ **AES-256-GCM** - Client-side encryption with authenticated encryption
-✅ **PBKDF2** - 100,000 iterations for key derivation (OWASP 2023 standard)
-✅ **Master Password** - Required second factor beyond wallet keypair
-✅ **Unique Nonces** - 96-bit random nonces per entry (crypto.randomBytes)
-✅ **Authentication Tags** - 128-bit GCM tags prevent tampering
+✅ **XChaCha20-Poly1305** - Client-side AEAD encryption via TweetNaCl
+✅ **HKDF-SHA256** - Key derivation from wallet signatures (deterministic)
+✅ **Wallet-Based Keys** - Session keys derived from wallet signatures
+✅ **Unique Nonces** - 192-bit random nonces per entry (24 bytes)
+✅ **Authentication Tags** - 128-bit Poly1305 MAC prevents tampering
 
 ### Access Control
 ✅ **Wallet-Based Authentication** - All operations require wallet signature

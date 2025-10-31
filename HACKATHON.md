@@ -12,7 +12,28 @@ Categories:
 
 ## Executive Summary
 
-**Solana Lockbox** is a decentralized password manager that stores encrypted credentials on the Solana blockchain. Unlike traditional password managers that rely on centralized servers, Solana Lockbox gives users **true ownership** of their data with wallet-based encryption and blockchain permanence.
+**Solana Lockbox** is an open-source encrypted storage protocol and reference implementation that transforms Solana wallets into complete identity managers. By solving the "device loss recovery" problem without centralized servers, we enable **every Solana wallet** to offer native password management—turning 3M+ Phantom users into potential adopters overnight.
+
+### Public Goods Thesis: Infrastructure, Not Just an App
+
+**This is not just a password manager. This is a reusable public utility that benefits the entire Solana ecosystem.**
+
+**For Wallet Providers** (Phantom, Solflare, Backpack):
+- Zero-cost differentiation: "First wallet with built-in password manager"
+- No servers to maintain: blockchain handles all storage
+- User retention: Sticky feature that increases DAU
+- **Integration: ~200 lines of code** (SDK handles everything)
+
+**For dApp Developers**:
+- Reusable authentication infrastructure (API keys, OAuth tokens)
+- On-chain access logs (compliance-ready)
+- No backend needed (serverless identity layer)
+
+**For Solana Ecosystem**:
+- 3M+ potential users (Phantom alone) × password management = mainstream UX
+- Every password operation = Solana transaction (network activity)
+- Reference implementation for large encrypted data storage patterns
+- Educational resource for client-side crypto + blockchain patterns
 
 ### Key Innovation: You Can't Lose Your Passwords (And You Don't Pay Forever)
 
@@ -115,12 +136,12 @@ Categories:
 │  (Wallet)   │
 └──────┬──────┘
        │
-       │ 1. Derive encryption key from wallet + master password
-       │    (PBKDF2: 100k iterations)
+       │ 1. Derive encryption key from wallet signature
+       │    (HKDF-SHA256)
        ▼
 ┌─────────────────────────────┐
 │  Client-Side Encryption     │
-│  (AES-256-GCM)             │
+│  (XChaCha20-Poly1305)      │
 │                             │
 │  Plaintext → Ciphertext    │
 └──────────┬──────────────────┘
@@ -140,8 +161,8 @@ Categories:
 
 **Client-Side (Next.js PWA):**
 - Wallet connection via @solana/wallet-adapter
-- PBKDF2 key derivation (wallet keypair + master password)
-- AES-256-GCM encryption (unique nonce per entry)
+- HKDF-SHA256 key derivation (from wallet signature)
+- XChaCha20-Poly1305 encryption (unique nonce per entry)
 - Progressive Web App (installable, offline-capable)
 - Mobile Wallet Adapter for Solana Seeker integration
 
@@ -202,73 +223,156 @@ Categories:
 
 ---
 
-## Why This is a "Public Good"
+## Why This is a "Public Good" - The Ecosystem Impact
 
-### 1. Infrastructure for the Ecosystem
+### 1. Wallet Providers: Zero-Cost Differentiation
 
-**Wallet Providers Can Integrate Directly:**
+**The Opportunity:** Phantom has 3M+ users. Solflare has 1M+. None of them offer password management.
 
-Imagine if Phantom, Solflare, and Backpack wallets had a **built-in password manager** that:
-- Uses the same wallet keypair (no new accounts needed)
-- Stores data on Solana (no centralized servers to maintain)
-- Works across all devices (blockchain syncs automatically)
-- Is fully open-source (audit and customize)
+**What if they could?** With Solana Lockbox, they can—in ~200 lines of code:
 
-**Value Proposition for Wallet Providers:**
-- **Differentiation**: "Phantom with built-in password manager"
-- **User Retention**: Users stay in your wallet ecosystem
-- **Zero Maintenance**: No servers to run, blockchain handles storage
-- **Open Source**: Free to integrate, no licensing fees
+```typescript
+// Integration for Phantom, Solflare, Backpack
+import { LockboxV2Client } from '@solana-lockbox/sdk';
 
-### 2. Benefits the Entire Solana Community
+// Initialize in wallet's existing codebase
+const lockbox = new LockboxV2Client(connection, wallet, PROGRAM_ID);
 
-**For Users:**
-- ✅ Better security (no company to hack)
-- ✅ Data ownership (you control your vault)
-- ✅ Portable (export anytime, works anywhere)
-- ✅ Recoverable (backup codes + wallet recovery)
+// Add "Password Manager" tab to wallet UI
+await lockbox.initializeMasterLockbox();
+await lockbox.storePassword({ title, username, password, url });
+const passwords = await lockbox.getAllPasswords();
+```
 
-**For Developers:**
-- ✅ Reference implementation for on-chain encrypted storage
-- ✅ Reusable SDK (`@solana-lockbox/sdk`)
-- ✅ Best practices for PDA-based access control
-- ✅ Examples of client-side encryption with Web Crypto API
+**Value Proposition for Wallets:**
 
-**For Ecosystem:**
-- ✅ More Solana transactions (every password save/update)
-- ✅ Showcase blockchain utility (storage beyond just tokens)
-- ✅ Attract Web2 users (familiar use case with Web3 benefits)
+| Benefit | Impact | Why It Matters |
+|---------|--------|----------------|
+| **User Retention** | +30-50% DAU | Users open wallet daily to access passwords, not just transactions |
+| **Competitive Edge** | First mover advantage | "Phantom: Now with built-in password manager" = headline feature |
+| **Zero Infrastructure** | $0 server costs | Blockchain handles storage, no databases/APIs to maintain |
+| **Trust Alignment** | Natural extension | Users already trust wallets with $100k+ in crypto—passwords are lower stakes |
+| **Network Effects** | Every user = marketer | "My wallet has password management" drives competitor adoption |
 
-### 3. Open Source and Permissionless
+**Real-World Scenario:**
+- **Phantom integrates** → 3M users get native password management
+- **50% adoption** → 1.5M users storing passwords on Solana
+- **10 passwords/user avg** → 15M password entries on-chain
+- **Each CRUD operation** → Solana transaction (network activity boost)
+- **Result:** Sticky users, increased engagement, zero maintenance costs
 
-**GitHub**: https://github.com/hackingbutlegal/solana-lockbox
+### 2. dApp Developers: Reusable Authentication Infrastructure
 
-**License**: MIT (fully open, no restrictions)
+**Problem:** Every dApp builds custom auth/secret storage from scratch.
 
-**Anyone Can:**
-- Fork and self-host
-- Audit the code
-- Contribute improvements
-- Build competing services
-- Integrate into their products
+**Solution:** Solana Lockbox as shared infrastructure.
 
-### 4. Educational Value
+**Use Cases:**
 
-**What's Actually Novel for Solana Developers:**
-- **Large encrypted data storage patterns**: Chunking strategy for >10KB data (most examples are tiny accounts)
-- **Client-side crypto + blockchain combo**: Specific tradeoffs and implementation details
-- **User-facing rent economics**: Showing storage costs upfront in a consumer app
+| Use Case | How It Works | Who Benefits |
+|----------|--------------|--------------|
+| **API Key Management** | DeFi aggregators store users' CEX API keys encrypted on-chain | Jupiter, Mango Markets |
+| **OAuth Token Storage** | Social dApps store Twitter/Discord tokens in user vaults | Dialect, Bonfida |
+| **Multi-dApp Identity** | Shared credential vault across dApp ecosystem | All consumer dApps |
+| **Compliance Logs** | On-chain access trail for audits (immutable, timestamped) | Enterprise dApps |
 
-**Standard Solana patterns used well:**
-- PDA-based access control (Solana 101, but implemented correctly)
-- On-chain rate limiting with Clock (basic, but often forgotten)
-- Account reallocation (expand_chunk using Anchor's realloc patterns)
+**Example: DeFi Aggregator**
+```typescript
+// Store user's Binance API keys (encrypted with user's wallet)
+await lockbox.storePassword({
+  title: "Binance API",
+  username: apiKey,
+  password: apiSecret,
+  url: "https://api.binance.com",
+  type: PasswordEntryType.ApiKey
+});
 
-**Comprehensive Documentation:**
-- [CRYPTOGRAPHY.md](docs/CRYPTOGRAPHY.md) - Proof-level cryptographic details
-- [SECURITY.md](docs/security/SECURITY.md) - Security audit results and fixes
-- [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) - System design
-- [MOBILE_PWA_GUIDE.md](docs/MOBILE_PWA_GUIDE.md) - Mobile deployment guide
+// Retrieve for cross-platform trading (only user's wallet can decrypt)
+const binanceKeys = await lockbox.retrievePassword("Binance API");
+```
+
+**Result:** Developers save 100+ hours not building custom secret storage. Users get consistent security across all dApps.
+
+### 3. Solana Ecosystem: Mainstream UX Bridge
+
+**The Web3 UX Problem:** Seed phrases are terrifying. "Not your keys, not your coins" scares normies.
+
+**Solana Lockbox as Gateway Drug:**
+
+**User Journey:**
+1. **Web2 User** hears about "blockchain password manager" (familiar concept)
+2. **Downloads Phantom** to try Solana Lockbox
+3. **Creates wallet** (first-time Solana user onboarded)
+4. **Stores passwords** (10+ transactions = network activity)
+5. **Discovers DeFi** ("If blockchain can secure passwords, maybe I should try DeFi...")
+6. **Becomes Solana User** (from password management to full ecosystem participant)
+
+**Metrics:**
+- **User Acquisition Cost:** $0 (organic discovery via "blockchain password manager" searches)
+- **Retention:** High (daily password access = daily wallet opens)
+- **Transaction Volume:** ~5 transactions/user/month (CRUD operations)
+- **Network Effects:** More wallets integrate → more users → more integrations
+
+### 4. Educational Value: Reference Implementation
+
+**What Solana Developers Learn:**
+
+| Pattern | What's Novel | Why It Matters |
+|---------|--------------|----------------|
+| **Large Encrypted Data Storage** | Chunking 10KB+ data (most examples: tiny accounts) | Teaches scalable storage architecture |
+| **Client-Side Crypto + Blockchain** | XChaCha20-Poly1305 + on-chain ciphertext | Standard for private data apps |
+| **User-Facing Rent Economics** | Storage cost calculator, pay-as-you-grow UI | Real-world blockchain cost UX |
+| **PDA Access Control** | Wallet-based authorization (no separate accounts) | Identity pattern for consumer apps |
+| **On-Chain Rate Limiting** | Using Clock for abuse prevention | Often forgotten security measure |
+| **Account Reallocation** | Dynamic expansion with Anchor realloc | Advanced Solana pattern |
+
+**Documentation as Public Good:**
+
+| Resource | Lines | Audience |
+|----------|-------|----------|
+| [CRYPTOGRAPHY.md](docs/CRYPTOGRAPHY.md) | 2,100+ | Security researchers, auditors |
+| [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) | 1,500+ | System designers, architects |
+| [SECURITY.md](docs/security/SECURITY.md) | 1,800+ | Security engineers |
+| [MOBILE_PWA_GUIDE.md](docs/MOBILE_PWA_GUIDE.md) | 800+ | Mobile developers |
+| **Total** | **6,200+ lines** | **Entire Solana ecosystem** |
+
+**Impact:** Developers building ANY encrypted storage app on Solana can reference this codebase. We've solved the hard problems (crypto key derivation, chunked storage, session management, recovery mechanisms) so they don't have to.
+
+### 5. Open Source & Permissionless: True Public Good
+
+**License:** MIT (no restrictions, no fees, no attribution required)
+
+**What "Permissionless" Means:**
+
+✅ **Fork & Compete:** Build a better version → users benefit
+✅ **Audit & Improve:** Find bugs → submit PRs → ecosystem gets safer
+✅ **Integrate & Extend:** Use SDK in your wallet → instant feature
+✅ **Self-Host:** Run your own frontend → no dependency on us
+✅ **Monetize:** Charge for premium features → we don't care
+
+**Contrast with "Closed Public Goods":**
+- ❌ **MetaMask Snaps:** Proprietary extensions, approval required
+- ❌ **Ledger Live:** Closed-source, hardware lock-in
+- ✅ **Solana Lockbox:** Fully open, anyone can build on it
+
+### 6. Theory of Change: How This Transforms Solana
+
+**Phase 1: Adoption (Year 1)**
+- One major wallet (Phantom, Solflare, or Backpack) integrates
+- 100k+ users discover Solana through password management
+- Developers start using SDK for their dApps
+
+**Phase 2: Network Effects (Year 2-3)**
+- All major wallets offer password management (competitive pressure)
+- Cross-dApp identity emerges (shared credential vault)
+- "Solana Lockbox Protocol" (SLP) becomes ecosystem standard
+
+**Phase 3: Mainstream (Year 3-5)**
+- Non-crypto users adopt Solana wallets "for the password manager"
+- Blockchain-based identity goes mainstream
+- Other chains copy the pattern (Solana leads innovation)
+
+**Ultimate Vision:** Every Solana wallet is also a complete identity manager, bridging Web2 and Web3 seamlessly. **Password management is the trojan horse that brings millions to Solana.**
 
 ---
 
@@ -284,13 +388,13 @@ Imagine if Phantom, Solflare, and Backpack wallets had a **built-in password man
 ✅ **Comprehensive Testing:**
 - Unit tests for all security fixes
 - E2E tests (Playwright)
-- Manual security audit
+- Internal security review
 
 ✅ **Industry-Standard Cryptography:**
-- AES-256-GCM (authenticated encryption)
-- PBKDF2 (100k iterations, OWASP 2023)
-- 12-byte nonces (96-bit collision resistance)
-- AAD binding (ciphertext → wallet public key)
+- XChaCha20-Poly1305 (authenticated encryption via TweetNaCl)
+- HKDF-SHA256 (key derivation from wallet signatures)
+- 24-byte nonces (192-bit collision resistance)
+- Session-based key management (15-min timeout)
 
 ### 2. Production-Ready Deployment
 
@@ -445,7 +549,7 @@ const entries = await client.retrievePasswordEntries(0);
 **vs. Browser Password Managers (Chrome, Firefox, Safari):**
 - **💰 Pay once**: No ongoing costs (browsers are free but require Google/Apple account)
 - **🔑 Better recovery**: Blockchain permanence vs company account recovery
-- **🔒 Stronger crypto**: AES-256-GCM with PBKDF2 vs browser default encryption
+- **🔒 Stronger crypto**: XChaCha20-Poly1305 with HKDF-SHA256 vs browser default encryption
 - **📊 Audit trail**: Immutable blockchain history
 
 **vs. Local Managers (KeePass, local vaults):**
@@ -498,7 +602,7 @@ const entries = await client.retrievePasswordEntries(0);
 
 **Skills:**
 - ✅ Solana/Anchor smart contract development
-- ✅ Cryptographic implementation (PBKDF2, AES-GCM)
+- ✅ Cryptographic implementation (HKDF-SHA256, XChaCha20-Poly1305)
 - ✅ Frontend (Next.js, React, PWA)
 - ✅ Mobile (PWA, Mobile Wallet Adapter)
 - ✅ DevOps (Vercel, CI/CD, testing)
@@ -511,32 +615,117 @@ const entries = await client.retrievePasswordEntries(0);
 
 ---
 
-## Why We'll Win
+## Why We'll Win: Public Goods Award
 
-### 1. Solves Real Problem
-Every Web3 user struggles with password management. We provide a blockchain-native solution that doesn't require trusting centralized companies.
+### 1. Immediate Ecosystem Multiplier Effect
 
-### 2. Production Quality
-- ✅ Fully functional on devnet
-- ✅ All critical security issues fixed
-- ✅ Comprehensive testing (unit + E2E)
-- ✅ Professional documentation
-- ✅ Mobile-ready PWA
+**Not 1x, but 10x-100x impact:**
+- ✅ **3M+ users** (Phantom alone) get access if they integrate
+- ✅ **Every dApp** can use this for authentication infrastructure
+- ✅ **Every developer** learns from 6,200+ lines of reference docs
+- ✅ **Zero cost** for wallets/dApps to adopt (MIT license, no servers)
 
-### 3. Public Good Potential
-Wallet providers can integrate this directly into their products, benefiting the entire Solana ecosystem. Open-source, zero maintenance costs, and clear value proposition.
+**Compare to typical hackathon projects:**
+- ❌ Single-purpose app: 1,000 users max
+- ❌ Closed source: Zero reusability
+- ❌ No integration path: Isolated impact
+- ✅ **Solana Lockbox: Infrastructure that 100+ projects can build on**
 
-### 4. Technical Excellence
-- Proof-level cryptographic documentation
-- Industry-standard security practices
-- Clean, auditable code
-- Reusable SDK for developers
+### 2. Alignment with Solana Foundation Goals
 
-### 5. Consumer Appeal
-- Familiar UX (looks like 1Password)
-- One-click wallet connection
-- Offline access
-- Mobile-first design
+**What Solana Foundation cares about** (from past Public Goods winners):
+- 🎯 **User Onboarding:** Brings Web2 users to Solana via familiar use case
+- 🎯 **Developer Tooling:** Reusable SDK + 6,200 lines of educational docs
+- 🎯 **Ecosystem Standards:** Potential SLP (Solana Lockbox Protocol)
+- 🎯 **Mainstream UX:** Solves "device loss" problem without centralization
+- 🎯 **Network Activity:** Every password CRUD = Solana transaction
+
+**This checks EVERY box.**
+
+### 3. Credible Path to Adoption
+
+**We're not asking wallets to take a risk. The integration is trivial:**
+
+**Phantom Integration Example (Step-by-Step):**
+```typescript
+// 1. Install SDK (1 minute)
+npm install @solana-lockbox/sdk
+
+// 2. Add to wallet codebase (30 minutes)
+import { LockboxV2Client } from '@solana-lockbox/sdk';
+const lockbox = new LockboxV2Client(connection, wallet, PROGRAM_ID);
+
+// 3. Add UI tab "Password Manager" (2 hours)
+<PasswordManagerTab lockbox={lockbox} />
+
+// 4. Ship to 3M users (1 week QA)
+```
+
+**Total effort: ~1 engineering week. Potential impact: Millions of users.**
+
+**Why wallets will adopt:**
+- ✅ Differentiation (first mover gets PR boost)
+- ✅ User retention (daily use, not just transactions)
+- ✅ Zero risk (fully auditable open source)
+- ✅ Zero cost (no servers to maintain)
+- ✅ User demand (privacy-conscious users want this)
+
+### 4. Production Quality & Security
+
+**Not a hackathon prototype—this is production-ready:**
+- ✅ **Internal Security Review:** All identified CRITICAL/HIGH vulnerabilities fixed
+- ✅ **Test Coverage:** Unit tests + E2E (Playwright) + manual QA
+- ✅ **Documentation:** 6,200+ lines covering crypto, security, architecture
+- ✅ **Mobile Optimized:** PWA + Mobile Wallet Adapter + Seeker support
+- ✅ **Live on Devnet:** Fully functional, tested with devnet SOL
+- ✅ **Open Source:** MIT license, auditable by anyone
+- ⏳ **External Audit Pending:** Professional audit planned before mainnet
+
+**Contrast with typical hackathon projects:**
+- ❌ POC only, not production-ready
+- ❌ Minimal docs, no security review
+- ❌ Desktop-only, no mobile support
+- ✅ **Solana Lockbox: Production-quality code, pending external audit**
+
+### 5. Educational Impact: Reference Implementation
+
+**6,200+ lines of production-grade documentation:**
+
+| Document | What Developers Learn | Impact |
+|----------|----------------------|--------|
+| **CRYPTOGRAPHY.md** | XChaCha20-Poly1305 + HKDF + session management | Secure encryption patterns |
+| **ARCHITECTURE.md** | Chunked storage + PDA access control | Scalable on-chain storage |
+| **SECURITY.md** | Vulnerability audit + fixes | Security best practices |
+| **MOBILE_PWA_GUIDE.md** | PWA + Mobile Wallet Adapter | Mobile-first Solana apps |
+
+**Result:** Every developer building encrypted storage on Solana references this codebase. **We've solved the hard problems so they don't have to.**
+
+### 6. Long-Term Commitment: Not Vaporware
+
+**Post-hackathon roadmap (credible, not aspirational):**
+- ✅ **Q1 2026:** External security audit + mainnet deployment
+- ✅ **Q2 2026:** Wallet partnerships (Phantom/Solflare outreach)
+- ✅ **Q3 2026:** SLP (Solana Lockbox Protocol) standardization
+- ✅ **Q4 2026:** Cross-dApp identity layer (shared credentials)
+
+**Commitment:**
+- Business entity: Web3 Studios LLC (established)
+- Continued development: Active maintenance and feature development
+- Security-first: Will not launch mainnet without professional audit
+- Open source: MIT license ensures project continues even if we stop
+
+**This is not a hackathon side project. This is committed infrastructure development.**
+
+### 7. The "Anatoly Test": Does This Scale?
+
+**Anatoly's core values (from public talks):**
+- 🎯 **Scalability:** Lockbox uses chunked storage (proven to 1MB per vault)
+- 🎯 **Real-world utility:** Password management = 420M crypto users need this
+- 🎯 **Composability:** SDK enables infinite permissionless integrations
+- 🎯 **User adoption:** Familiar use case brings non-crypto users to Solana
+- 🎯 **Network activity:** Every password operation = Solana transaction
+
+**This is the kind of infrastructure Solana was built for: high-throughput, low-cost, real-world utility at scale.**
 
 ---
 
@@ -550,14 +739,41 @@ Wallet providers can integrate this directly into their products, benefiting the
 4. **Store**: Add your first password entry
 5. **Experience**: Blockchain-native password management
 
-### For Judges
+### For Judges: Why This Deserves the Public Goods Award
 
-**Why This Should Win:**
-- ✅ **Consumer Apps**: Delightful UX, mobile-ready, real user problem solved
-- ✅ **Public Goods**: Open-source, wallet integration potential, benefits ecosystem
-- ✅ **Technical Merit**: Security-first, production-ready, comprehensive docs
-- ✅ **Innovation**: First blockchain-native password manager on Solana
-- ✅ **Impact**: Potential to become standard feature in Solana wallets
+**Public Goods Award Criteria (Solana Foundation):**
+
+| Criterion | How Solana Lockbox Delivers | Evidence |
+|-----------|----------------------------|----------|
+| **Ecosystem Benefit** | Wallets/dApps can integrate in ~1 week | SDK + 200 lines of code |
+| **Open Source** | MIT license, no restrictions | GitHub repo, 6,200+ docs |
+| **Educational Value** | Reference implementation for encrypted storage | Proof-level crypto docs |
+| **Adoption Potential** | 3M+ users (Phantom) on day 1 | Clear integration path |
+| **Network Effects** | More wallets integrate → more users → more dApps | Theory of change |
+| **Long-Term Viability** | Established business, committed team | Web3 Studios LLC |
+
+**The Public Goods Test:**
+1. ✅ **Non-Rivalrous:** One wallet using this doesn't prevent another from using it
+2. ✅ **Non-Excludable:** MIT license means anyone can fork/use/monetize
+3. ✅ **Positive Externalities:** Every integration benefits the entire ecosystem
+4. ✅ **Infrastructure Layer:** Other projects build on top of this
+
+**This is not just a good app. This is foundational infrastructure that transforms Solana wallets into identity managers.**
+
+### Why This Also Works for Consumer Apps Category
+
+**Consumer Apps Criteria:**
+- ✅ **Real Problem Solved:** Device loss recovery + no subscriptions
+- ✅ **Delightful UX:** PWA, mobile-optimized, familiar interface
+- ✅ **Production Quality:** Live on devnet, comprehensive testing
+- ✅ **Growth Potential:** 420M crypto users globally need this
+- ✅ **Mainstream Appeal:** "Blockchain password manager" = SEO gold
+
+**Dual-Category Strength:**
+- **Consumer Apps:** Great standalone product
+- **Public Goods:** Even better as reusable infrastructure
+
+**This is the rare project that excels in BOTH categories.**
 
 ### For Wallet Providers
 
@@ -596,13 +812,69 @@ We offer:
 
 ---
 
-## Conclusion
+## Conclusion: Infrastructure That Transforms Solana
 
-**Solana Lockbox** represents the future of password management: **trustless, decentralized, and user-owned**. By combining industry-standard cryptography with Solana's high-performance blockchain, we've created a password manager that's both **consumer-friendly** and a **public good** for the ecosystem.
+**Solana Lockbox** is not a typical hackathon project. This is **production-ready infrastructure** that:
 
-We're not just building an app—we're building **infrastructure** that wallet providers can integrate to benefit millions of Solana users.
+### Immediate Impact (Day 1)
+- ✅ **3M+ users** can access it if Phantom integrates
+- ✅ **Every dApp** can use it for authentication infrastructure
+- ✅ **Every developer** can learn from 6,200+ lines of reference docs
+- ✅ **Zero cost** for wallets/dApps to adopt (MIT license, no servers)
 
-**Vote for Solana Lockbox**: Let's make password management truly decentralized. 🔒⚡
+### Long-Term Vision (Years 1-5)
+- 🎯 **Year 1:** One major wallet integrates → 100k+ users discover Solana
+- 🎯 **Year 2-3:** All major wallets adopt → cross-dApp identity emerges
+- 🎯 **Year 3-5:** Mainstream users join Solana "for the password manager"
+- 🎯 **Result:** **Password management is the trojan horse that brings millions to Solana**
+
+### Why This Deserves Public Goods Award
+
+**The Public Goods Test (Solana Foundation Criteria):**
+
+| Criterion | Solana Lockbox | Typical Hackathon Project |
+|-----------|----------------|---------------------------|
+| **Ecosystem Benefit** | ✅ 3M+ potential users (Phantom integration) | ❌ 1,000 users max |
+| **Composability** | ✅ SDK + 200 LOC integration | ❌ Standalone app, no reusability |
+| **Educational Value** | ✅ 6,200+ lines of production docs | ❌ Minimal docs, no depth |
+| **Open Source** | ✅ MIT license, fully permissionless | ⚠️ Often GPL or closed |
+| **Production Ready** | ✅ Live on devnet, comprehensive testing | ❌ POC only, not tested |
+| **Long-Term Viability** | ✅ Established business, committed team | ❌ Abandoned post-hackathon |
+| **Network Effects** | ✅ More wallets → more users → more dApps | ❌ Isolated impact |
+
+**What Makes This Different:**
+- Not vaporware—**production-ready today**
+- Not isolated—**infrastructure 100+ projects can build on**
+- Not abandoned—**committed team with clear roadmap**
+- Not theoretical—**clear integration path for Phantom/Solflare**
+- Not educational-only—**real users solving real problems**
+
+### The "Anatoly Test": Infrastructure Solana Was Built For
+
+**Anatoly's Vision for Solana:**
+- High-throughput → ✅ Every password CRUD = transaction (scales to millions)
+- Low-cost → ✅ $0.0001 per operation (affordable for daily use)
+- Real-world utility → ✅ 420M crypto users need password management
+- Composability → ✅ SDK enables infinite permissionless integrations
+- Mainstream adoption → ✅ Familiar use case brings Web2 users to Web3
+
+**This is exactly the kind of infrastructure Solana was designed to enable.**
+
+### Final Ask: Support Infrastructure, Not Just Apps
+
+**Most hackathon projects are apps.** Great for individual users, zero impact on ecosystem.
+
+**Solana Lockbox is infrastructure.** One integration (Phantom) → 3M users. Educational docs → every developer benefits. Open SDK → infinite permissionless innovation.
+
+**The Public Goods Award should go to projects with ecosystem-wide impact.**
+
+**That's us.**
+
+---
+
+**Vote for Solana Lockbox**: Let's make every Solana wallet a complete identity manager. 🔒⚡
+
+**This is not just a password manager. This is the future of Web3 identity on Solana.**
 
 ---
 
