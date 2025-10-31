@@ -1845,14 +1845,18 @@ export class LockboxV2Client {
     }
 
     // Create new chunks if still needed
+    let nextChunkIndex = master.storageChunksCount;
     while (remainingBytes > 0) {
       const chunkSize = Math.min(remainingBytes, 10240);
-      console.log(`  Creating new chunk ${master.storageChunksCount + signatures.length - master.storageChunks.length} with ${chunkSize} bytes`);
+      console.log(`  Creating new chunk ${nextChunkIndex} with ${chunkSize} bytes`);
 
-      const sig = await this.initializeStorageChunk(master.storageChunksCount + signatures.length - master.storageChunks.length, chunkSize);
-      if (sig !== 'chunk-already-exists') {
+      const sig = await this.initializeStorageChunk(nextChunkIndex, chunkSize);
+      if (sig !== 'chunk-already-exists' && sig !== 'chunk-exists-error-caught') {
         signatures.push(sig);
       }
+
+      // Always increment chunk index, even if chunk already existed
+      nextChunkIndex++;
       remainingBytes -= chunkSize;
     }
 
