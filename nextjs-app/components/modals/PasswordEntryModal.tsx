@@ -8,10 +8,9 @@ import { useToast } from '../ui/Toast';
 import { normalizeUrl, isValidUrl } from '../../lib/url-validation';
 import { useCategory } from '../../contexts/CategoryContext';
 import { CategoryManager } from '../../lib/category-manager';
-import { trackPasswordChange, isPasswordReused } from '../../lib/password-history';
+import { trackPasswordChange } from '../../lib/password-history';
 import { TOTPManager } from '../../lib/totp';
 import QRCode from 'qrcode';
-import { validatePasswordPolicy, loadPasswordPolicy } from '../../lib/password-strength-policy';
 
 interface PasswordEntryModalProps {
   isOpen: boolean;
@@ -225,18 +224,7 @@ export function PasswordEntryModal({
           return;
         }
 
-        // Show password strength indicator but don't block weak passwords
-        const policy = loadPasswordPolicy();
-        if (policy.enabled) {
-          const policyResult = validatePasswordPolicy(formAny.password, policy);
-          if (!policyResult.isValid) {
-            const errorMessages = policyResult.errors.join('\n• ');
-            toast.showWarning(`Weak password detected:\n• ${errorMessages}\n\nConsider using a stronger password for better security.`, {
-              duration: 6000,
-            });
-            // Don't return - allow saving with weak password
-          }
-        }
+        // Password strength validation removed - users can save any password they choose
 
         entry = {
           type: PasswordEntryType.Login,
@@ -408,17 +396,8 @@ export function PasswordEntryModal({
       const oldPassword = (entry as any).password;
       const newPassword = (formData as any).password as string;
 
-      // Check if password has changed
+      // Track the password change if it changed (but don't nag about reuse)
       if (oldPassword !== newPassword) {
-        // Check for password reuse
-        if (isPasswordReused(formData.id, newPassword)) {
-          const confirmed = window.confirm(
-            'Warning: This password was previously used for this entry. Reusing passwords reduces security. Continue anyway?'
-          );
-          if (!confirmed) return;
-        }
-
-        // Track the password change
         trackPasswordChange(formData.id, oldPassword, newPassword);
       }
     }

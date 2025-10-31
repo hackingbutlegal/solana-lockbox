@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useLockbox } from './LockboxContext';
 
 /**
  * Lock Context - App Lock/Unlock
@@ -26,6 +27,7 @@ export interface LockContextType {
 
   // Lock/Unlock Actions
   lockApp: () => void;
+  clearLock: () => void;
   unlockWithWallet: () => Promise<boolean>;
   unlockWithBiometric: () => Promise<boolean>;
 
@@ -67,6 +69,7 @@ const DEFAULT_AUTO_LOCK_TIMEOUT = 5;
 
 export function LockProvider({ children }: LockProviderProps) {
   const { clearSession, isSessionActive, initializeSession, wallet, client } = useAuth();
+  const { masterLockbox } = useLockbox();
 
   // Lock state
   const [isLocked, setIsLocked] = useState(false);
@@ -97,6 +100,14 @@ export function LockProvider({ children }: LockProviderProps) {
     setIsLocked(true);
     clearSession();
   }, [clearSession]);
+
+  /**
+   * Clear lock state (used for account closure and logout)
+   */
+  const clearLock = useCallback(() => {
+    console.log('🔓 Clearing lock state...');
+    setIsLocked(false);
+  }, []);
 
   /**
    * Unlock app with wallet signature
@@ -331,15 +342,15 @@ export function LockProvider({ children }: LockProviderProps) {
 
   /**
    * Auto-lock when session becomes inactive
-   * Only lock if client exists (wallet is connected with publicKey)
-   * This prevents locking on initial page load when wallet object exists but isn't connected
+   * Only lock if client exists (wallet is connected with publicKey) AND user has a vault
+   * This prevents locking on initial page load and for users without vaults
    */
   useEffect(() => {
-    if (!isSessionActive && !isLocked && client) {
+    if (!isSessionActive && !isLocked && client && masterLockbox) {
       console.log('🔒 Session expired, locking app');
       setIsLocked(true);
     }
-  }, [isSessionActive, isLocked, client]);
+  }, [isSessionActive, isLocked, client, masterLockbox]);
 
   const value: LockContextType = {
     isLocked,
@@ -347,6 +358,7 @@ export function LockProvider({ children }: LockProviderProps) {
     autoLockTimeout,
     hasBiometricSetup,
     lockApp,
+    clearLock,
     unlockWithWallet,
     unlockWithBiometric,
     setAutoLockEnabled,

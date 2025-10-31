@@ -467,12 +467,75 @@ export function FavoritesSidebar({
 
         @media (max-width: 768px) {
           .favorites-sidebar {
-            width: 100%;
-            left: -100%;
+            width: 280px;
+            left: -280px;
+            max-width: 85vw;
           }
 
           .favorites-toggle.open {
-            left: calc(100% - 48px);
+            left: 280px;
+          }
+
+          .sidebar-header {
+            padding: 12px;
+          }
+
+          .header-title h3 {
+            font-size: 16px;
+          }
+
+          .title-icon {
+            font-size: 20px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .favorites-sidebar {
+            width: 260px;
+            left: -260px;
+            max-width: 80vw;
+          }
+
+          .favorites-toggle.open {
+            left: 260px;
+          }
+
+          .sidebar-search {
+            padding: 10px 12px;
+          }
+
+          .search-input {
+            font-size: 13px;
+            padding: 6px 28px 6px 10px;
+          }
+
+          .favorites-list {
+            padding: 6px;
+          }
+
+          .favorite-item {
+            padding: 10px;
+            gap: 10px;
+          }
+
+          .item-icon {
+            font-size: 20px;
+          }
+
+          .item-title {
+            font-size: 13px;
+          }
+
+          .item-meta {
+            font-size: 11px;
+          }
+
+          .sidebar-footer {
+            padding: 10px 12px;
+          }
+
+          .quick-stat {
+            font-size: 12px;
           }
         }
       `}</style>

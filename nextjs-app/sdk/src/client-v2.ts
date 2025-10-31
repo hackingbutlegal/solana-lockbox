@@ -723,10 +723,22 @@ export class LockboxV2Client {
 
       console.log(`[initializeStorageChunk] Signing and sending transaction for chunk ${chunkIndex}...`);
 
+      // VALIDATION: Check wallet connection state before sending
+      if (!this.wallet.publicKey) {
+        throw new Error('Wallet public key not available. Please reconnect your wallet.');
+      }
+
+      // VALIDATION: Check if wallet has required methods
+      if (!this.wallet.sendTransaction && !this.wallet.signTransaction) {
+        throw new Error('Wallet does not support transaction signing. Please use a different wallet.');
+      }
+
       let signature: string;
       let sendError: any = null;
 
       try {
+        console.log(`[initializeStorageChunk] Using ${this.wallet.sendTransaction ? 'sendTransaction' : 'signTransaction'} method`);
+
         if (this.wallet.sendTransaction) {
           signature = await this.wallet.sendTransaction(transaction, this.connection, {
             skipPreflight: false,

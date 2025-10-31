@@ -54,63 +54,119 @@ export function SubscriptionBillingPanel() {
   };
 
   const handleStorageExpansion = async (targetBytes: number) => {
-    // Get the client from auth context
-    const clientInstance = auth?.client;
+    console.log('[StorageExpansion] Starting expansion to:', targetBytes);
 
-    if (!connected || !clientInstance) {
-      alert('Please connect your wallet first.');
+    // STEP 1: Validate basic requirements
+    if (!connected) {
+      alert('❌ Wallet not connected. Please connect your wallet first.');
       return;
     }
 
-    // Optimistic update - immediately show new capacity in UI
+    if (!auth?.client) {
+      alert('❌ Client not ready. Please reconnect your wallet and try again.');
+      return;
+    }
+
+    const client = auth.client;
+
+    // STEP 2: Check SOL balance for transaction fees
+    try {
+      const balance = await client.connection.getBalance(client.wallet.publicKey);
+      const balanceInSOL = balance / 1_000_000_000;
+      console.log('[StorageExpansion] Wallet balance:', balanceInSOL, 'SOL');
+
+      if (balance < 10_000_000) { // Less than 0.01 SOL
+        alert(`❌ Insufficient SOL balance (${balanceInSOL.toFixed(4)} SOL).\n\nYou need at least 0.01 SOL for transaction fees and rent.\n\nPlease add SOL to your wallet and try again.`);
+        return;
+      }
+    } catch (error) {
+      console.error('[StorageExpansion] Failed to check balance:', error);
+      alert('❌ Failed to check wallet balance. Please check your internet connection and try again.');
+      return;
+    }
+
+    // STEP 3: Close modal and show optimistic UI
+    setShowSliderModal(false);
     setOptimisticCapacity(targetBytes);
     setUpgrading(true);
 
     try {
-      await clientInstance.expandStorageToCapacity(targetBytes);
+      // STEP 4: Attempt expansion
+      console.log('[StorageExpansion] Calling expandStorageToCapacity...');
+      const signatures = await client.expandStorageToCapacity(targetBytes);
+      console.log('[StorageExpansion] Expansion completed with signatures:', signatures);
 
-      // Transaction sent, wait for confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // STEP 5: Wait and verify
+      console.log('[StorageExpansion] Waiting 3s for chain to update...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
       await lockbox.refreshLockbox();
-
-      // Verify it worked
-      const master = await clientInstance.getMasterLockbox();
+      const master = await client.getMasterLockbox();
       const actualCapacity = Number(master.totalCapacity);
 
       if (actualCapacity >= targetBytes) {
-        // Success! Keep optimistic update
-        alert(`Storage expanded to ${formatBytes(actualCapacity)}!`);
+        console.log('[StorageExpansion] ✅ Success! Capacity:', actualCapacity);
+        alert(`✅ Storage expanded to ${formatBytes(actualCapacity)}!`);
       } else {
-        // Failed - rollback optimistic update
+        console.warn('[StorageExpansion] ⚠️ Incomplete expansion. Target:', targetBytes, 'Actual:', actualCapacity);
         setOptimisticCapacity(null);
-        alert(`Expansion incomplete. Current: ${formatBytes(actualCapacity)}`);
+        alert(`⚠️ Expansion incomplete.\n\nTarget: ${formatBytes(targetBytes)}\nActual: ${formatBytes(actualCapacity)}\n\nPlease try again or refresh the page.`);
       }
     } catch (error: any) {
-      // Error - check if it actually worked
+      console.error('[StorageExpansion] ❌ Error during expansion:', error);
+
+      // STEP 6: Recovery check - did it actually work despite error?
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('[StorageExpansion] Checking if expansion succeeded despite error...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         await lockbox.refreshLockbox();
 
-        const master = await clientInstance.getMasterLockbox();
+        const master = await client.getMasterLockbox();
         const actualCapacity = Number(master.totalCapacity);
 
         if (actualCapacity >= targetBytes) {
-          // Worked despite error!
-          alert(`Storage expanded to ${formatBytes(actualCapacity)}!`);
+          console.log('[StorageExpansion] ✅ Expansion succeeded despite error!');
+          alert(`✅ Storage expanded to ${formatBytes(actualCapacity)}!\n\n(There was an error message, but the expansion actually worked!)`);
         } else {
-          // Actually failed - rollback
+          // Real failure
           setOptimisticCapacity(null);
-          alert(`Expansion failed: ${error.message || 'Unknown error'}`);
+
+          // Provide user-friendly error messages
+          let userMessage = '❌ Failed to expand storage.\n\n';
+
+          const errorMsg = error.message || String(error);
+          const errorName = error.name || '';
+
+          if (errorMsg.includes('Insufficient') || errorMsg.includes('insufficient funds')) {
+            userMessage += 'Your wallet does not have enough SOL for transaction fees and rent.\n\nPlease add more SOL to your wallet and try again.';
+          } else if (errorMsg.includes('User rejected') || errorMsg.includes('rejected') || errorMsg.includes('denied')) {
+            userMessage += 'Transaction was cancelled by the wallet.\n\nPlease try again and approve the transaction.';
+          } else if (errorMsg.includes('Network') || errorMsg.includes('timeout')) {
+            userMessage += 'Network error. Please check your internet connection and try again.';
+          } else if (errorMsg.includes('Unexpected error') || errorName.includes('WalletSendTransactionError')) {
+            userMessage += 'Wallet transaction failed. Common causes:\n\n';
+            userMessage += '• Not enough SOL for fees (~0.01 SOL per chunk)\n';
+            userMessage += '• Transaction rejected in wallet\n';
+            userMessage += '• Wallet connection issue\n\n';
+            userMessage += 'Please:\n1. Check your SOL balance\n2. Try disconnecting and reconnecting wallet\n3. Refresh the page if needed';
+          } else {
+            userMessage += `Error: ${errorMsg}\n\n`;
+            userMessage += 'If this persists, please try:\n1. Refreshing the page\n2. Reconnecting your wallet\n3. Checking your SOL balance';
+          }
+
+          alert(userMessage);
         }
-      } catch {
-        // Can't verify - rollback optimistic update
+      } catch (checkError) {
+        console.error('[StorageExpansion] ❌ Failed to verify expansion:', checkError);
         setOptimisticCapacity(null);
-        alert(`Error: ${error.message || 'Unknown error'}. Refresh to see current storage.`);
+        alert('❌ Expansion failed and unable to verify.\n\nPlease refresh the page to see your current storage capacity.');
       }
     } finally {
       setUpgrading(false);
-      // Clear optimistic update after refresh completes
-      setTimeout(() => setOptimisticCapacity(null), 3000);
+      // Clear optimistic update after a delay
+      setTimeout(() => {
+        setOptimisticCapacity(null);
+      }, 5000);
     }
   };
 
@@ -128,7 +184,6 @@ export function SubscriptionBillingPanel() {
 
   return (
     <div className="subscription-billing-panel">
-      {/* Current Plan Section */}
       <div className="current-plan-card">
         <div className="plan-header">
           <div>

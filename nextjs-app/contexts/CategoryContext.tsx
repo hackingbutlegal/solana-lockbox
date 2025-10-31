@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from './AuthContext';
+import { useLockbox } from './LockboxContext';
 import { CategoryManager, Category } from '../lib/category-manager';
 
 /**
@@ -75,6 +76,7 @@ interface EncryptedCategoryStorage {
 export function CategoryProvider({ children }: CategoryProviderProps) {
   const { publicKey } = useWallet();
   const { isSessionActive, initializeSession } = useAuth();
+  const { masterLockbox } = useLockbox();
 
   // State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -91,6 +93,13 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
    */
   const loadCategories = useCallback(async () => {
     if (!publicKey) {
+      setCategories([]);
+      return;
+    }
+
+    // Don't load categories if there's no vault yet
+    // This prevents signature prompts for new users who haven't created a vault
+    if (!masterLockbox) {
       setCategories([]);
       return;
     }
@@ -140,7 +149,7 @@ export function CategoryProvider({ children }: CategoryProviderProps) {
       console.error('Failed to load categories:', err);
       setError('Failed to load categories from storage');
     }
-  }, [publicKey, isSessionActive, initializeSession]);
+  }, [publicKey, isSessionActive, initializeSession, masterLockbox]);
 
   /**
    * Save categories to localStorage

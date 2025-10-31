@@ -384,7 +384,7 @@ export function CategoryManagerModal({
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            z-index: 99999 !important;
+            z-index: 999999 !important;
             padding: 1rem !important;
           }
 

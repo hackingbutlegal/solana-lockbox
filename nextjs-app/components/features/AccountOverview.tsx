@@ -128,8 +128,9 @@ export function AccountOverview() {
         }
 
         .card-icon {
-          font-size: 2.5rem;
+          font-size: 2rem;
           line-height: 1;
+          flex-shrink: 0;
         }
 
         .card-content {
@@ -139,7 +140,7 @@ export function AccountOverview() {
         .card-content h4 {
           margin: 0 0 0.5rem 0;
           color: #7f8c8d;
-          font-size: 0.85rem;
+          font-size: 0.75rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.5px;
@@ -148,10 +149,12 @@ export function AccountOverview() {
         .card-value {
           margin: 0;
           color: #2c3e50;
-          font-size: 1rem;
+          font-size: 0.9rem;
           font-weight: 700;
           word-break: break-word;
           overflow-wrap: break-word;
+          white-space: normal;
+          line-height: 1.4;
         }
 
         .address-container {
@@ -166,11 +169,13 @@ export function AccountOverview() {
           padding: 0.5rem 0.75rem;
           border-radius: 6px;
           font-family: 'Courier New', monospace;
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           color: #667eea;
           font-weight: 600;
           word-break: break-all;
           overflow-wrap: break-word;
+          white-space: normal;
+          line-height: 1.3;
         }
 
         .btn-copy {

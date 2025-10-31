@@ -135,6 +135,12 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       return;
     }
 
+    // Don't try to fetch passwords if there's no vault yet
+    // This prevents signature prompts for new users who haven't created a vault
+    if (!masterLockbox) {
+      return;
+    }
+
     // If session is not active, try to initialize it first
     if (!isSessionActive) {
       const initialized = await initializeSession();
@@ -171,7 +177,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, isSessionActive, initializeSession]);
+  }, [client, isSessionActive, initializeSession, masterLockbox]);
 
   // Create new password entry
   const createEntry = useCallback(async (entry: PasswordEntry): Promise<number | null> => {

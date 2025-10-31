@@ -54,7 +54,7 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
     >
       <div className="card-header">
         <h3 className="tier-name">{info.name}</h3>
-        {isCurrent && <span className="badge-current">Current Plan</span>}
+        {isCurrent && <span className="badge-current">✓ Active</span>}
         {tier === SubscriptionTier.Premium && !isCurrent && <span className="badge-popular">Most Popular</span>}
         {tier === SubscriptionTier.Pro && !isCurrent && <span className="badge-best-value">Best Value</span>}
       </div>
@@ -93,12 +93,12 @@ export function SubscriptionCard({ tier, currentTier, onUpgrade, disabled }: Sub
       <div className="card-action">
         {isCurrent && (
           <button className="btn-current" disabled>
-            Current Plan
+            ✓ Active
           </button>
         )}
         {isUpgrade && (
           <button className="btn-upgrade" disabled={disabled}>
-            {disabled ? 'Processing...' : 'Expand Storage'}
+            {disabled ? 'Processing...' : 'Select'}
           </button>
         )}
         {isDowngrade && (

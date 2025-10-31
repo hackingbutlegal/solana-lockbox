@@ -39,8 +39,8 @@ export function Footer() {
         </div>
 
         <div className="footer-section">
-          <span className="footer-text">
-            Solana Lockbox v2.3.2
+          <span className="footer-text" title={`Build: ${new Date().toISOString()}`}>
+            Solana Lockbox v2.3.3-storage-fix
           </span>
         </div>
       </div>

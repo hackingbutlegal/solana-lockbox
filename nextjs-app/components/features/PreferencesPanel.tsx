@@ -15,14 +15,12 @@ import { useToast } from '../ui/Toast';
 
 interface Preferences {
   viewMode: 'list' | 'grid' | 'virtual';
-  theme: 'light' | 'dark' | 'system';
   showPreviews: boolean;
   compactMode: boolean;
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
   viewMode: 'list',
-  theme: 'system',
   showPreviews: true,
   compactMode: false,
 };
@@ -51,18 +49,7 @@ function savePreferences(prefs: Preferences): void {
   }
 }
 
-function applyTheme(theme: 'light' | 'dark' | 'system'): void {
-  if (typeof window === 'undefined') return;
-
-  const root = document.documentElement;
-
-  if (theme === 'system') {
-    // Remove explicit theme attribute to use system preference
-    root.removeAttribute('data-theme');
-  } else {
-    root.setAttribute('data-theme', theme);
-  }
-}
+// Theme feature removed - not implemented
 
 export function PreferencesPanel() {
   const toast = useToast();
@@ -75,7 +62,6 @@ export function PreferencesPanel() {
     const loaded = loadPreferences();
     setPreferences(loaded);
     setSavedPreferences(loaded);
-    applyTheme(loaded.theme);
   }, []);
 
   // Track changes
@@ -88,11 +74,6 @@ export function PreferencesPanel() {
     setPreferences({ ...preferences, viewMode: e.target.value as 'list' | 'grid' | 'virtual' });
   };
 
-  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newTheme = e.target.value as 'light' | 'dark' | 'system';
-    setPreferences({ ...preferences, theme: newTheme });
-  };
-
   const handleShowPreviewsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPreferences({ ...preferences, showPreviews: e.target.checked });
   };
@@ -103,7 +84,6 @@ export function PreferencesPanel() {
 
   const handleSave = () => {
     savePreferences(preferences);
-    applyTheme(preferences.theme);
     setSavedPreferences(preferences);
     setHasChanges(false);
     toast.showSuccess('Preferences saved successfully');
@@ -111,14 +91,12 @@ export function PreferencesPanel() {
 
   const handleCancel = () => {
     setPreferences(savedPreferences);
-    applyTheme(savedPreferences.theme);
     setHasChanges(false);
     toast.showInfo('Changes discarded');
   };
 
   return (
     <div className="preferences-panel">
-      <h3>Display Preferences</h3>
       <div className="settings-section">
         <div className="setting-item">
           <label>
@@ -130,7 +108,6 @@ export function PreferencesPanel() {
             </select>
           </label>
         </div>
-        {/* Theme feature removed - not working */}
         <div className="setting-item">
           <label>
             <input

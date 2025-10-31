@@ -158,6 +158,96 @@ body {
   width: 100%;
 }
 
+/* Mobile-first responsive spacing */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Optimize main content area for mobile */
+  .password-manager-container,
+  .settings-page,
+  .initialize-vault-page,
+  .recovery-page {
+    padding-top: 0.75rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Ensure modals work well on mobile */
+  .modal-overlay {
+    padding: 0.5rem !important;
+  }
+
+  .modal-content,
+  .modal-container {
+    width: 95% !important;
+    max-width: 100% !important;
+    margin: 0.5rem !important;
+  }
+
+  .modal-header {
+    padding: 1rem !important;
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem !important;
+  }
+
+  .modal-body {
+    padding: 1rem !important;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1rem !important;
+    flex-wrap: wrap;
+  }
+
+  .modal-footer button {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* Optimize touch targets for mobile */
+  button,
+  .btn,
+  a[role="button"],
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Improve form inputs on mobile */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+}
+
+@media (max-width: 480px) {
+  .password-manager-container,
+  .settings-page,
+  .initialize-vault-page,
+  .recovery-page {
+    padding-top: 0.5rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .modal-header h2 {
+    font-size: 1.1rem !important;
+  }
+
+  .modal-footer button {
+    width: 100%;
+    flex: none;
+  }
+}
+
 /* Global Modal Styles - Standardized for all modals */
 .modal-overlay,
 .category-manager-modal-overlay,

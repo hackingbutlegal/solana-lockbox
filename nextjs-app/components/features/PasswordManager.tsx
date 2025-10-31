@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth, useLockbox, usePassword, useSubscription, useCategory } from '../../contexts';
 import { PasswordEntry, PasswordEntryType, TIER_INFO, LoginEntry } from '../../sdk/src/types-v2';
@@ -53,13 +54,14 @@ type SortOption = 'title' | 'lastModified' | 'accessCount';
 type SortOrder = 'asc' | 'desc';
 
 export function PasswordManager() {
+  const router = useRouter();
   const toast = useToast();
   const { confirm } = useConfirm();
   const { publicKey } = useWallet();
 
   // Use specialized context hooks
   const { client, isSessionActive, initializeSession, loading: authLoading, error: authError } = useAuth();
-  const { masterLockbox, error: lockboxError } = useLockbox();
+  const { masterLockbox, exists, error: lockboxError, loading: lockboxLoading } = useLockbox();
   const { entries, refreshEntries, createEntry, updateEntry, deleteEntry, queueUpdate, loading, error } = usePassword();
   const { upgradeSubscription } = useSubscription();
   const { categories, createCategory, updateCategory, deleteCategory, getCategoryName } = useCategory();
@@ -118,6 +120,17 @@ export function PasswordManager() {
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
   // and handles session initialization as needed, so no manual trigger required here
+
+  // Redirect to /initialize if no vault exists
+  // IMPORTANT: Use the `exists` field to avoid race condition where masterLockbox
+  // is temporarily null while loading. Only redirect after we've confirmed no vault exists.
+  useEffect(() => {
+    // Wait for lockbox check to complete before deciding to redirect
+    if (publicKey && !lockboxLoading && !masterLockbox && !exists) {
+      console.log('No vault found (confirmed), redirecting to /initialize');
+      router.push('/initialize');
+    }
+  }, [publicKey, lockboxLoading, masterLockbox, exists, router]);
 
   // Filtered and sorted entries
   const filteredEntries = useMemo(() => {
@@ -769,7 +782,7 @@ export function PasswordManager() {
             }}>
               <strong>⚠️ TESTNET DEMO - NOT PROFESSIONALLY AUDITED</strong>
               <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                Pre-production software on Devnet. Do not use for sensitive data. Security audit pending.
+                Pre-production software on Devnet. Do not use for sensitive data.
               </div>
             </div>
             <p className="tagline">Open-source password manager on Solana</p>
@@ -1007,298 +1020,10 @@ export function PasswordManager() {
     );
   }
 
-  // If master lockbox not initialized
+  // If master lockbox not initialized, redirect will handle it
+  // Show loading state while redirect processes
   if (!masterLockbox) {
-    return (
-      <div className="password-manager">
-        <div className="pm-setup-prompt">
-          <div className="setup-card">
-            <h2>Password Manager v2.0</h2>
-
-            {(error || lockboxError) && (error?.includes('IDL not loaded') || lockboxError?.includes('IDL not loaded')) ? (
-              <>
-                <div className="info-message">
-                  <p><strong>Status:</strong> ✅ Program Deployed to Devnet</p>
-                  <p><strong>Program ID:</strong> 7JxsHjdReydiz36jwsWuvwwR28qqK6V454VwFJnnSkoB</p>
-                  <p>
-                    The program is deployed with all security fixes, but the IDL (Interface Description Language) needs to be generated for the frontend to interact with it.
-                  </p>
-                </div>
-
-                <div className="info-box">
-                  <h3>What&apos;s Next?</h3>
-                  <ul>
-                    <li>✅ v2 Rust program code complete</li>
-                    <li>✅ All critical security fixes applied</li>
-                    <li>✅ Frontend dashboard complete</li>
-                    <li>✅ SDK complete (client, types, utils)</li>
-                    <li>✅ Deployed to devnet</li>
-                    <li>⏳ Generate program IDL (blocked by anchor-syn version issue)</li>
-                    <li>⏳ Full integration testing</li>
-                  </ul>
-                </div>
-
-                <div className="info-box">
-                  <h3>Technical Details:</h3>
-                  <p>
-                    The program binary was successfully built and deployed using cargo-build-sbf.
-                    IDL generation failed due to a proc-macro2 incompatibility in anchor-syn 0.30.1.
-                  </p>
-                  <p>
-                    <strong>Security Fixes Deployed:</strong>
-                  </p>
-                  <ul>
-                    <li>✅ Fixed FEE_RECEIVER .unwrap() panic risk</li>
-                    <li>✅ Added checked arithmetic for overflow prevention</li>
-                    <li>✅ Added chunk validation and duplicate detection</li>
-                  </ul>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2>Initialize Your Password Vault</h2>
-                <p>Create your master lockbox to start storing passwords securely</p>
-
-                {error && (
-                  <div className="error-message">
-                    {error}
-                  </div>
-                )}
-
-                {/* Orphaned Chunk Recovery Component */}
-                <OrphanedChunkRecovery
-                  client={client}
-                  onRecoveryComplete={() => {
-                    toast.showSuccess('Recovery complete! Refreshing page...');
-                    setTimeout(() => window.location.reload(), 2000);
-                  }}
-                  onCancel={() => {
-                    // User cancelled, they can still try normal initialization
-                  }}
-                />
-
-                <button
-                  onClick={async () => {
-                    if (client && !loading) {
-                      try {
-                        console.log('Creating password vault...');
-                        await client.initializeMasterLockbox();
-                        console.log('Vault created! Refreshing page...');
-                        toast.showSuccess('Password vault created! Refreshing page...');
-                        // Refresh to show new lockbox
-                        setTimeout(() => window.location.reload(), 1000);
-                      } catch (err: any) {
-                        console.error('Failed to initialize:', err);
-
-                        // Handle specific errors
-                        if (err.message?.includes('already initialized') ||
-                            err.message?.includes('already been processed')) {
-                          toast.showInfo('Your password vault already exists! Refreshing page...');
-                          window.location.reload();
-                        } else if (err.message?.includes('orphaned')) {
-                          // If orphaned chunks error, the recovery component should have shown
-                          toast.showError('Please use the recovery button above to fix orphaned chunks first');
-                        } else {
-                          toast.showError(`Failed to create vault: ${err.message || 'Unknown error'}`);
-                        }
-                      }
-                    }
-                  }}
-                  disabled={loading}
-                  className="btn-primary"
-                >
-                  {loading ? 'Initializing...' : 'Create Password Vault'}
-                </button>
-
-                <div className="info-box">
-                  <h3>What is a Master Lockbox?</h3>
-                  <p>
-                    Your master lockbox is your personal password vault stored on the Solana blockchain.
-                    All passwords are encrypted client-side before storage.
-                  </p>
-                  <p>
-                    <strong>Free Tier:</strong> 1KB storage (~10 passwords)
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <style jsx>{`
-          .password-manager {
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          }
-
-          .pm-header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 1rem 2rem;
-          }
-
-          .pm-header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-
-          .pm-header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #2c3e50;
-          }
-
-          .pm-setup-prompt {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: calc(100vh - 100px);
-            padding: 2rem;
-          }
-
-          .setup-card {
-            background: white;
-            border-radius: 16px;
-            padding: 3rem;
-            max-width: 600px;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-          }
-
-          .setup-card h2 {
-            margin: 0 0 1rem 0;
-            color: #2c3e50;
-          }
-
-          .setup-card p {
-            color: #7f8c8d;
-            margin-bottom: 2rem;
-          }
-
-          .btn-primary {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 1rem 2rem;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 2rem;
-          }
-
-          .btn-primary:hover:not(:disabled) {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-          }
-
-          .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-
-          .info-box {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1.5rem;
-            text-align: left;
-            margin-bottom: 1rem;
-          }
-
-          .info-box h3 {
-            margin: 0 0 0.5rem 0;
-            color: #2c3e50;
-            font-size: 1.1rem;
-          }
-
-          .info-box p {
-            margin: 0.5rem 0;
-            color: #7f8c8d;
-            font-size: 0.95rem;
-          }
-
-          .info-box ul {
-            list-style: none;
-            padding: 0;
-            margin: 0.5rem 0;
-          }
-
-          .info-box li {
-            padding: 0.5rem 0;
-            color: #2c3e50;
-          }
-
-          .info-message {
-            background: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            text-align: center;
-          }
-
-          .info-message p {
-            margin: 0.5rem 0;
-            color: #1976d2;
-          }
-
-          .error-message {
-            background: #fee;
-            border: 1px solid #fcc;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            color: #c33;
-          }
-
-          /* Mobile responsive */
-          @media (max-width: 768px) {
-            .pm-header {
-              padding: 0.75rem;
-            }
-
-            .pm-header-content {
-              padding: 0;
-            }
-
-            .pm-header h1 {
-              font-size: 1.2rem;
-            }
-
-            .pm-setup-prompt {
-              padding: 1rem;
-            }
-
-            .setup-card {
-              padding: 2rem 1.5rem;
-              max-width: 100%;
-            }
-
-            .setup-card h2 {
-              font-size: 1.3rem;
-            }
-
-            .btn-primary {
-              padding: 0.875rem 1.5rem;
-              font-size: 1rem;
-            }
-
-            .info-box {
-              padding: 1rem;
-            }
-
-            .info-box h3 {
-              font-size: 1rem;
-            }
-          }
-        `}</style>
-      </div>
-    );
+    return null; // Redirect will handle navigation to /initialize
   }
 
   // Main password manager UI
@@ -1312,6 +1037,8 @@ export function PasswordManager() {
   // Show signature prompt if:
   // 1. Session is not active AND
   // 2. Either there's an auth error OR we're trying to load auth
+  // 3. BUT ONLY if user already has a vault (masterLockbox exists)
+  //    - New users without a vault should see the "Create Password Vault" screen first
   const showSignaturePrompt = !isSessionActive && (!!authError || authLoading);
 
   return (
@@ -1394,15 +1121,6 @@ export function PasswordManager() {
               onClick={() => setShowPolicyModal(true)}
             >
               🔒 Password Policy
-            </button>
-            <button
-              className="tool-btn"
-              onClick={() => {
-                setShareEntry(undefined);
-                setShowShareModal(true);
-              }}
-            >
-              🔗 Share Manager
             </button>
             <button
               className="tool-btn"

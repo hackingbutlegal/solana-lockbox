@@ -153,7 +153,7 @@ export function QuickStart() {
         <ul>
           <li>⚠️ <strong>Demo Only</strong>: This is for testing purposes. DO NOT store real passwords, private keys, or sensitive data</li>
           <li>Each new store operation overwrites your previous data - you&apos;ll get a warning</li>
-          <li>Your session expires after 15 minutes of inactivity for security</li>
+          <li>Your session expires after 30 minutes of inactivity for security (resets with each action)</li>
           <li>Transactions are logged in the Activity Log with links to Solana Explorer</li>
           <li>Maximum storage: 1 KiB (about 1000 characters)</li>
         </ul>

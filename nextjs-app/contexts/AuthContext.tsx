@@ -111,57 +111,51 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
   const [lastActivityTime, setLastActivityTime] = useState<number | null>(null);
 
   // SECURITY FIX (C-3): Session timeout constants
-  const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-  const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity
+  // Using rolling window approach - no hard timeout, only inactivity-based
+  const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity (best practice for password managers)
 
   // SECURITY FIX (C-3): Check if session has timed out
+  // BEST PRACTICE: Use rolling window - only timeout on inactivity, not absolute time
   const isSessionTimedOut = useCallback((): boolean => {
-    if (!sessionStartTime || !lastActivityTime) {
+    if (!lastActivityTime) {
       return false; // No session active
     }
 
     const now = Date.now();
-    const sessionAge = now - sessionStartTime;
     const inactivityTime = now - lastActivityTime;
 
-    // Check absolute timeout (15 minutes from session start)
-    if (sessionAge > SESSION_TIMEOUT_MS) {
-      return true;
-    }
-
-    // Check inactivity timeout (5 minutes since last activity)
+    // Check inactivity timeout only - session stays alive as long as user is active
     if (inactivityTime > INACTIVITY_TIMEOUT_MS) {
+      console.log(`Session timed out after ${Math.floor(inactivityTime / 60000)} minutes of inactivity`);
       return true;
     }
 
     return false;
-  }, [sessionStartTime, lastActivityTime]);
+  }, [lastActivityTime]);
 
   // Calculate time remaining until session timeout
+  // BEST PRACTICE: Show time until inactivity timeout (rolling window)
   const sessionTimeRemaining = useMemo((): number | null => {
-    if (!sessionStartTime || !lastActivityTime) {
+    if (!lastActivityTime) {
       return null;
     }
 
     const now = Date.now();
-    const sessionAge = now - sessionStartTime;
     const inactivityTime = now - lastActivityTime;
-
-    // Time until absolute timeout
-    const absoluteTimeRemaining = Math.max(0, SESSION_TIMEOUT_MS - sessionAge);
 
     // Time until inactivity timeout
     const inactivityTimeRemaining = Math.max(0, INACTIVITY_TIMEOUT_MS - inactivityTime);
 
-    // Return the smaller of the two (whichever will happen first)
-    const remainingMs = Math.min(absoluteTimeRemaining, inactivityTimeRemaining);
-
-    return Math.floor(remainingMs / 1000); // Convert to seconds
-  }, [sessionStartTime, lastActivityTime]);
+    return Math.floor(inactivityTimeRemaining / 1000); // Convert to seconds
+  }, [lastActivityTime]);
 
   // SECURITY FIX (C-3): Update last activity timestamp
+  // BEST PRACTICE: Each activity extends the session window (rolling timeout)
   const updateActivity = useCallback(() => {
-    setLastActivityTime(Date.now());
+    const now = Date.now();
+    setLastActivityTime(now);
+    // Note: We don't update sessionStartTime - it tracks initial session creation
+    // The rolling window is based on lastActivityTime only
   }, []);
 
   // Clear session and wipe sensitive data
@@ -198,16 +192,9 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
 
   // Create client instance (memoized)
   const client = useMemo(() => {
-    console.log('Client creation check:', {
-      hasPublicKey: !!publicKey,
-      hasConnection: !!connection,
-      hasWallet: !!wallet,
-      publicKey: publicKey?.toBase58()
-    });
-
     // Only require publicKey and connection - wallet adapter will provide signTransaction when needed
     if (!publicKey || !connection) {
-      console.warn('Client not created - missing publicKey or connection');
+      // Client creation skipped - no wallet connected (this is expected)
       return null;
     }
 
@@ -255,6 +242,7 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
         setError(null);
 
         console.log('🔐 Requesting wallet signature for session key...');
+        console.log('🔍 Call stack:', new Error().stack);
 
         // Generate challenge and get signature
         const challenge = generateChallenge(publicKey);
@@ -308,16 +296,16 @@ export function AuthProvider({ children, programId, treasuryWallet }: AuthProvid
   }, [publicKey, signMessage, getSessionKey, setSessionKey]);
 
   // SECURITY FIX (C-3): Automatic session timeout checking
-  // Poll every 30 seconds to check for timeout
+  // BEST PRACTICE: Poll every 60 seconds (less aggressive) to check for inactivity timeout
   useEffect(() => {
     if (!isSessionActive) return;
 
     const intervalId = setInterval(() => {
       if (isSessionTimedOut()) {
         clearSession();
-        setError('Session expired due to inactivity. Please sign in again.');
+        setError('Session expired after 30 minutes of inactivity. Please sign in again to continue.');
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds (less aggressive polling)
 
     return () => clearInterval(intervalId);
   }, [isSessionActive, isSessionTimedOut, clearSession]);

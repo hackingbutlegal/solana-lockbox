@@ -7,12 +7,12 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { ConnectionProvider, WalletProvider, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, PublicKey } from '@solana/web3.js';
-import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider, CategoryProvider, RecoveryProvider } from '../../contexts';
+import { AuthProvider, LockboxProvider, PasswordProvider, SubscriptionProvider, CategoryProvider, RecoveryProvider, useLockbox } from '../../contexts';
 import { LockProvider, useLock } from '../../contexts/LockContext';
 import { ErrorBoundary, ContextErrorBoundary } from '../ui';
 import { ToastProvider } from '../ui/Toast';
@@ -21,6 +21,7 @@ import { AppHeader } from './AppHeader';
 import { Footer } from './Footer';
 import { LockScreen } from '../ui/LockScreen';
 import { MobileWalletProvider } from '../providers/MobileWalletProvider';
+import { useRouter, usePathname } from 'next/navigation';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -32,13 +33,34 @@ const TREASURY_WALLET = new PublicKey('465Av5qxktim1iN9p54k41MbRGPe2nqCfyVYwB2EF
 function AppWithProviders({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = React.useState(false);
   const { isLocked } = useLock();
+  const { masterLockbox } = useLockbox();
+  const { publicKey } = useWallet();
+  const router = useRouter();
+  const pathname = usePathname();
+  const previousPublicKey = React.useRef(publicKey);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Show lock screen if app is locked
-  if (mounted && isLocked) {
+  // Redirect to homepage when wallet is disconnected
+  React.useEffect(() => {
+    // Only redirect if we had a wallet connected before and now it's disconnected
+    // AND we're not already on the homepage
+    if (mounted && previousPublicKey.current && !publicKey && pathname !== '/') {
+      console.log('Wallet disconnected, redirecting to homepage');
+      sessionStorage.clear(); // Clear any session data
+      // Use replace instead of push to avoid adding to browser history
+      router.replace('/');
+    }
+
+    // Update the previous value
+    previousPublicKey.current = publicKey;
+  }, [publicKey, mounted, router, pathname]);
+
+  // Show lock screen if app is locked AND user has a vault
+  // Don't show lock screen for new users without a vault - they should see home/initialize page
+  if (mounted && isLocked && masterLockbox) {
     return <LockScreen />;
   }
 
@@ -79,8 +101,8 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
                     }
                   }}>
                     <AuthProvider programId={PROGRAM_ID} treasuryWallet={TREASURY_WALLET}>
-                      <LockProvider>
-                        <LockboxProvider>
+                      <LockboxProvider>
+                        <LockProvider>
                           <CategoryProvider>
                             <PasswordProvider>
                               <SubscriptionProvider>
@@ -94,8 +116,8 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({ children })
                               </SubscriptionProvider>
                             </PasswordProvider>
                           </CategoryProvider>
-                        </LockboxProvider>
-                      </LockProvider>
+                        </LockProvider>
+                      </LockboxProvider>
                     </AuthProvider>
                   </ContextErrorBoundary>
                 </ConfirmProvider>

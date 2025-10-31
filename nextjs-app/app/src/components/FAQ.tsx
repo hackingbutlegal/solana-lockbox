@@ -53,7 +53,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "What's the session timeout?",
-    answer: "Your session automatically expires after 15 minutes of inactivity. This protects you if you forget to disconnect your wallet. You'll need to reconnect to continue."
+    answer: "Your session automatically expires after 30 minutes of inactivity. Each time you interact with the app, the timer resets. This rolling window keeps you secure while minimizing interruptions during active use."
   },
   {
     question: "Is this ready for mainnet?",

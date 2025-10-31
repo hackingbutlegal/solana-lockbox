@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useAuth, useLockbox } from '../../contexts';
+import { useLock } from '../../contexts/LockContext';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
 
@@ -14,7 +16,10 @@ import { useConfirm } from '../ui/ConfirmDialog';
  */
 
 export function DangerZonePanel() {
+  const { disconnect } = useWallet();
   const { client } = useAuth();
+  const { refreshLockbox } = useLockbox();
+  const { clearLock } = useLock();
   const toast = useToast();
   const { confirm } = useConfirm();
 
@@ -53,13 +58,22 @@ export function DangerZonePanel() {
       const signature = await client.closeMasterLockbox();
 
       toast.showSuccess(
-        `Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet. Redirecting to home page...`
+        `Account closed successfully! Transaction: ${signature}. Rent has been returned to your wallet.`
       );
 
+      // Clear lock state first to prevent lock screen from showing
+      clearLock();
+
+      // Refresh lockbox to clear state immediately
+      await refreshLockbox();
+
+      // Clean up ALL local data - session, preferences, backup codes, recovery keys, etc.
       sessionStorage.clear();
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1500);
+      localStorage.clear();
+
+      // Disconnect wallet - this will trigger Providers.tsx redirect to homepage
+      // No need for manual redirect as the wallet disconnect handler will take care of it
+      await disconnect();
     } catch (error: any) {
       console.error('Failed to close account:', error);
 
@@ -68,21 +82,39 @@ export function DangerZonePanel() {
         error.message?.includes('AlreadyProcessed')
       ) {
         toast.showInfo(
-          'Your account may have already been closed. Redirecting to home page...'
+          'Your account may have already been closed.'
         );
+
+        // Clear lock state first to prevent lock screen from showing
+        clearLock();
+
+        // Refresh lockbox to clear state immediately
+        await refreshLockbox();
+
+        // Clean up ALL local data
         sessionStorage.clear();
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
+        localStorage.clear();
+
+        // Disconnect wallet - this will trigger Providers.tsx redirect to homepage
+        await disconnect();
       } else if (
         error.message?.includes('AccountNotFound') ||
         error.message?.includes('not found')
       ) {
-        toast.showInfo('Account is already closed. Redirecting to home page...');
+        toast.showInfo('Account is already closed.');
+
+        // Clear lock state first to prevent lock screen from showing
+        clearLock();
+
+        // Refresh lockbox to clear state immediately
+        await refreshLockbox();
+
+        // Clean up ALL local data
         sessionStorage.clear();
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
+        localStorage.clear();
+
+        // Disconnect wallet - this will trigger Providers.tsx redirect to homepage
+        await disconnect();
       } else {
         toast.showError(
           `Failed to close account: ${error.message || 'Unknown error'}. Please try refreshing the page.`

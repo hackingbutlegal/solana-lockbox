@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSubscription, useLockbox } from '../../contexts';
 import { SubscriptionTier } from '../../sdk/src/types-v2';
@@ -11,13 +12,14 @@ import { SubscriptionTier } from '../../sdk/src/types-v2';
  *
  * Persistent sticky header with:
  * - Logo/branding
- * - Storage usage indicator (only when vault initialized)
- * - Navigation links (only when vault initialized)
+ * - Storage usage indicator (only when wallet connected AND vault initialized)
+ * - Navigation links (only when wallet connected AND vault initialized)
  * - Wallet connection button (always visible)
  */
 
 export function AppHeader() {
   const router = useRouter();
+  const { publicKey } = useWallet();
   const { masterLockbox } = useLockbox();
   const {
     currentTier,
@@ -26,8 +28,8 @@ export function AppHeader() {
     storagePercentage
   } = useSubscription();
 
-  // Only show navigation and storage when vault is initialized
-  const isVaultInitialized = !!masterLockbox;
+  // Only show navigation and storage when wallet is connected AND vault is initialized
+  const isVaultInitialized = !!publicKey && !!masterLockbox;
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -58,7 +60,10 @@ export function AppHeader() {
     <header className="app-header">
       <div className="header-content">
         {/* Logo/Branding */}
-        <div className="logo-section" onClick={handleNavigateDashboard}>
+        <div
+          className={`logo-section ${isVaultInitialized ? 'clickable' : ''}`}
+          onClick={isVaultInitialized ? handleNavigateDashboard : undefined}
+        >
           <div className="logo-icon">🔒</div>
           <div className="logo-text">
             <h1>Solana Lockbox</h1>
@@ -103,6 +108,15 @@ export function AppHeader() {
 
         {/* Right Section */}
         <div className="header-actions">
+          {!publicKey && (
+            <button
+              onClick={() => router.push('/recovery')}
+              className="btn-recovery"
+              title="Access your vault using backup codes"
+            >
+              🔑 Recovery
+            </button>
+          )}
           <WalletMultiButton />
         </div>
       </div>
@@ -148,15 +162,18 @@ export function AppHeader() {
           display: flex;
           align-items: center;
           gap: 0.75rem;
-          cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .logo-section:hover {
+        .logo-section.clickable {
+          cursor: pointer;
+        }
+
+        .logo-section.clickable:hover {
           transform: translateY(-2px) scale(1.02);
         }
 
-        .logo-section:active {
+        .logo-section.clickable:active {
           transform: translateY(0) scale(0.98);
         }
 
@@ -299,6 +316,29 @@ export function AppHeader() {
           margin-left: auto;
         }
 
+        .btn-recovery {
+          padding: 0.65rem 1.25rem;
+          background: rgba(255, 255, 255, 0.2);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 10px;
+          font-size: 0.95rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          backdrop-filter: blur(10px);
+        }
+
+        .btn-recovery:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-recovery:active {
+          transform: translateY(0) scale(0.98);
+        }
+
         .btn-upgrade-header {
           padding: 0.65rem 1.5rem;
           background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
@@ -361,29 +401,108 @@ export function AppHeader() {
         }
 
         @media (max-width: 768px) {
+          .app-header {
+            position: sticky;
+            top: 0;
+          }
+
           .header-content {
             flex-wrap: wrap;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 0.75rem 0.5rem 0.75rem;
+            gap: 0.75rem;
+          }
+
+          .logo-section {
+            flex-shrink: 0;
+          }
+
+          .logo-icon {
+            font-size: 1.75rem;
           }
 
           .logo-text h1 {
-            font-size: 1rem;
+            font-size: 0.95rem;
           }
 
           .storage-indicator {
             order: 3;
             flex: 1 1 100%;
             max-width: 100%;
-            margin-top: 0.5rem;
+            margin-top: 0;
+            padding: 0.5rem 0.75rem;
+          }
+
+          .storage-label {
+            font-size: 0.7rem;
+          }
+
+          .storage-bar-container {
+            height: 6px;
+          }
+
+          .storage-text {
+            font-size: 0.65rem;
           }
 
           .header-nav {
-            display: none; // Hide on mobile, use hamburger menu if needed
+            display: none;
+          }
+
+          .header-actions {
+            gap: 0.5rem;
+            margin-left: auto;
+          }
+
+          .btn-recovery {
+            padding: 0.5rem 0.875rem;
+            font-size: 0.85rem;
           }
 
           .btn-upgrade-header {
             font-size: 0.85rem;
-            padding: 0.4rem 1rem;
+            padding: 0.5rem 0.875rem;
+          }
+
+          /* Optimize wallet button for mobile */
+          :global(.wallet-adapter-button) {
+            padding: 0.5rem 0.875rem !important;
+            font-size: 0.85rem !important;
+            height: auto !important;
+            min-height: 44px !important; /* iOS touch target minimum */
+          }
+
+          :global(.wallet-adapter-button-start-icon) {
+            width: 20px !important;
+            height: 20px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .header-content {
+            padding: 0.5rem 0.5rem 0.4rem 0.5rem;
+          }
+
+          .logo-icon {
+            font-size: 1.5rem;
+          }
+
+          .logo-text h1 {
+            font-size: 0.875rem;
+          }
+
+          .storage-indicator {
+            padding: 0.4rem 0.6rem;
+          }
+
+          .btn-recovery {
+            padding: 0.45rem 0.75rem;
+            font-size: 0.8rem;
+          }
+
+          /* Make wallet button text shorter on very small screens */
+          :global(.wallet-adapter-button) {
+            padding: 0.45rem 0.75rem !important;
+            font-size: 0.8rem !important;
           }
         }
       `}</style>

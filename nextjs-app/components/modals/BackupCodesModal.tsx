@@ -446,9 +446,317 @@ export function BackupCodesModal({
         </div>
 
         <style jsx>{`
+          .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 1rem;
+          }
+
+          .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          }
+
+          .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e1e8ed;
+          }
+
+          .modal-header h2 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.5rem;
+          }
+
+          .modal-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: #7f8c8d;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+          }
+
+          .modal-close:hover {
+            color: #2c3e50;
+          }
+
+          .modal-body {
+            padding: 1.5rem;
+            min-height: 200px;
+          }
+
+          .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #e1e8ed;
+          }
+
           .backup-codes-modal {
             max-width: 700px;
             width: 90%;
+          }
+
+          .password-step {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+          }
+
+          .step-header {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+          }
+
+          .step-icon {
+            font-size: 2.5rem;
+            line-height: 1;
+            flex-shrink: 0;
+          }
+
+          .step-header h3 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+            font-size: 1.3rem;
+          }
+
+          .step-header p {
+            margin: 0;
+            color: #7f8c8d;
+            line-height: 1.5;
+          }
+
+          .password-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+          }
+
+          .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+
+          .form-group label {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.95rem;
+          }
+
+          .password-input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+          }
+
+          .password-input-group input {
+            flex: 1;
+            padding: 0.75rem 3rem 0.75rem 0.75rem;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+          }
+
+          .password-input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+
+          .form-group input[type="password"],
+          .form-group input[type="text"] {
+            padding: 0.75rem;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+          }
+
+          .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+
+          .btn-toggle-password {
+            position: absolute;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.3rem;
+            padding: 0.5rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+          }
+
+          .btn-toggle-password:hover {
+            opacity: 1;
+          }
+
+          .password-requirements {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #e1e8ed;
+          }
+
+          .password-requirements h4 {
+            margin: 0 0 0.75rem 0;
+            color: #2c3e50;
+            font-size: 0.9rem;
+          }
+
+          .password-requirements ul {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+
+          .password-requirements li {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+          }
+
+          .password-requirements li.valid {
+            color: #27ae60;
+            font-weight: 600;
+          }
+
+          .security-notice {
+            background: linear-gradient(135deg, #fff3cd 0%, #fff8e1 100%);
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem;
+          }
+
+          .security-notice h4 {
+            margin: 0 0 0.75rem 0;
+            color: #856404;
+            font-size: 0.95rem;
+          }
+
+          .security-notice ul {
+            margin: 0;
+            padding-left: 1.5rem;
+            color: #856404;
+            font-size: 0.85rem;
+            line-height: 1.6;
+          }
+
+          .security-notice li {
+            margin-bottom: 0.25rem;
+          }
+
+          .btn-cancel,
+          .btn-create-codes,
+          .btn-confirm {
+            padding: 0.875rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+
+          .btn-cancel {
+            background: #f8f9fa;
+            color: #2c3e50;
+            border: 1px solid #e1e8ed;
+          }
+
+          .btn-cancel:hover {
+            background: #e1e8ed;
+          }
+
+          .btn-create-codes {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+          }
+
+          .btn-create-codes:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+          }
+
+          .btn-create-codes:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          .btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          .btn-upgrade-security {
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+
+          .btn-upgrade-security:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+          }
+
+          .migration-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #fff8e1 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+          }
+
+          .warning-icon {
+            font-size: 2rem;
+            line-height: 1;
+          }
+
+          .warning-content h3 {
+            margin: 0 0 0.5rem 0;
+            color: #856404;
+            font-size: 1.1rem;
+          }
+
+          .warning-content p {
+            margin: 0;
+            color: #856404;
+            line-height: 1.5;
           }
 
           .first-time-notice {

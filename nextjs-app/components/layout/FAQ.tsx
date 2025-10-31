@@ -13,7 +13,7 @@ const faqData: FAQItem[] = [
     question: "What makes Lockbox innovative and first-of-its-kind?",
     answer: (
       <>
-        <strong>Lockbox is the first password manager to combine blockchain storage with client-side encryption in a truly decentralized architecture.</strong>
+        <strong>Solana's first password manager.</strong>
         <br /><br />
         <strong>Technical Innovation:</strong>
         <ul style={{ marginLeft: '20px', marginTop: '8px', marginBottom: '8px' }}>

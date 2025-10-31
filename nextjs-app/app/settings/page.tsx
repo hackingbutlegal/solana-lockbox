@@ -4,13 +4,12 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { AccountOverview } from '../../components/features/AccountOverview';
-import { SubscriptionBillingPanel } from '../../components/features/SubscriptionBillingPanel';
 import { SecuritySettingsPanel } from '../../components/features/SecuritySettingsPanel';
 import { PreferencesPanel } from '../../components/features/PreferencesPanel';
 import { ImportExportPanel } from '../../components/features/ImportExportPanel';
 import { DangerZonePanel } from '../../components/features/DangerZonePanel';
 import { LoadingState } from '../../components/ui/LoadingState';
-import { usePassword } from '../../contexts';
+import { usePassword, useLockbox } from '../../contexts';
 import { PasswordEntry } from '../../sdk/src/types-v2';
 
 /**
@@ -26,32 +25,53 @@ import { PasswordEntry } from '../../sdk/src/types-v2';
  * 7. Danger Zone - Account reset, closure
  */
 
-type SettingsTab = 'account' | 'storage' | 'import-export' | 'preferences' | 'danger-zone';
+type SettingsTab = 'account' | 'security' | 'import-export' | 'preferences' | 'danger-zone';
 
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { connected } = useWallet();
+  const { publicKey, connected } = useWallet();
+  const { masterLockbox, loading: lockboxLoading } = useLockbox();
 
   // Import/Export functionality
   const { entries, createEntry } = usePassword();
 
   // Get tab from URL query params, default to 'account'
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Redirect to home if wallet disconnects
+  // Redirect based on authentication state
   useEffect(() => {
     if (!connected) {
+      setRedirecting(true);
       router.push('/');
+    } else if (!lockboxLoading && !masterLockbox) {
+      setRedirecting(true);
+      router.push('/initialize');
     }
-  }, [connected, router]);
+  }, [connected, masterLockbox, lockboxLoading, router]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as SettingsTab;
-    if (tabParam && ['account', 'storage', 'import-export', 'preferences', 'danger-zone'].includes(tabParam)) {
+    if (tabParam && ['account', 'security', 'import-export', 'preferences', 'danger-zone'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
+
+  // Show loading state while checking vault status or redirecting
+  if (lockboxLoading || redirecting) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%)',
+      }}>
+        <LoadingState variant="pulse" size="lg" />
+      </div>
+    );
+  }
 
   const handleTabChange = (tab: SettingsTab) => {
     setActiveTab(tab);
@@ -84,11 +104,11 @@ function SettingsContent() {
             <span className="tab-label">Account</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'storage' ? 'active' : ''}`}
-            onClick={() => handleTabChange('storage')}
+            className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`}
+            onClick={() => handleTabChange('security')}
           >
-            <span className="tab-icon">💾</span>
-            <span className="tab-label">Storage</span>
+            <span className="tab-icon">🔒</span>
+            <span className="tab-label">Security</span>
           </button>
           <button
             className={`tab-btn ${activeTab === 'import-export' ? 'active' : ''}`}
@@ -116,7 +136,7 @@ function SettingsContent() {
         {/* Tab Content */}
         <div className="tab-content">
           {activeTab === 'account' && <AccountOverview />}
-          {activeTab === 'storage' && <SubscriptionBillingPanel />}
+          {activeTab === 'security' && <SecuritySettingsPanel />}
           {activeTab === 'import-export' && (
             <div className="import-export-panel">
               <ImportExportPanel
@@ -319,20 +339,37 @@ function SettingsContent() {
 
         @media (max-width: 768px) {
           .settings-container {
-            padding: 1rem;
+            padding: 0.75rem;
+          }
+
+          .breadcrumb {
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+          }
+
+          .page-header {
+            margin-bottom: 1.5rem;
           }
 
           .page-header h1 {
-            font-size: 2rem;
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+          }
+
+          .page-header p {
+            font-size: 0.95rem;
           }
 
           .tabs-nav {
             gap: 0.25rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0;
           }
 
           .tab-btn {
-            padding: 0.5rem 0.75rem;
+            padding: 0.6rem 0.75rem;
             font-size: 0.85rem;
+            border-radius: 8px 8px 0 0;
           }
 
           .tab-label {
@@ -340,11 +377,43 @@ function SettingsContent() {
           }
 
           .tab-icon {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
           }
 
           .tab-content {
-            padding: 1.5rem;
+            padding: 1.25rem;
+            border-radius: 16px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .settings-container {
+            padding: 0.5rem;
+          }
+
+          .page-header h1 {
+            font-size: 1.5rem;
+          }
+
+          .page-header p {
+            font-size: 0.9rem;
+          }
+
+          .tabs-nav {
+            gap: 0.15rem;
+          }
+
+          .tab-btn {
+            padding: 0.5rem 0.6rem;
+          }
+
+          .tab-icon {
+            font-size: 1.3rem;
+          }
+
+          .tab-content {
+            padding: 1rem;
+            border-radius: 12px;
           }
         }
       `}</style>
