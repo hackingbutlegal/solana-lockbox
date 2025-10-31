@@ -705,13 +705,26 @@ export function PasswordManager() {
               <div className="logo-icon">🔐</div>
               <h2>Solana Lockbox</h2>
             </div>
+            <div className="security-warning-banner" style={{
+              background: '#ff9800',
+              border: '2px solid #f57c00',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '24px',
+              color: '#000'
+            }}>
+              <strong>⚠️ TESTNET DEMO - NOT PROFESSIONALLY AUDITED</strong>
+              <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                Pre-production software on Devnet. Do not use for sensitive data. Security audit pending.
+              </div>
+            </div>
             <p className="tagline">The world&apos;s first blockchain-powered password manager</p>
             <div className="features-grid">
               <div className="feature-item">
                 <span className="feature-icon">🔒</span>
                 <div className="feature-content">
-                  <h4>Military-Grade Encryption</h4>
-                  <p>XChaCha20-Poly1305 encryption • Your data stays private, always</p>
+                  <h4>Client-Side Encryption</h4>
+                  <p>XChaCha20-Poly1305 AEAD • Your data stays private, always</p>
                 </div>
               </div>
               <div className="feature-item">
@@ -725,14 +738,14 @@ export function PasswordManager() {
                 <span className="feature-icon">🛡️</span>
                 <div className="feature-content">
                   <h4>Blockchain-Secured</h4>
-                  <p>Open-source, auditable • Data stored on Solana blockchain</p>
+                  <p>Open-source, auditable code • Data stored on Solana blockchain</p>
                 </div>
               </div>
               <div className="feature-item">
                 <span className="feature-icon">💰</span>
                 <div className="feature-content">
-                  <h4>No Subscriptions</h4>
-                  <p>One-time fees starting at 0.003 SOL (~$0.42) • Partially refundable</p>
+                  <h4>No Monthly Subscriptions</h4>
+                  <p>One-time storage fees per chunk • Rent is refundable</p>
                 </div>
               </div>
             </div>

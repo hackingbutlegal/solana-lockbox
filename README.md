@@ -2,6 +2,18 @@
 
 **A Decentralized Password Manager Built on Solana**
 
+> ## ⚠️ IMPORTANT SECURITY NOTICE
+>
+> **This is PRE-PRODUCTION software deployed on Solana Devnet for testing and demonstration purposes only.**
+>
+> - ❌ **NOT professionally security audited**
+> - ❌ **NOT recommended for real sensitive data**
+> - ❌ **Devnet can be reset without notice**
+> - ✅ **Use test data only**
+> - ⏳ **Professional audit planned for Q1 2026** before mainnet deployment
+>
+> **Wait for the audited mainnet version before storing real passwords or sensitive information.**
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solana](https://img.shields.io/badge/Solana-Devnet-9945FF)](https://solana.com)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.4-black)](https://nextjs.org)
@@ -11,7 +23,9 @@
 > **Categories:** Consumer Apps · Public Goods
 > **Developer:** Web3 Studios LLC
 > **Version:** 2.3.2
-> **Status:** ✅ Production Ready (Devnet)
+> **Status:** ⚠️ **Pre-Production** (Devnet - Not Professionally Audited)
+>
+> **📚 [Documentation Index](docs/INDEX.md)** | **🔒 [Security Policy](SECURITY_POLICY.md)** | **🔐 [Cryptography Spec](docs/CRYPTOGRAPHY.md)**
 
 ---
 
@@ -170,8 +184,8 @@ dApps, Services, Traditional Apps
 │   │  Next.js PWA (100% Client-Side)                        │    │
 │   │                                                         │    │
 │   │  1. User connects Solana wallet (Phantom, Solflare)   │    │
-│   │  2. Derive encryption key from wallet keypair         │    │
-│   │  3. Encrypt passwords with AES-256-GCM                │    │
+│   │  2. Sign challenge → derive key via HKDF-SHA256      │    │
+│   │  3. Encrypt passwords with XChaCha20-Poly1305        │    │
 │   │  4. Send encrypted blobs to blockchain                │    │
 │   │                                                         │    │
 │   │  • NO backend servers                                  │    │
@@ -216,99 +230,139 @@ dApps, Services, Traditional Apps
 
 **For Security Researchers and Cryptographers:**
 
-The implementation is fully auditable in `/nextjs-app/lib/crypto.ts` and `/programs/lockbox/src/`. Here's the complete cryptographic flow:
+The implementation is fully auditable in [/nextjs-app/lib/crypto.ts](nextjs-app/lib/crypto.ts) and [/programs/lockbox/src/](programs/lockbox/src/). Here's the complete cryptographic flow:
 
-#### 1. Key Derivation
+#### 1. Session Key Derivation (HKDF-SHA256)
 
 ```typescript
-// Derive 256-bit AES key from wallet's Ed25519 keypair
-// File: nextjs-app/lib/crypto.ts, function: deriveEncryptionKey()
+// Derive session key from wallet signature
+// File: nextjs-app/lib/crypto.ts, functions: deriveSessionKey() and createSessionKeyFromSignature()
 
-import { pbkdf2Sync } from 'crypto';
+// Step 1: Generate challenge for wallet to sign
+const challenge = generateChallenge(publicKey);
+// Challenge includes: publicKey + timestamp + random nonce + chain ID
 
-const masterKey = pbkdf2Sync(
-  password: wallet.secretKey,      // 32-byte Ed25519 secret key
-  salt: wallet.publicKey,          // 32-byte Ed25519 public key
-  iterations: 100_000,             // OWASP recommendation
-  keyLength: 32,                   // 256 bits for AES-256
-  digest: 'sha256'                 // HMAC-SHA256
+// Step 2: User signs challenge with wallet
+const signature = await wallet.signMessage(challenge);
+// Returns Ed25519 signature (64 bytes)
+
+// Step 3: Derive deterministic salt from public key
+const saltInput = concat(publicKey, "lockbox-salt-v1");
+const salt = SHA256(saltInput); // 32 bytes
+
+// Step 4: HKDF key derivation
+const ikm = concat(publicKey, signature, salt); // Input Key Material
+const sessionKey = HKDF-SHA256(
+  ikm: ikm,
+  salt: salt,
+  info: "lockbox-session-key",
+  length: 256 bits // 32 bytes
 );
-
-// Result: 256-bit key unique to this wallet
-// Property: Deterministic (same wallet = same key)
-// Security: 100k iterations prevents rainbow tables
 ```
 
-**Design Rationale:**
-- **PBKDF2** chosen for broad compatibility and FIPS 140-2 approval
-- **100,000 iterations** balances security and performance (OWASP 2023 guidelines)
-- **Salt = publicKey** prevents rainbow tables (unique per wallet)
-- **Password = secretKey** ensures only wallet owner can decrypt
+**Key Properties:**
+- **Algorithm**: HKDF-SHA256 (HMAC-based Key Derivation Function)
+- **Input**: publicKey (32 bytes) || signature (64 bytes) || salt (32 bytes)
+- **Salt**: Deterministic SHA-256(publicKey || "lockbox-salt-v1")
+- **Info**: "lockbox-session-key" (domain separation)
+- **Output**: 32-byte session key for XChaCha20-Poly1305
+- **Determinism**: Same signature → same session key (enables decryption)
+- **Replay Protection**: Challenge includes random nonce
 
-#### 2. Per-Entry Encryption
+**Design Rationale:**
+- **HKDF** provides cryptographically strong key derivation from non-uniform input
+- **Deterministic salt** ensures same wallet signature produces same decryption key
+- **SHA-256** provides 256-bit collision resistance
+- **No password storage** - keys exist only in memory during session
+
+#### 2. Password Encryption (XChaCha20-Poly1305 AEAD)
 
 ```typescript
-// Encrypt each password entry independently
-// File: nextjs-app/lib/crypto.ts, function: encrypt()
+// Encrypt password entry with authenticated encryption
+// File: nextjs-app/lib/crypto.ts, function: encryptAEAD()
 
-import { randomBytes } from 'crypto';
-import { createCipheriv } from 'crypto';
+import nacl from 'tweetnacl';
 
-// 1. Generate unique nonce (CRITICAL: Never reuse!)
-const nonce = randomBytes(12); // 96 bits for GCM
+// 1. Generate random 24-byte nonce (192-bit)
+const nonce = nacl.randomBytes(24);
 
-// 2. Prepare plaintext
-const plaintext = JSON.stringify({
+// 2. Prepare plaintext (JSON-serialized entry)
+const plaintext = new TextEncoder().encode(JSON.stringify({
   title: "Gmail",
   username: "user@gmail.com",
   password: "my-secret-password",
   url: "https://gmail.com",
-  notes: "Recovery: backup@example.com",
-  type: PasswordEntryType.Login,
+  notes: "Recovery email: backup@example.com",
+  type: "Login",
   category: 1,
   favorite: false,
   tags: ["email", "work"]
-});
+}));
 
-// 3. Encrypt with AES-256-GCM
-const cipher = createCipheriv('aes-256-gcm', masterKey, nonce);
+// 3. Encrypt using XChaCha20-Poly1305 (NaCl secretbox)
+const ciphertext = nacl.secretbox(plaintext, nonce, sessionKey);
+// Returns: encrypted_data + 16-byte Poly1305 authentication tag
 
-// 4. Add authenticated data (AAD) - not encrypted but authenticated
-cipher.setAAD(wallet.publicKey); // Binds ciphertext to this wallet
-
-let ciphertext = cipher.update(plaintext, 'utf8', 'hex');
-ciphertext += cipher.final('hex');
-
-// 5. Extract authentication tag
-const authTag = cipher.getAuthTag(); // 128-bit tag
-
-// 6. Construct final encrypted blob
-const encryptedBlob = Buffer.concat([
-  nonce,         // 12 bytes
-  authTag,       // 16 bytes
-  Buffer.from(ciphertext, 'hex')  // Variable length
-]);
-
-// Result: Authenticated, encrypted blob
-// Properties:
-//   - Confidentiality: AES-256 is unbreakable with current technology
-//   - Integrity: GCM auth tag detects any tampering
-//   - Uniqueness: Each encryption uses fresh random nonce
-//   - Binding: AAD ties ciphertext to specific wallet
+// 4. Result format (stored on-chain)
+const result = {
+  ciphertext: ciphertext,  // plaintext.length + 16 bytes (MAC tag)
+  nonce: nonce,            // 24 bytes
+  salt: salt               // 32 bytes (for key re-derivation)
+};
 ```
 
-**Security Properties:**
+**Encryption Specifications:**
+
+| Property | Value | Details |
+|----------|-------|---------|
+| **Algorithm** | XChaCha20-Poly1305 | AEAD cipher (authenticated encryption) |
+| **Cipher** | XChaCha20 | Extended-nonce ChaCha20 stream cipher |
+| **MAC** | Poly1305 | 128-bit authentication tag |
+| **Key Size** | 256 bits (32 bytes) | From HKDF-SHA256 derivation |
+| **Nonce Size** | 192 bits (24 bytes) | Extended nonce space (XChaCha) |
+| **Tag Size** | 128 bits (16 bytes) | Poly1305 MAC appended to ciphertext |
+| **Library** | TweetNaCl 1.0.3 | Audited NaCl implementation (D. Bernstein) |
+| **Nonce Reuse** | NEVER | Cryptographically random per encryption |
+
+**Security Guarantees:**
 
 | Property | Implementation | Guarantee |
 |----------|---------------|-----------|
-| **Confidentiality** | AES-256 (256-bit key) | Computationally infeasible to break |
-| **Integrity** | GCM authentication tag | Detects any bit flip or tampering |
-| **Authenticity** | AAD = wallet public key | Prevents ciphertext reuse across wallets |
-| **Forward Secrecy** | Unique nonce per entry | Compromise of one entry doesn't affect others |
-| **Replay Protection** | Nonce never reused | Prevents replay attacks |
-| **Side-Channel Resistance** | Constant-time comparison | Mitigates timing attacks on auth tag |
+| **Confidentiality** | XChaCha20 (256-bit key) | IND-CPA secure stream cipher |
+| **Integrity** | Poly1305 authentication | Detects any tampering (forgery resistance) |
+| **Authenticity** | AEAD construction | Ciphertext is authenticated |
+| **Nonce Uniqueness** | 192-bit random nonce | 2^-96 collision probability |
+| **Forward Secrecy** | Independent per entry | Compromise one ≠ compromise others |
+| **Domain Separation** | HKDF info string | Session keys isolated from search keys |
 
-#### 3. On-Chain Storage Format
+#### 3. Secondary Encryption: AES-GCM (Recovery & Sharing)
+
+**Note**: Social recovery and password sharing features use **AES-GCM** (WebCrypto API) instead of XChaCha20-Poly1305:
+
+```typescript
+// Used in: lib/recovery-client-v2.ts and lib/password-sharing.ts
+const encryptedData = await crypto.subtle.encrypt(
+  {
+    name: 'AES-GCM',
+    iv: nonce // 12 bytes (96-bit)
+  },
+  key, // 256-bit AES key
+  plaintext
+);
+```
+
+**Why two algorithms?**
+- **Main storage (XChaCha20-Poly1305)**: TweetNaCl provides consistent cross-platform implementation
+- **Recovery/Sharing (AES-GCM)**: WebCrypto API provides native browser performance
+- **Both are secure**: NIST/industry-standard AEAD ciphers with 256-bit keys
+
+**Specifications:**
+- **Algorithm**: AES-256-GCM
+- **Key Size**: 256 bits
+- **IV Size**: 96 bits (12 bytes) - standard for GCM
+- **Tag Size**: 128 bits (16 bytes) - authentication tag
+
+#### 4. On-Chain Storage Format
 
 ```rust
 // What actually gets stored on Solana
@@ -324,7 +378,7 @@ pub struct StorageChunk {
     pub data_type: StorageType,       // Passwords, Notes, etc.
 
     // ⚠️ ENCRYPTED DATA - OPAQUE TO PROGRAM
-    pub encrypted_data: Vec<u8>,      // AES-256-GCM ciphertext
+    pub encrypted_data: Vec<u8>,      // XChaCha20-Poly1305 ciphertext
 
     // METADATA (for indexing, NOT sensitive)
     pub entry_headers: Vec<DataEntryHeader>,
@@ -370,77 +424,67 @@ Data: [0xf3, 0x9a, 0x7c, 0xe2, 0x45, 0x8f, 0x1b, ...] ← Gibberish
 
 **Security Guarantee:** Even Solana validators cannot decrypt your passwords.
 
-#### 4. Decryption (Retrieval)
+#### 5. Decryption (Retrieval)
 
 ```typescript
 // Decrypt passwords when user needs them
-// File: nextjs-app/lib/crypto.ts, function: decrypt()
+// File: nextjs-app/lib/crypto.ts, function: decryptAEAD()
 
-import { createDecipheriv } from 'crypto';
+import nacl from 'tweetnacl';
 
-// 1. Fetch encrypted blob from blockchain
+// 1. User signs challenge to derive session key (same as encryption)
+const challenge = generateChallenge(publicKey);
+const signature = await wallet.signMessage(challenge);
+const { sessionKey, salt } = await createSessionKeyFromSignature(publicKey, signature);
+
+// 2. Fetch encrypted data from blockchain
 const chunk = await program.account.storageChunk.fetch(chunkAddress);
-const encryptedBlob = Buffer.from(chunk.encryptedData);
+const ciphertext = chunk.encryptedData; // Includes 16-byte Poly1305 tag
+const nonce = chunk.nonce; // 24 bytes
 
-// 2. Extract components
-const nonce = encryptedBlob.slice(0, 12);
-const authTag = encryptedBlob.slice(12, 28);
-const ciphertext = encryptedBlob.slice(28);
+// 3. Decrypt using XChaCha20-Poly1305
+const plaintext = nacl.secretbox.open(ciphertext, nonce, sessionKey);
 
-// 3. Derive master key from wallet (same as encryption)
-const masterKey = deriveEncryptionKey(wallet);
-
-// 4. Create decipher
-const decipher = createDecipheriv('aes-256-gcm', masterKey, nonce);
-
-// 5. Set auth tag and AAD (must match encryption!)
-decipher.setAuthTag(authTag);
-decipher.setAAD(wallet.publicKey);
-
-// 6. Decrypt
-let plaintext;
-try {
-  plaintext = decipher.update(ciphertext, 'hex', 'utf8');
-  plaintext += decipher.final('utf8');  // ← Verifies auth tag here
-} catch (error) {
-  // Auth tag mismatch = tampering detected
-  throw new Error('Decryption failed: data has been tampered with');
+if (!plaintext) {
+  // Authentication failed - data has been tampered with
+  throw new Error('Decryption failed: invalid ciphertext or key');
 }
 
-// 7. Parse and return
-const entry = JSON.parse(plaintext);
+// 4. Parse and return password entry
+const entry = JSON.parse(new TextDecoder().decode(plaintext));
 return entry;
 ```
 
 **Tamper Detection:**
-If even a single bit of the ciphertext is modified, `decipher.final()` throws an error. This is GCM's authenticated encryption guarantee.
+If even a single bit of the ciphertext is modified, `nacl.secretbox.open()` returns `null`. This is Poly1305's authenticated encryption guarantee - the MAC verification fails and decryption is aborted.
 
-#### 5. Security Analysis
+#### 6. Security Analysis
 
 **Threat Model:**
 
 | Threat | Mitigation |
 |--------|-----------|
-| **Blockchain observer** | AES-256 encryption (ciphertext reveals nothing) |
+| **Blockchain observer** | XChaCha20-Poly1305 encryption (ciphertext reveals nothing) |
 | **Man-in-the-middle** | HTTPS + RPC signatures (Solana's built-in security) |
 | **Compromised validator** | Validators only see ciphertext, can't decrypt |
 | **Malicious program upgrade** | Program is immutable (or explicitly upgradeable with multisig) |
 | **Wallet theft** | User must secure their seed phrase (same as any crypto) |
 | **Browser compromise** | Plaintext exists briefly in memory (same as all password managers) |
-| **Timing attacks** | Constant-time auth tag comparison |
-| **Nonce reuse** | Cryptographically secure RNG, 96-bit nonce space |
-| **Key derivation attacks** | 100k PBKDF2 iterations + unique salt |
+| **Timing attacks** | Constant-time operations in NaCl library |
+| **Nonce reuse** | Cryptographically secure RNG, 192-bit nonce space |
+| **Key derivation attacks** | HKDF-SHA256 with deterministic salt |
+| **Replay attacks** | Challenge includes random nonce + timestamp |
 
 **Cryptographic Verification:**
 
 Researchers can verify the implementation:
-1. **Source Code:** All crypto in `/nextjs-app/lib/crypto.ts` (JavaScript)
+1. **Source Code:** All crypto in [/nextjs-app/lib/crypto.ts](nextjs-app/lib/crypto.ts) (TypeScript)
 2. **Dependencies:**
-   - `crypto` (Node.js built-in, FIPS 140-2 validated)
-   - `tweetnacl` (Ed25519 operations, DJB's library)
-3. **Smart Contract:** `/programs/lockbox/src/` (Rust, Anchor framework)
+   - `tweetnacl@1.0.3` - XChaCha20-Poly1305 AEAD (D. Bernstein's NaCl)
+   - `crypto.subtle` (WebCrypto API) - HKDF-SHA256 key derivation
+3. **Smart Contract:** [/programs/lockbox/src/](programs/lockbox/src/) (Rust, Anchor framework)
 4. **On-Chain Binary:** Deployed program can be decompiled and compared
-5. **IDL:** `/nextjs-app/lib/idl/lockbox.json` (interface definition)
+5. **IDL:** [/sdk/idl/lockbox-v2.json](sdk/idl/lockbox-v2.json) (interface definition)
 
 **External Audit Status:**
 - ⏳ Pending full external audit before mainnet
@@ -537,7 +581,7 @@ Researchers can verify the implementation:
 |---------|----------------|------------------|
 | **Cross-Browser** | ✅ Yes (wallet-based) | ❌ No (browser-locked) |
 | **Cross-Device** | ✅ Yes (blockchain) | ⚠️ Limited (account sync) |
-| **Encryption** | AES-256-GCM | OS keychain (varies) |
+| **Encryption** | XChaCha20-Poly1305 | OS keychain (varies) |
 | **Password Health** | ✅ Yes | ⚠️ Basic |
 | **Breach Detection** | ✅ Yes | ⚠️ Chrome only |
 | **Categories/Tags** | ✅ Yes | ❌ No |
@@ -699,7 +743,7 @@ await lockbox.deletePassword(chunkIndex, entryId);
 - ⏳ **Mainnet:** Planned Q1 2026 (after external audit)
 
 **Security Status:**
-- ✅ All critical vulnerabilities patched (see [SECURITY.md](./docs/security/SECURITY.md))
+- ✅ All critical vulnerabilities patched (see [SECURITY_STATUS.md](./docs/security/SECURITY_STATUS.md))
 - ✅ Internal security review completed
 - ✅ Constant-time cryptographic operations
 - ✅ Comprehensive test coverage (85%+)
@@ -709,7 +753,7 @@ await lockbox.deletePassword(chunkIndex, entryId);
 **Feature Completeness:**
 - ✅ Core password management (CRUD)
 - ✅ Multiple entry types (7 types)
-- ✅ Encryption/decryption (AES-256-GCM)
+- ✅ Encryption/decryption (XChaCha20-Poly1305)
 - ✅ Mobile support (PWA + MWA)
 - ✅ Import/export (5 formats)
 - ✅ Dynamic storage expansion
@@ -855,8 +899,8 @@ await lockbox.deletePassword(chunkIndex, entryId);
 | **TypeScript** | 5.x | Type safety |
 | **Solana Wallet Adapter** | 0.15.39 | Wallet connection |
 | **Mobile Wallet Adapter** | 2.2.4 | Seeker support |
-| **TweetNaCl** | 1.0.3 | Ed25519 crypto primitives |
-| **crypto (Node.js)** | Built-in | AES-256-GCM encryption |
+| **TweetNaCl** | 1.0.3 | XChaCha20-Poly1305 encryption |
+| **Web Crypto API** | Browser built-in | HKDF-SHA256 key derivation |
 | **zxcvbn** | 4.4.2 | Password strength estimation |
 | **Playwright** | 1.40+ | E2E testing |
 
@@ -898,7 +942,7 @@ We welcome contributions from the Solana community!
 **Ways to Contribute:**
 - 🐛 Report bugs (GitHub Issues)
 - 💡 Suggest features (GitHub Discussions)
-- 🔐 Security research (see [SECURITY.md](./SECURITY.md))
+- 🔐 Security research (see [SECURITY_POLICY.md](./SECURITY_POLICY.md))
 - 📝 Improve documentation
 - 🧪 Add tests
 - 🎨 Design improvements
@@ -934,7 +978,7 @@ We welcome contributions from the Solana community!
 
 If you discover a security vulnerability, please follow our security policy:
 
-1. **Review:** [SECURITY.md](./SECURITY.md) for full disclosure guidelines
+1. **Review:** [SECURITY_POLICY.md](./SECURITY_POLICY.md) for full disclosure guidelines
 2. **Contact:** security@web3stud.io
 3. **Include:** Description, reproduction steps, potential impact, severity
 4. **Do NOT:** Open public GitHub issues for security vulnerabilities
@@ -946,8 +990,8 @@ If you discover a security vulnerability, please follow our security policy:
 - Medium/Low: Credit in release notes
 
 **Security Documentation:**
-- [SECURITY.md](./SECURITY.md) - **Vulnerability reporting policy**
-- [Security Posture](./docs/security/SECURITY.md) - Current security status
+- [SECURITY_POLICY.md](./SECURITY_POLICY.md) - **Vulnerability reporting policy**
+- [Security Status](./docs/security/SECURITY_STATUS.md) - Current security posture & fixes
 - [CRYPTOGRAPHY.md](./docs/CRYPTOGRAPHY.md) - Cryptographic implementation
 - [Audit Reports](./docs/security/) - Security audit history
 
@@ -984,7 +1028,7 @@ If you discover a security vulnerability, please follow our security policy:
 ### Technical Specs
 - 🏛️ [Architecture Deep Dive](./docs/architecture/ARCHITECTURE.md)
 - 🔬 [Cryptographic Specification](./docs/CRYPTOGRAPHY.md)
-- 🛡️ [Security Analysis](./docs/security/SECURITY.md)
+- 🛡️ [Security Analysis](./docs/security/SECURITY_STATUS.md)
 - 📊 [Performance Benchmarks](./docs/PERFORMANCE.md)
 
 ---

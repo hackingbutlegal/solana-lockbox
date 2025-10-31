@@ -39,7 +39,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How does encryption work?",
-    answer: "All encryption happens in your browser using XChaCha20-Poly1305 (military-grade encryption). Your wallet signature is used to derive a session key, which encrypts your data. The encrypted data is then stored on Solana's blockchain."
+    answer: "All encryption happens in your browser using XChaCha20-Poly1305 (industry-standard authenticated encryption) for password storage. Social recovery and sharing features use AES-GCM. Your wallet signature is used to derive a session key via HKDF-SHA256, which encrypts your data. The encrypted data is then stored on Solana's blockchain. Keys exist only in memory and are never stored."
   },
   {
     question: "Where are my encryption keys stored?",
@@ -51,7 +51,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How much does it cost to use?",
-    answer: "Storage costs 0.001 SOL per transaction (~$0.0002 USD at current prices). The first time you store data, there's an additional one-time cost of ~0.009 SOL to create your account. This is currently on Devnet (free test network)."
+    answer: "One-time storage rent: ~0.01-0.03 SOL per storage chunk (recoverable when account closed). Initial account creation: ~0.009 SOL. Transaction fees: ~0.00001 SOL per operation. There are NO monthly subscriptions - you pay once for storage space. Currently on Devnet (free test network with test SOL)."
   },
   {
     question: "What's the maximum data size?",

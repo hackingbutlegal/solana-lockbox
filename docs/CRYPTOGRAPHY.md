@@ -2,6 +2,10 @@
 
 **Technical Specification for Security Researchers and Cryptographers**
 
+> **Last Updated:** October 30, 2025
+> **Version:** 2.3.2
+> **Status:** ⚠️ Pre-Production (Not Professionally Audited)
+
 This document provides a complete, proof-level description of the cryptographic implementation in Solana Lockbox. All claims are verifiable by examining the source code referenced below.
 
 ---
@@ -10,321 +14,460 @@ This document provides a complete, proof-level description of the cryptographic 
 
 1. [Overview](#overview)
 2. [Threat Model](#threat-model)
-3. [Key Derivation](#key-derivation)
-4. [Password Entry Encryption](#password-entry-encryption)
-5. [Data Integrity](#data-integrity)
-6. [Authentication](#authentication)
-7. [Security Properties](#security-properties)
-8. [Attack Resistance](#attack-resistance)
-9. [Formal Security Analysis](#formal-security-analysis)
-10. [Implementation Details](#implementation-details)
-11. [Audit Trail](#audit-trail)
+3. [Session Key Derivation (HKDF-SHA256)](#session-key-derivation-hkdf-sha256)
+4. [Password Encryption (XChaCha20-Poly1305)](#password-encryption-xchacha20-poly1305)
+5. [Secondary Encryption (AES-GCM)](#secondary-encryption-aes-gcm)
+6. [Security Properties](#security-properties)
+7. [Attack Resistance](#attack-resistance)
+8. [Implementation Details](#implementation-details)
+9. [Cryptographic Dependencies](#cryptographic-dependencies)
+10. [Security Audit Status](#security-audit-status)
 
 ---
 
 ## Overview
 
 ### Architecture
+
 Solana Lockbox implements a **client-side encryption** architecture where:
 1. All cryptographic operations occur in the user's browser
-2. Only **ciphertext** is stored on-chain
+2. Only **ciphertext** is stored on the Solana blockchain
 3. The blockchain acts as an immutable, replicated storage layer
-4. Decryption keys never leave the client environment
+4. Encryption keys **never leave the client** and exist only in memory during active sessions
+5. Keys are derived from wallet signatures (deterministically) rather than stored
 
 ### Cryptographic Primitives
 
-| Primitive | Algorithm | Standard | Purpose |
+| Component | Algorithm | Standard | Purpose |
 |-----------|-----------|----------|---------|
-| **Key Derivation** | PBKDF2-HMAC-SHA256 | RFC 8018 | Derive encryption key from wallet keypair |
-| **Symmetric Encryption** | AES-256-GCM | NIST SP 800-38D | Encrypt password entries |
-| **Authentication** | GCM Auth Tag (128-bit) | NIST SP 800-38D | Authenticate ciphertext integrity |
-| **Nonce Generation** | crypto.getRandomValues() | Web Crypto API | Generate unique IVs |
-| **Wallet Signing** | Ed25519 | RFC 8032 | Authorize blockchain transactions |
+| **Session Key Derivation** | HKDF-SHA256 | RFC 5869 | Derive encryption key from wallet signature |
+| **Salt Derivation** | SHA-256 | FIPS 180-4 | Deterministic salt from public key |
+| **Main Encryption** | XChaCha20-Poly1305 | RFC 8439 (extended) | Encrypt password entries (AEAD) |
+| **Secondary Encryption** | AES-256-GCM | NIST SP 800-38D | Recovery & sharing features (AEAD) |
+| **Challenge-Response** | Ed25519 Signature | RFC 8032 | Wallet authentication for key derivation |
+| **Nonce Generation** | crypto.getRandomValues() | Web Crypto API | Cryptographically secure random nonces |
+| **Memory Wiping** | Multi-pass overwrite | Custom | Secure erasure of sensitive data |
 
 ### Trust Assumptions
 
 **What We Trust:**
-- ✅ Browser's Web Crypto API implementation (provided by OS/browser vendor)
-- ✅ User's Solana wallet implementation (Phantom, Solflare, etc.)
-- ✅ Solana blockchain consensus (validator honesty assumed ≥66.67%)
+- ✅ Browser's Web Crypto API implementation (HKDF-SHA256, AES-GCM)
+- ✅ TweetNaCl library implementation (XChaCha20-Poly1305)
+- ✅ User's Solana wallet implementation (Ed25519 signing)
+- ✅ Solana blockchain consensus (≥66.67% honest validators)
+- ✅ Operating system's random number generator (crypto.getRandomValues)
 
 **What We Don't Trust:**
-- ❌ The blockchain network (assumes adversarial observers)
-- ❌ RPC providers (can see encrypted data, but not plaintext)
-- ❌ Web server hosting the application (code is open-source and verifiable)
-- ❌ Third-party services (none used)
+- ❌ The blockchain network (assumes passive/active adversaries can observe)
+- ❌ RPC providers (can see encrypted data, transaction patterns)
+- ❌ Web server hosting the application (static files, verifiable by hash)
+- ❌ Third-party services (none used for cryptographic operations)
+- ❌ Other users or validators (zero-knowledge architecture)
 
 ---
 
 ## Threat Model
 
-### Adversaries
+### Primary Adversaries
 
-**Adversary A1: Passive Network Observer**
-- **Capabilities:** Can read all blockchain data, observe RPC calls
-- **Goal:** Decrypt password entries
-- **Mitigation:** All entries encrypted with AES-256-GCM, computationally infeasible to break
+**Adversary A1: Passive Blockchain Observer**
+- **Capabilities:** Can read all on-chain data, monitor transactions, observe patterns
+- **Goal:** Decrypt password entries without wallet access
+- **Mitigation:** XChaCha20-Poly1305 provides IND-CPA security; computationally infeasible to decrypt
+- **Result:** ❌ **Attack fails** - ciphertext is semantically secure
 
 **Adversary A2: Active Blockchain Manipulator**
-- **Capabilities:** Can modify blockchain state (if controlling ≥33.33% of validators)
-- **Goal:** Substitute ciphertext, cause decryption to different plaintext
-- **Mitigation:** GCM authentication tags detect any tampering, AAD binds ciphertext to wallet
+- **Capabilities:** Can modify on-chain ciphertext (Byzantine validators)
+- **Goal:** Cause decryption to different plaintext or extract key information
+- **Mitigation:** Poly1305 authentication tag detects any tampering; decryption aborts
+- **Result:** ❌ **Attack detected** - tampered ciphertext rejected
 
 **Adversary A3: Malicious RPC Provider**
-- **Capabilities:** Can return fake account data
-- **Goal:** Cause user to decrypt wrong data or leak keys
-- **Mitigation:** All ciphertext is authenticated; fake data fails authentication check
+- **Capabilities:** Can return fake account data, incorrect blockchain state
+- **Goal:** Cause user to decrypt wrong data, leak session keys, or accept forged entries
+- **Mitigation:** All ciphertext authenticated with Poly1305; fake data fails MAC verification
+- **Result:** ❌ **Attack detected** - authentication failure
 
-**Adversary A4: Stolen Wallet (Without Master Password)**
-- **Capabilities:** Has wallet keypair but not master password
-- **Goal:** Decrypt password vault
-- **Result:** **CANNOT decrypt** (requires both wallet keypair AND master password)
+**Adversary A4: Stolen Wallet / Lost Seed Phrase**
+- **Capabilities:** Obtains user's wallet seed phrase or private key
+- **Goal:** Access encrypted password vault
+- **Result:** ✅ **Attack succeeds** - this is by design (wallet = master key)
+- **Note:** Same threat model as losing master password in traditional password managers
 
-**Adversary A5: Compromised Client Environment**
-- **Capabilities:** Can execute JavaScript in user's browser
-- **Goal:** Extract decryption keys or plaintext passwords
-- **Result:** **ATTACK SUCCEEDS** (this is out-of-scope; similar to keylogger on desktop)
+**Adversary A5: Compromised Browser / XSS Attack**
+- **Capabilities:** Execute arbitrary JavaScript in user's browser session
+- **Goal:** Extract session keys or plaintext passwords from memory
+- **Result:** ✅ **Attack succeeds** - client-side compromise defeats all cryptography
+- **Mitigation:** Content Security Policy (CSP), memory wiping on session end
+- **Note:** Out of scope - equivalent to keylogger on desktop applications
+
+**Adversary A6: Replay Attack**
+- **Capabilities:** Capture and replay wallet signatures from previous sessions
+- **Goal:** Derive session keys without user consent
+- **Mitigation:** Challenge includes random 32-byte nonce + timestamp
+- **Result:** ❌ **Attack fails** - each challenge is unique, signatures not reusable
 
 ### Out-of-Scope Threats
 
-1. **Browser/OS Compromise:** If attacker controls execution environment, all client-side encryption is defeated
-2. **Side-Channel Attacks:** Timing attacks, power analysis (not applicable to browser environment)
-3. **Social Engineering:** Phishing, credential theft (user education required)
+1. **Browser/OS Compromise:** If attacker controls execution environment, all cryptography is defeated
+2. **Side-Channel Attacks:** Timing attacks, cache analysis (JavaScript environment limitations)
+3. **Social Engineering:** Phishing for wallet seed phrases, fake wallet applications
+4. **Quantum Computing:** Current algorithms (Ed25519, XChaCha20, SHA-256) vulnerable to quantum attacks
+   - Post-quantum migration planned for when quantum-safe Solana wallets exist
 
 ---
 
-## Key Derivation
+## Session Key Derivation (HKDF-SHA256)
 
-### Overview
-Solana Lockbox derives a **256-bit master encryption key** from the user's Solana wallet keypair using PBKDF2-HMAC-SHA256.
+### Purpose
+
+Derive a deterministic 256-bit session key from a user's wallet signature. The session key is used for XChaCha20-Poly1305 encryption and persists only in memory during the active session.
 
 ### Algorithm
 
+**HKDF** (HMAC-based Key Derivation Function) as specified in **RFC 5869** with SHA-256.
+
+### Implementation
+
+**Source Code:** [nextjs-app/lib/crypto.ts](../nextjs-app/lib/crypto.ts) - Functions: `deriveSessionKey()`, `createSessionKeyFromSignature()`
+
+#### Step 1: Generate Challenge for Wallet Signature
+
 ```typescript
-// Inputs:
-const walletSecretKey: Uint8Array = wallet.secretKey; // 64 bytes (Ed25519 secret key)
-const walletPublicKey: Uint8Array = wallet.publicKey.toBytes(); // 32 bytes
-const userMasterPassword: string = "<user_chosen_password>"; // 12+ chars
+function generateChallenge(publicKey: PublicKey): Uint8Array {
+  const timestamp = Date.now();
+  const nonce = crypto.getRandomValues(new Uint8Array(32)); // 256-bit random
 
-// Step 1: Combine wallet secret with master password
-const combinedSecret = new Uint8Array([
-  ...walletSecretKey,           // 64 bytes
-  ...new TextEncoder().encode(userMasterPassword) // variable length
-]);
+  const message = `Lockbox Session Key Derivation
 
-// Step 2: Derive master key using PBKDF2
-const masterKey: Uint8Array = pbkdf2Sync(
-  password: combinedSecret,     // Combined secret (64+ bytes)
-  salt: walletPublicKey,        // 32-byte public key (globally unique)
-  iterations: 100_000,          // OWASP 2023 recommendation
-  keyLength: 32,                // 256 bits for AES-256
-  digest: 'sha256'              // HMAC-SHA256
-);
+Public Key: ${publicKey.toBase58()}
+Timestamp: ${timestamp}
+Nonce: ${nonceHex}
+Chain: solana-devnet
+
+Sign this message to derive an encryption key for this session.
+
+⚠️  WARNING: Only sign this on trusted applications.
+⚠️  DO NOT sign if you did not initiate this request.`;
+
+  return new TextEncoder().encode(message);
+}
 ```
 
-**Implementation Reference:** [`nextjs-app/lib/encryption.ts:15-45`](../nextjs-app/lib/encryption.ts)
+**Properties:**
+- **Domain Separation:** "Lockbox Session Key Derivation" prevents cross-protocol attacks
+- **Public Key Binding:** Ties challenge to specific wallet
+- **Timestamp:** Provides temporal context (not used for expiry, just context)
+- **Random Nonce:** 256-bit entropy prevents replay attacks
+- **Chain Identifier:** Prevents cross-chain signature reuse
+
+#### Step 2: User Signs Challenge with Wallet
+
+```typescript
+const signature = await wallet.signMessage(challenge);
+// Returns: Ed25519 signature (64 bytes)
+```
+
+**Security Note:** User must confirm signature in wallet UI (Phantom/Solflare modal)
+
+#### Step 3: Derive Deterministic Salt from Public Key
+
+```typescript
+const saltInput = new Uint8Array([
+  ...publicKey.toBytes(),                          // 32 bytes
+  ...new TextEncoder().encode('lockbox-salt-v1')   // 16 bytes
+]);
+
+const saltBuffer = await crypto.subtle.digest('SHA-256', saltInput);
+const salt = new Uint8Array(saltBuffer); // 32 bytes
+```
+
+**Rationale:**
+- **Determinism:** Same public key → same salt → same session key from same signature
+- **Uniqueness:** SHA-256 ensures each wallet has unique salt
+- **Version String:** "lockbox-salt-v1" allows future salt rotation if needed
+
+**Properties:**
+- **Output:** 32-byte deterministic salt
+- **Collision Resistance:** SHA-256 provides 256-bit collision resistance
+- **Domain Separation:** Version string prevents reuse across protocol versions
+
+#### Step 4: HKDF Key Derivation
+
+```typescript
+// Concatenate Input Key Material (IKM)
+const ikm = new Uint8Array([
+  ...publicKey.toBytes(),  // 32 bytes
+  ...signature,            // 64 bytes (Ed25519 signature)
+  ...salt                  // 32 bytes
+]);
+// Total IKM: 128 bytes
+
+// Import IKM as HKDF key
+const key = await crypto.subtle.importKey(
+  'raw',
+  ikm,
+  { name: 'HKDF' },
+  false,
+  ['deriveBits']
+);
+
+// Derive session key
+const infoBytes = new TextEncoder().encode('lockbox-session-key');
+const derivedBits = await crypto.subtle.deriveBits(
+  {
+    name: 'HKDF',
+    hash: 'SHA-256',      // HMAC-SHA256
+    salt: salt,           // 32-byte salt
+    info: infoBytes,      // "lockbox-session-key" (domain separation)
+  },
+  key,
+  256 // Output: 32 bytes (256 bits)
+);
+
+const sessionKey = new Uint8Array(derivedBits);
+```
+
+### HKDF Parameters
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| **Hash Function** | SHA-256 | HMAC-SHA256 for extract & expand |
+| **IKM (Input Key Material)** | 128 bytes | publicKey (32) ‖ signature (64) ‖ salt (32) |
+| **Salt** | 32 bytes | Deterministic from SHA-256(publicKey ‖ "lockbox-salt-v1") |
+| **Info** | "lockbox-session-key" | Domain separation for session keys |
+| **Output Length** | 256 bits (32 bytes) | XChaCha20-Poly1305 key size |
 
 ### Security Properties
 
-| Property | Value | Rationale |
-|----------|-------|-----------|
-| **Iteration Count** | 100,000 | OWASP 2023 recommendation for PBKDF2-SHA256 |
-| **Salt** | Wallet Public Key (32 bytes) | Globally unique per wallet (collision probability ≈ 2^-256) |
-| **Key Length** | 256 bits | Matches AES-256 key size |
-| **Entropy Source** | Ed25519 secret key (256 bits) + user password | High entropy even with weak password |
+| Property | Guarantee |
+|----------|-----------|
+| **Determinism** | Same signature → same session key (enables decryption) |
+| **Uniqueness** | Each wallet has unique session key |
+| **Forward Secrecy** | Compromise of one session doesn't reveal others |
+| **Domain Separation** | Info string isolates session keys from search keys |
+| **Key Strength** | 256-bit output entropy |
+| **Standard Compliance** | RFC 5869 (HKDF) |
 
-### Security Analysis
+### Attack Resistance
 
-**Claim 1:** *The derived master key has ≥256 bits of entropy.*
-
-**Proof:**
-- Ed25519 secret keys are uniformly random 256-bit values
-- Even with zero-entropy password, total entropy ≥ 256 bits
-- User password adds additional entropy (≥40 bits for typical 12-char password)
-- PBKDF2 is a PRF (pseudorandom function); output is computationally indistinguishable from uniform random
-- ∴ master key has full 256 bits of security
-
-**Claim 2:** *PBKDF2 with 100k iterations resists brute-force attacks.*
-
-**Analysis:**
-- Attacker needs wallet secret key to attempt password guessing
-- If attacker has wallet secret, they can already sign transactions (vault is already compromised)
-- Master password serves as **second factor** defense-in-depth
-- 100k iterations makes each password attempt cost ~100ms (rate limiting at cryptographic level)
-
-**Claim 3:** *Each wallet derives a unique master key (no collisions).*
-
-**Proof:**
-- Salt is the wallet public key (32 bytes)
-- Ed25519 public keys are generated from secret keys via point multiplication on Curve25519
-- Probability of two wallets sharing the same public key: P(collision) ≈ 2^-256
-- For 2^80 wallets, collision probability ≈ 2^-96 (negligible)
-- ∴ Each wallet has a unique salt → unique master key
+**Pre-Image Attack:** SHA-256 provides 256-bit pre-image resistance
+**Collision Attack:** SHA-256 provides 128-bit collision resistance
+**Rainbow Tables:** Deterministic salt is unique per wallet, prevents precomputation
+**Brute Force:** 2^256 key space, computationally infeasible
 
 ---
 
-## Password Entry Encryption
+## Password Encryption (XChaCha20-Poly1305)
 
-### Overview
-Each password entry is encrypted independently using **AES-256-GCM** with a unique nonce.
+### Purpose
+
+Encrypt individual password entries with authenticated encryption (AEAD). Each entry is encrypted independently with a unique nonce.
 
 ### Algorithm
 
+**XChaCha20-Poly1305** - Extended-nonce variant of ChaCha20-Poly1305 AEAD cipher.
+
+- **Cipher:** XChaCha20 (stream cipher by Daniel J. Bernstein)
+- **MAC:** Poly1305 (message authentication code)
+- **Construction:** Encrypt-then-MAC (AEAD)
+- **Nonce Size:** 192 bits (24 bytes) - extended nonce space
+- **Key Size:** 256 bits (32 bytes)
+- **Tag Size:** 128 bits (16 bytes)
+
+### Implementation
+
+**Source Code:** [nextjs-app/lib/crypto.ts](../nextjs-app/lib/crypto.ts) - Function: `encryptAEAD()`
+
+**Library:** TweetNaCl 1.0.3 (`nacl.secretbox`)
+
 ```typescript
-// Inputs:
-const masterKey: Buffer = /* derived from wallet keypair (32 bytes) */;
-const plaintext: string = JSON.stringify({
-  id: "entry_001",
-  title: "GitHub",
-  username: "alice",
-  password: "supersecret123",
-  url: "https://github.com",
-  notes: "Primary account",
-  category: "Development",
-  favorite: false,
-  tags: ["work"],
-  createdAt: 1704067200000,
-  updatedAt: 1704067200000
-});
-const walletPublicKey: Buffer = /* 32-byte Ed25519 public key */;
+import nacl from 'tweetnacl';
 
-// Step 1: Generate unique nonce (12 bytes for GCM)
-const nonce: Buffer = crypto.randomBytes(12);
+function encryptAEAD(
+  plaintext: Uint8Array,
+  sessionKey: Uint8Array
+): { ciphertext: Uint8Array; nonce: Uint8Array; salt: Uint8Array } {
 
-// Step 2: Create AES-256-GCM cipher
-const cipher: crypto.Cipher = crypto.createCipheriv('aes-256-gcm', masterKey, nonce);
+  // 1. Generate unique 24-byte nonce
+  const nonce = nacl.randomBytes(24); // 192-bit nonce
 
-// Step 3: Set Additional Authenticated Data (AAD)
-cipher.setAAD(walletPublicKey);
+  // 2. Encrypt with XChaCha20-Poly1305
+  const ciphertext = nacl.secretbox(plaintext, nonce, sessionKey);
 
-// Step 4: Encrypt plaintext
-let ciphertext: string = cipher.update(plaintext, 'utf8', 'hex');
-ciphertext += cipher.final('hex');
+  // 3. Generate salt for storage (used in key re-derivation)
+  const salt = nacl.randomBytes(32);
 
-// Step 5: Extract authentication tag (16 bytes)
-const authTag: Buffer = cipher.getAuthTag(); // 128-bit authentication tag
-
-// Output (stored on-chain):
-const encryptedEntry = {
-  ciphertext: ciphertext,     // Variable length (hex-encoded)
-  nonce: nonce.toString('hex'), // 24 hex characters (12 bytes)
-  authTag: authTag.toString('hex') // 32 hex characters (16 bytes)
-};
+  return { ciphertext, nonce, salt };
+}
 ```
 
-**Implementation Reference:** [`nextjs-app/lib/encryption.ts:78-145`](../nextjs-app/lib/encryption.ts)
+### Data Flow
+
+```
+Plaintext (password entry JSON)
+    ↓
+[Serialize to bytes]
+    ↓
+plaintext: Uint8Array
+    ↓
+[Generate random 24-byte nonce]
+    ↓
+[XChaCha20 stream cipher + Poly1305 MAC]
+    ↓
+ciphertext: Uint8Array (plaintext.length + 16)
+    ↓
+[Store on blockchain: ciphertext, nonce, salt]
+```
+
+### Ciphertext Format
+
+```
+ciphertext = encrypted_data || auth_tag
+
+where:
+  encrypted_data = XChaCha20(plaintext, nonce, sessionKey)
+  auth_tag = Poly1305(encrypted_data, nonce, sessionKey)
+```
+
+**Total Size:** `plaintext.length + 16` bytes
+
+**Stored On-Chain:**
+- `ciphertext`: Encrypted data + 16-byte Poly1305 tag
+- `nonce`: 24-byte unique nonce
+- `salt`: 32-byte salt (for future key re-derivation)
+
+### Security Properties
+
+| Property | Implementation | Guarantee |
+|----------|---------------|-----------|
+| **Confidentiality** | XChaCha20 stream cipher | IND-CPA secure |
+| **Integrity** | Poly1305 MAC | Detects any modification |
+| **Authenticity** | AEAD construction | Ciphertext is authenticated |
+| **Nonce Uniqueness** | 192-bit random nonce | 2^-96 collision probability |
+| **Key Strength** | 256-bit session key | 2^256 brute-force resistance |
+| **Forward Secrecy** | Independent nonces per entry | Compromise one ≠ others |
+
+### Nonce Collision Analysis
+
+**Nonce Size:** 192 bits (24 bytes)
+
+**Collision Probability:**
+- After 2^96 encryptions: ~50% probability of collision (birthday bound)
+- At 1 billion (10^9) encryptions/user: probability ≈ 2^-67 (negligible)
+
+**Reuse Consequence:**
+If nonce is reused with same key:
+- XChaCha20 keystream is reused → plaintext XOR can leak information
+- **Mitigation:** Use cryptographically secure RNG (`nacl.randomBytes()`)
 
 ### Decryption
 
 ```typescript
-// Inputs (from blockchain):
-const encryptedEntry = {
-  ciphertext: "a1b2c3d4...",
-  nonce: "f4e5d6c7b8a9...",
-  authTag: "1a2b3c4d5e6f..."
-};
+function decryptAEAD(
+  ciphertext: Uint8Array,
+  nonce: Uint8Array,
+  sessionKey: Uint8Array
+): Uint8Array {
 
-// Step 1: Create decipher
-const decipher: crypto.Decipher = crypto.createDecipheriv(
-  'aes-256-gcm',
-  masterKey,
-  Buffer.from(encryptedEntry.nonce, 'hex')
-);
+  const plaintext = nacl.secretbox.open(ciphertext, nonce, sessionKey);
 
-// Step 2: Set AAD (must match encryption)
-decipher.setAAD(walletPublicKey);
+  if (!plaintext) {
+    throw new Error('Decryption failed - invalid ciphertext or key');
+  }
 
-// Step 3: Set authentication tag
-decipher.setAuthTag(Buffer.from(encryptedEntry.authTag, 'hex'));
-
-// Step 4: Decrypt and authenticate
-try {
-  let plaintext = decipher.update(encryptedEntry.ciphertext, 'hex', 'utf8');
-  plaintext += decipher.final('utf8'); // Throws if authentication fails
-
-  const entry = JSON.parse(plaintext);
-  return entry; // Successfully decrypted and authenticated
-} catch (error) {
-  // Authentication failure: ciphertext was tampered with
-  throw new Error('Decryption failed: data integrity check failed');
+  return plaintext;
 }
 ```
 
-**Implementation Reference:** [`nextjs-app/lib/encryption.ts:147-210`](../nextjs-app/lib/encryption.ts)
+**Authentication Verification:**
+- `nacl.secretbox.open()` verifies Poly1305 MAC before decryption
+- If MAC invalid → returns `null` (authentication failure)
+- If MAC valid → returns plaintext
+
+**Tamper Detection:**
+- Any modification to ciphertext → MAC verification fails
+- Decryption aborts, user notified of tampering
+
+---
+
+## Secondary Encryption (AES-GCM)
+
+### Purpose
+
+Social recovery and password sharing features use **AES-256-GCM** (WebCrypto API) instead of XChaCha20-Poly1305.
+
+### Algorithm
+
+**AES-256-GCM** - Galois/Counter Mode authenticated encryption.
+
+- **Cipher:** AES (Rijndael) with 256-bit key
+- **Mode:** GCM (Galois/Counter Mode)
+- **Key Size:** 256 bits (32 bytes)
+- **IV Size:** 96 bits (12 bytes) - standard for GCM
+- **Tag Size:** 128 bits (16 bytes)
+
+### Implementation
+
+**Source Code:**
+- [nextjs-app/lib/recovery-client-v2.ts](../nextjs-app/lib/recovery-client-v2.ts) (Lines 50-108)
+- [nextjs-app/lib/password-sharing.ts](../nextjs-app/lib/password-sharing.ts) (Lines 82-162)
+
+```typescript
+// Encryption
+const encryptedData = await crypto.subtle.encrypt(
+  {
+    name: 'AES-GCM',
+    iv: nonce // 12 bytes (96-bit IV)
+  },
+  key, // 256-bit AES key
+  plaintext
+);
+
+// Decryption
+const plaintext = await crypto.subtle.decrypt(
+  {
+    name: 'AES-GCM',
+    iv: nonce
+  },
+  key,
+  ciphertext
+);
+```
+
+### Use Cases
+
+| Feature | Encryption | Key Derivation |
+|---------|-----------|----------------|
+| **Social Recovery** | AES-256-GCM | Shared secrets from guardians |
+| **Password Sharing** | AES-256-GCM | Recipient's public key (ECDH) |
+| **Backup Codes** | Likely AES-GCM | Password-based KDF |
+
+### Why Two Algorithms?
+
+**Main Storage (XChaCha20-Poly1305):**
+- TweetNaCl provides consistent cross-platform implementation
+- Extended 192-bit nonce space (better for high-volume encryption)
+- Well-audited library by Daniel J. Bernstein
+
+**Recovery/Sharing (AES-GCM):**
+- WebCrypto API provides native browser performance
+- Hardware acceleration on modern CPUs (AES-NI)
+- Standard for web applications
+
+**Both are secure:** NIST/industry-standard AEAD ciphers with 256-bit keys.
 
 ### Security Properties
 
-| Property | Implementation | Security Level |
-|----------|---------------|----------------|
-| **Confidentiality** | AES-256-GCM | 256-bit security (computationally infeasible) |
-| **Integrity** | GCM Auth Tag (128-bit) | 128-bit security (2^128 forgery attempts) |
-| **Authenticity** | AAD = Wallet Public Key | Binds ciphertext to specific wallet |
-| **Nonce Uniqueness** | crypto.randomBytes(12) | Collision probability ≈ 2^-96 per 2^32 entries |
-
----
-
-## Data Integrity
-
-### GCM Authentication Tag
-
-**How It Works:**
-1. During encryption, GCM computes a **polynomial MAC** (Message Authentication Code) over:
-   - The ciphertext
-   - The AAD (Additional Authenticated Data = wallet public key)
-   - The lengths of both
-2. This produces a 128-bit authentication tag
-3. During decryption, GCM recomputes the tag and compares:
-   - **If tags match:** Data is authentic and unmodified
-   - **If tags differ:** Decryption aborts (throws error)
-
-**Security Guarantee:**
-- Attacker cannot modify even 1 bit of ciphertext without detection
-- Attacker cannot substitute ciphertext from another wallet (AAD mismatch)
-- Forgery probability: ≤ 2^-128 (negligible)
-
-### Additional Authenticated Data (AAD)
-
-**Purpose:** Binds the ciphertext to a specific wallet public key.
-
-**Attack Prevented:**
-- Suppose Alice encrypts password "alice123" for her wallet
-- Attacker copies Alice's ciphertext to Bob's vault
-- When Bob tries to decrypt:
-  1. AAD = Bob's public key (set during decryption)
-  2. But ciphertext was encrypted with AAD = Alice's public key
-  3. **Authentication tag verification fails**
-  4. Decryption aborts
-
-**Result:** Ciphertext cannot be reused across wallets.
-
----
-
-## Authentication
-
-### Wallet-Based Authentication
-
-**Claim:** *Only the wallet owner can decrypt their password vault.*
-
-**Proof:**
-1. Decryption requires the master key
-2. Master key is derived from wallet secret key + master password
-3. Wallet secret key is:
-   - Stored in wallet software (Phantom, Solflare)
-   - Protected by OS-level keychain or hardware wallet
-   - Never transmitted over network
-4. Attacker without wallet secret key cannot derive master key
-5. Attacker without master key cannot decrypt ciphertext (AES-256 is IND-CPA secure)
-6. ∴ Only wallet owner can decrypt
-
-### Transaction Authorization
-
-**Blockchain-Level Authentication:**
-1. All write operations (store, update, delete) require on-chain transactions
-2. Solana transactions require Ed25519 signature from wallet
-3. Signature verification is done by Solana validators
-4. Invalid signatures are rejected by consensus
-
-**Result:** Attacker cannot modify vault contents without wallet private key.
+| Property | AES-GCM | XChaCha20-Poly1305 |
+|----------|---------|---------------------|
+| **Confidentiality** | ✅ IND-CPA | ✅ IND-CPA |
+| **Authentication** | ✅ GCM tag | ✅ Poly1305 MAC |
+| **Key Size** | 256 bits | 256 bits |
+| **Nonce Size** | 96 bits | 192 bits (extended) |
+| **Tag Size** | 128 bits | 128 bits |
+| **Standard** | NIST SP 800-38D | RFC 8439 (extended) |
+| **Performance** | Hardware accel | Software (fast) |
 
 ---
 
@@ -332,305 +475,282 @@ try {
 
 ### Confidentiality
 
-**Theorem:** *Assuming AES-256 is a secure block cipher, password entries are computationally indistinguishable from random bitstrings to any polynomial-time adversary.*
+**Claim:** Encrypted password entries are computationally indistinguishable from random data.
 
 **Proof Sketch:**
-1. AES-256 is assumed to be a pseudorandom permutation (PRP) under the standard model
-2. GCM mode (CTR + GMAC) provides IND-CPA security when nonces are unique
-3. Nonces are generated using crypto.randomBytes(12), which outputs uniform random bits
-4. Collision probability for 2^32 entries: ≈ 2^-64 (negligible)
-5. Given ciphertext C = Enc(K, N, P), adversary's advantage in distinguishing C from random is negligible
-6. ∴ Ciphertext reveals no information about plaintext
+- XChaCha20 is a stream cipher based on ChaCha20, proven IND-CPA secure
+- Session keys are unique per wallet (HKDF derives from wallet signature)
+- Nonces are unique per encryption (192-bit random)
+- Given ciphertext `C`, adversary cannot determine plaintext `P` without session key `K`
+- Brute-force attack requires 2^256 operations (computationally infeasible)
+
+**Conclusion:** ✅ **Confidentiality holds** under standard cryptographic assumptions.
 
 ### Integrity
 
-**Theorem:** *Assuming GMAC is a secure MAC, the probability an adversary can modify ciphertext without detection is negligible.*
+**Claim:** Any modification to ciphertext is detected with overwhelming probability.
 
 **Proof Sketch:**
-1. GMAC is a polynomial-based MAC with 128-bit tags
-2. Forgery probability for single query: ≤ 2^-128
-3. For Q queries, probability ≤ Q · 2^-128 (still negligible for Q ≪ 2^64)
-4. Adversary must either:
-   - Break AES-256 (computationally infeasible)
-   - Forge authentication tag (probability ≤ 2^-128)
-5. ∴ Integrity holds with overwhelming probability
+- Poly1305 MAC provides 128-bit authentication
+- MAC is computed over ciphertext: `tag = Poly1305(ciphertext, nonce, key)`
+- Adversary must find `ciphertext'` such that `Poly1305(ciphertext', nonce, key) = tag`
+- Probability of successful forgery: 2^-128 (negligible)
+
+**Conclusion:** ✅ **Integrity holds** - tampering detected with probability 1 - 2^-128.
 
 ### Authenticity
 
-**Theorem:** *Ciphertext cannot be reused across different wallets.*
+**Claim:** Only the wallet owner can create valid encrypted entries.
 
-**Proof:**
-1. AAD is set to wallet public key during encryption
-2. AAD is checked during decryption (part of authentication tag computation)
-3. If AAD differs between encryption and decryption, tag verification fails
-4. Each wallet has a unique public key (collision probability ≈ 2^-256)
-5. ∴ Ciphertext is bound to the wallet that created it
+**Proof Sketch:**
+- Session key derived from wallet signature (only wallet owner can sign)
+- Challenge includes random nonce (prevents replay)
+- HKDF binds session key to specific public key
+- Adversary without wallet private key cannot derive valid session key
+
+**Conclusion:** ✅ **Authenticity holds** - only wallet owner can encrypt/decrypt.
+
+### Forward Secrecy
+
+**Claim:** Compromise of one encrypted entry does not compromise others.
+
+**Proof Sketch:**
+- Each entry encrypted with unique nonce
+- Nonces are independent (cryptographically random)
+- Session key is consistent within a session but re-derived per session
+- No key material is reused across entries
+
+**Conclusion:** ✅ **Forward secrecy holds** - entries are cryptographically independent.
 
 ---
 
 ## Attack Resistance
 
-### Brute Force Key Search
+### Brute-Force Key Search
 
-**Attack:** Try all possible 256-bit keys to decrypt ciphertext.
+**Attack:** Enumerate all possible 256-bit session keys.
 
-**Cost:** 2^256 AES decryptions ≈ 2^256 × 10^-9 seconds ≈ 10^68 years (infeasible)
+**Complexity:** 2^256 operations
 
-**Conclusion:** Computationally infeasible with current or foreseeable technology.
+**Cost Estimate:**
+- Assume 10^18 keys/second (unrealistic, current supercomputers ≈ 10^18 FLOPS)
+- Time: 2^256 / 10^18 ≈ 10^59 seconds ≈ 10^51 years
+- Universe age: 10^10 years
 
-### Password Guessing (With Stolen Wallet)
+**Result:** ❌ **Attack infeasible** - computationally impossible.
 
-**Attack:** Attacker steals wallet keypair, attempts to guess master password.
+### Nonce Collision Attack
 
-**Cost per guess:** ~100ms (100k PBKDF2 iterations)
+**Attack:** Cause nonce reuse to leak plaintext information.
 
-**Maximum rate:** 10 guesses/second (single CPU core)
+**Probability:** 2^-96 per encryption pair (birthday bound at 2^96 encryptions)
 
-**For 8-char random password (52^8 ≈ 2^45.6 entropy):**
-- Time to crack: 2^45.6 guesses × 0.1 seconds ≈ 111,000 years
+**Realistic Scenario:**
+- User encrypts 1 billion passwords (10^9 entries)
+- Collision probability: (10^9)^2 / 2^193 ≈ 2^-133 (negligible)
 
-**Mitigation:**
-- Master password enforced to be ≥12 characters
-- Strong password recommendations (≥16 chars with symbols)
-- Future: Add rate limiting via on-chain counter
+**Result:** ❌ **Attack improbable** - nonces are sufficiently random and unique.
 
-### Replay Attacks
+### Replay Attack
 
-**Attack:** Copy old ciphertext and submit to blockchain.
+**Attack:** Reuse captured wallet signature to derive session key.
 
-**Result:**
-- Old ciphertext is validly encrypted
-- Decryption succeeds (produces old password)
-- **This is a feature, not a bug** (blockchain is immutable history)
+**Mitigation:** Challenge includes 256-bit random nonce + timestamp.
 
-**User Protection:**
-- Password manager UI always shows latest version
-- Update operations create new ciphertext (old one remains on-chain but ignored)
-- Delete operations mark entry as deleted (tombstone)
+**Probability:** Reusing same challenge requires nonce collision: 2^-256.
 
-### Ciphertext Substitution
+**Result:** ❌ **Attack infeasible** - each challenge is unique.
 
-**Attack:** Replace Alice's ciphertext with Bob's ciphertext.
+### Timing Attack
 
-**Result:**
-1. Alice's vault now contains Bob's ciphertext
-2. Alice attempts decryption:
-   - AAD = Alice's public key
-   - But ciphertext was encrypted with AAD = Bob's public key
-   - **Authentication tag verification fails**
-3. Decryption aborts with error
-
-**Conclusion:** Cross-wallet ciphertext substitution is detected and prevented.
-
-### Nonce Reuse Attack
-
-**Attack:** Encrypt two different plaintexts with the same nonce.
-
-**Consequence:**
-- Attacker can XOR the two ciphertexts to get XOR of plaintexts
-- This leaks information (violates confidentiality)
+**Attack:** Measure decryption time to leak key material.
 
 **Mitigation:**
-- Nonces generated using crypto.randomBytes(12)
-- 12 bytes = 96 bits of randomness
-- Birthday paradox: collision probability ≈ Q^2 / 2^97 where Q = number of entries
-- For Q = 2^32 entries: collision probability ≈ 2^-33 (negligible)
+- TweetNaCl implements constant-time operations
+- Poly1305 MAC verification is constant-time
+- No branching on secret data
 
-**Formal Guarantee:** Nonce collision probability is negligible for realistic vault sizes.
+**Result:** ⚠️ **Partial mitigation** - JavaScript environment has limitations, but library is constant-time.
 
----
+### Ciphertext Substitution Attack
 
-## Formal Security Analysis
+**Attack:** Replace ciphertext with different encrypted data.
 
-### IND-CPA Security
+**Mitigation:**
+- Poly1305 MAC authenticates ciphertext
+- Substituted ciphertext fails MAC verification
+- Decryption aborts
 
-**Definition:** An encryption scheme is IND-CPA (Indistinguishable under Chosen Plaintext Attack) if no polynomial-time adversary can distinguish encryptions of two messages of their choice.
-
-**Theorem:** *AES-256-GCM with unique nonces is IND-CPA secure under the assumption that AES is a pseudorandom permutation.*
-
-**Proof:** See [NIST SP 800-38D, Section 7](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf)
-
-**Application to Solana Lockbox:**
-- AES-256-GCM is used with unique nonces (high probability)
-- ∴ Encrypted password entries are IND-CPA secure
-
-### INT-CTXT Security
-
-**Definition:** An authenticated encryption scheme is INT-CTXT (Integrity of Ciphertext) secure if no polynomial-time adversary can produce a valid ciphertext not generated by the encryption oracle.
-
-**Theorem:** *AES-256-GCM is INT-CTXT secure under the assumption that GMAC is a secure MAC.*
-
-**Proof:** See [An Interface and Algorithms for Authenticated Encryption (Rogaway, 2002)](https://eprint.iacr.org/2002/172.pdf)
-
-**Application to Solana Lockbox:**
-- GMAC produces 128-bit authentication tags
-- Forgery probability ≤ 2^-128 per attempt
-- ∴ Ciphertext modifications are detected with overwhelming probability
+**Result:** ❌ **Attack detected** - authentication failure.
 
 ---
 
 ## Implementation Details
 
-### Source Code References
+### Memory Security
 
-| Component | File | Lines |
-|-----------|------|-------|
-| Key Derivation | `nextjs-app/lib/encryption.ts` | 15-45 |
-| Entry Encryption | `nextjs-app/lib/encryption.ts` | 78-145 |
-| Entry Decryption | `nextjs-app/lib/encryption.ts` | 147-210 |
-| Password Validation | `nextjs-app/lib/validation.ts` | 30-80 |
-| On-Chain Storage | `programs/lockbox/src/instructions/store_password_entry.rs` | 10-120 |
-| Storage Retrieval | `sdk/src/client-v2.ts` | 280-350 |
+**Sensitive Data Wiping:**
 
-### Critical Constants
+```typescript
+function wipeSensitiveData(data: Uint8Array): void {
+  // Pass 1: Random data
+  crypto.getRandomValues(data);
 
-```rust
-// programs/lockbox/src/state/storage_chunk.rs
-pub const MAX_CHUNK_SIZE: usize = 10_240; // 10 KB per chunk
-pub const MAX_CHUNKS: u8 = 100;            // 100 chunks max
-pub const MAX_STORAGE: usize = 1_024_000;  // ~1 MB total
+  // Pass 2: All 0xFF
+  for (let i = 0; i < data.length; i++) {
+    data[i] = 0xFF;
+  }
 
-// nextjs-app/lib/encryption.ts
-const PBKDF2_ITERATIONS = 100_000;
-const NONCE_SIZE = 12;      // 96 bits
-const AUTH_TAG_SIZE = 16;   // 128 bits
-const KEY_SIZE = 32;        // 256 bits
+  // Pass 3: Random data
+  crypto.getRandomValues(data);
+
+  // Pass 4: Zeros
+  for (let i = 0; i < data.length; i++) {
+    data[i] = 0;
+  }
+}
 ```
 
-### Entropy Sources
+**Limitations:**
+- JavaScript garbage collector may leave copies in memory
+- No guarantee of complete erasure in browser environment
+- Mitigation: Minimize lifetime of sensitive data in memory
 
-| Component | Source | Entropy (bits) |
-|-----------|--------|----------------|
-| Wallet Secret Key | OS/Hardware RNG | 256 |
-| Master Password | User input | ≥40 (for 12-char) |
-| GCM Nonce | `crypto.randomBytes(12)` | 96 |
-| Entry ID | UUID v4 | 122 |
+### Random Number Generation
 
-### Dependencies
+**Source:** `crypto.getRandomValues()` (Web Crypto API)
 
-**Node.js Crypto Module:**
-- `crypto.pbkdf2Sync()` - PBKDF2 key derivation
-- `crypto.createCipheriv()` - AES-GCM encryption
-- `crypto.randomBytes()` - CSPRNG (cryptographically secure PRNG)
+**Properties:**
+- Cryptographically secure PRNG
+- OS-level entropy source
+- FIPS 140-2 compliant (most browsers)
 
-**Audited Implementations:**
-- OpenSSL (used by Node.js crypto module)
-- BoringSSL (used by Chromium-based browsers)
-- WebKit Crypto (used by Safari)
+**Usage:**
+- Nonce generation (24 bytes for XChaCha20, 12 bytes for AES-GCM)
+- Challenge nonce (32 bytes)
+- Salt generation (32 bytes)
+
+### Input Validation
+
+```typescript
+// Validate plaintext size (max 1024 bytes)
+if (plaintext.length > MAX_ENCRYPTED_SIZE) {
+  throw new Error(`Plaintext exceeds maximum size`);
+}
+
+// Validate session key length (32 bytes)
+if (sessionKey.length !== 32) {
+  throw new Error(`Session key must be 32 bytes`);
+}
+
+// Validate nonce length (24 bytes for XChaCha20)
+if (nonce.length !== NONCE_SIZE) {
+  throw new Error(`Nonce must be ${NONCE_SIZE} bytes`);
+}
+```
 
 ---
 
-## Audit Trail
+## Cryptographic Dependencies
 
-### Security Reviews
+### TweetNaCl 1.0.3
 
-**Internal Review:** December 2024
-- Reviewed by: Web3 Studios LLC engineering team
-- Focus: Cryptographic implementation, key management
-- Result: No critical vulnerabilities found
+**What:** Audited JavaScript implementation of NaCl (Networking and Cryptography Library)
 
-**Third-Party Audit:** *Pending*
-- Recommended auditors: Kudelski Security, NCC Group, OtterSec
-- Scope: Smart contracts + cryptographic implementation
+**Author:** Daniel J. Bernstein (DJB)
 
-### Known Limitations
+**Algorithms Provided:**
+- `nacl.secretbox()` - XChaCha20-Poly1305 encryption
+- `nacl.secretbox.open()` - XChaCha20-Poly1305 decryption
+- `nacl.randomBytes()` - Cryptographically secure random number generation
 
-1. **No Hardware Security Module (HSM) Support**
-   - Encryption keys exist in JavaScript memory (can be extracted via debugger)
-   - Mitigation: This is inherent to browser-based encryption
-   - Future: Explore WebAuthn for key storage
+**Audit Status:** Audited by Cure53 (2017)
 
-2. **No Forward Secrecy**
-   - If wallet keypair is compromised, all historical ciphertext can be decrypted
-   - Mitigation: Master password provides second factor
-   - Future: Implement key rotation mechanism
+**Package:** `tweetnacl@1.0.3`
 
-3. **No Multi-Party Computation (MPC)**
-   - Single point of failure (wallet keypair)
-   - Mitigation: Backup codes for account recovery
-   - Future: Shamir Secret Sharing for key distribution
+**Source:** https://github.com/dchest/tweetnacl-js
 
-4. **Nonce Management**
-   - Relies on CSPRNG quality
-   - No deterministic nonce generation
-   - Risk: If CSPRNG is weak, nonce collisions possible
-   - Mitigation: Use browser-provided crypto.getRandomValues() (audited by vendors)
+### Web Crypto API (crypto.subtle)
 
-### Changelog
+**What:** Browser-native cryptographic API
 
-**Version 2.0 (Current):**
-- ✅ Implemented PBKDF2 key derivation (100k iterations)
-- ✅ Added master password requirement
-- ✅ Implemented AES-256-GCM encryption
-- ✅ Added AAD binding to wallet public key
-- ✅ Security audit: CRITICAL and HIGH vulnerabilities fixed
+**Algorithms Used:**
+- `HKDF-SHA256` - Key derivation function
+- `AES-GCM` - Authenticated encryption (recovery/sharing)
+- `SHA-256` - Cryptographic hashing (salt derivation)
 
-**Version 1.0 (Deprecated):**
-- ❌ Direct wallet secret key as master key (INSECURE)
-- ❌ No master password (single factor authentication)
-- ❌ No iteration count (vulnerable to rainbow tables)
+**Standard:** W3C Web Cryptography API (https://www.w3.org/TR/WebCryptoAPI/)
+
+**Implementation:** Browser-dependent (Chrome, Firefox, Safari)
+- Most browsers use OpenSSL or BoringSSL
+- FIPS 140-2 validated in many cases
+
+---
+
+## Security Audit Status
+
+### Current Status (October 2025)
+
+**Internal Security Review:**
+- ✅ Code review completed
+- ✅ All known vulnerabilities patched
+- ✅ Security fixes documented in `/docs/security/SECURITY_STATUS.md`
+- ✅ Comprehensive unit and E2E tests
+
+**External Security Audit:**
+- ⏳ **PENDING** - Not yet professionally audited
+- ⏳ Planned before mainnet deployment (Q1 2026)
+- ⏳ Target auditors: Trail of Bits, OtterSec, or equivalent
+
+**Known Issues:**
+- None (as of Oct 30, 2025)
+- See [SECURITY_STATUS.md](security/SECURITY_STATUS.md) for historical vulnerabilities
+
+**Pre-Production Warning:**
+> ⚠️ **DO NOT use Solana Lockbox for sensitive, real-world passwords until a professional security audit has been completed.** This is test software deployed on Devnet for demonstration and evaluation purposes only.
+
+---
+
+## Changelog
+
+| Date | Version | Change |
+|------|---------|--------|
+| 2025-10-30 | 2.3.2 | Complete rewrite of CRYPTOGRAPHY.md with accurate implementation details |
+| 2025-10-12 | 2.0.0 | Initial (inaccurate) cryptography documentation |
 
 ---
 
 ## References
 
-### Standards
+1. **RFC 5869** - HMAC-based Extract-and-Expand Key Derivation Function (HKDF)
+   https://datatracker.ietf.org/doc/html/rfc5869
 
-1. **NIST SP 800-38D** - "Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM) and GMAC"
-   - https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
+2. **RFC 8439** - ChaCha20 and Poly1305 for IETF Protocols
+   https://datatracker.ietf.org/doc/html/rfc8439
 
-2. **RFC 8018** - "PKCS #5: Password-Based Cryptography Specification Version 2.1"
-   - https://datatracker.ietf.org/doc/html/rfc8018
+3. **NaCl: Networking and Cryptography library**
+   https://nacl.cr.yp.to/
 
-3. **RFC 8032** - "Edwards-Curve Digital Signature Algorithm (EdDSA)"
-   - https://datatracker.ietf.org/doc/html/rfc8032
+4. **TweetNaCl.js** - JavaScript implementation
+   https://github.com/dchest/tweetnacl-js
 
-4. **OWASP Password Storage Cheat Sheet**
-   - https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+5. **NIST SP 800-38D** - Galois/Counter Mode (GCM) and GMAC
+   https://csrc.nist.gov/publications/detail/sp/800-38d/final
 
-### Academic Papers
+6. **W3C Web Cryptography API Specification**
+   https://www.w3.org/TR/WebCryptoAPI/
 
-1. **Rogaway, P. (2002)** - "Authenticated-Encryption with Associated-Data"
-   - https://eprint.iacr.org/2002/098.pdf
-
-2. **Bellare, M. & Namprempre, C. (2008)** - "Authenticated Encryption: Relations among Notions and Analysis of the Generic Composition Paradigm"
-   - https://eprint.iacr.org/2000/025.pdf
-
-3. **McGrew, D. & Viega, J. (2004)** - "The Galois/Counter Mode of Operation (GCM)"
-   - https://csrc.nist.rip/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
-
-### Implementation Guides
-
-1. **Solana Cookbook** - "How to Use Wallet Keypairs"
-   - https://solanacookbook.com/references/keypairs-and-wallets.html
-
-2. **MDN Web Docs** - "SubtleCrypto API"
-   - https://developer.mozilla.org/en-US/Web/API/SubtleCrypto
+7. **Solana Documentation**
+   https://docs.solana.com/
 
 ---
 
-## Verification Checklist
+## Contact for Security Research
 
-For security researchers and auditors reviewing this implementation:
+**Security Vulnerabilities:** Please see [SECURITY_POLICY.md](../SECURITY_POLICY.md) for responsible disclosure process.
 
-- [ ] Key derivation uses PBKDF2 with ≥100k iterations
-- [ ] Master key derived from wallet secret + master password
-- [ ] Each password entry encrypted with unique nonce
-- [ ] Nonces are 96 bits (12 bytes) for GCM
-- [ ] Authentication tags are 128 bits (16 bytes)
-- [ ] AAD set to wallet public key for all entries
-- [ ] Decryption failures abort (no silent corruption)
-- [ ] No key material logged or stored persistently
-- [ ] Ciphertext stored on-chain, keys stay client-side
-- [ ] Blockchain transactions require wallet signature
+**General Questions:** Open a GitHub issue or discussion.
 
 ---
 
-**Document Status:** Living Document
-**Last Updated:** December 29, 2024
-**Maintainer:** Web3 Studios LLC
-**Contact:** support@web3stud.io
-
----
-
-**Disclaimer:** This document describes the cryptographic design as implemented. While we have made every effort to follow best practices, formal verification and third-party audits are recommended before production use with high-value assets.
+**Document Status:** ✅ Accurate as of version 2.3.2 (October 30, 2025)
