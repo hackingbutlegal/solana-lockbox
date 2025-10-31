@@ -66,7 +66,7 @@ const STORAGE_KEYS = {
 const DEFAULT_AUTO_LOCK_TIMEOUT = 5;
 
 export function LockProvider({ children }: LockProviderProps) {
-  const { clearSession, isSessionActive, initializeSession, wallet } = useAuth();
+  const { clearSession, isSessionActive, initializeSession, wallet, client } = useAuth();
 
   // Lock state
   const [isLocked, setIsLocked] = useState(false);
@@ -331,14 +331,15 @@ export function LockProvider({ children }: LockProviderProps) {
 
   /**
    * Auto-lock when session becomes inactive
-   * Only lock if wallet is connected (to avoid locking on initial page load)
+   * Only lock if client exists (wallet is connected with publicKey)
+   * This prevents locking on initial page load when wallet object exists but isn't connected
    */
   useEffect(() => {
-    if (!isSessionActive && !isLocked && wallet) {
+    if (!isSessionActive && !isLocked && client) {
       console.log('🔒 Session expired, locking app');
       setIsLocked(true);
     }
-  }, [isSessionActive, isLocked, wallet]);
+  }, [isSessionActive, isLocked, client]);
 
   const value: LockContextType = {
     isLocked,
