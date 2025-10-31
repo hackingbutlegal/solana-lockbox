@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useSubscription, useLockbox } from '../../contexts';
+import { useSubscription, useLockbox, useAuth } from '../../contexts';
 import { SubscriptionTier, TIER_INFO } from '../../sdk/src/types-v2';
 import { SubscriptionCard } from './SubscriptionCard';
 import { StorageSliderModal } from '../modals/StorageSliderModal';
@@ -18,7 +18,8 @@ import { StorageSliderModal } from '../modals/StorageSliderModal';
 
 export function SubscriptionBillingPanel() {
   const { connected } = useWallet();
-  const { client } = useLockbox();
+  const { client } = useAuth();
+  const { refreshLockbox } = useLockbox();
   const {
     currentTier,
     storageUsed,
@@ -65,9 +66,8 @@ export function SubscriptionBillingPanel() {
       console.log(`✅ Storage expanded successfully! ${signatures.length} transaction(s) completed.`);
       alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
 
-      // Refresh the subscription data to show new capacity
-      // The context should automatically refetch, but we can trigger it explicitly
-      window.location.reload(); // Simple refresh to show updated stats
+      // Refresh the lockbox data to show new capacity
+      await refreshLockbox();
 
     } catch (error) {
       console.error('Failed to expand storage:', error);

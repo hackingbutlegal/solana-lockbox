@@ -68,7 +68,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     clearSession,
     checkSessionTimeout: checkAuthTimeout
   } = useAuth();
-  const { masterLockbox } = useLockbox();
+  const { masterLockbox, refreshLockbox } = useLockbox();
 
   // State
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
@@ -203,6 +203,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       // Refresh entries after creation
       await refreshEntries();
 
+      // Refresh lockbox to update storage usage
+      await refreshLockbox();
+
       return result.entryId;
     } catch (err) {
       // Check if it's a conflict error
@@ -219,7 +222,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
+  }, [client, checkSessionTimeout, updateActivity, refreshEntries, refreshLockbox]);
 
   // Update existing password entry
   const updateEntry = useCallback(async (
@@ -255,6 +258,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       // Refresh entries after update
       await refreshEntries();
 
+      // Refresh lockbox to update storage usage
+      await refreshLockbox();
+
       return true;
     } catch (err) {
       // Check if it's a conflict error
@@ -270,7 +276,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
+  }, [client, checkSessionTimeout, updateActivity, refreshEntries, refreshLockbox]);
 
   // Delete password entry
   const deleteEntry = useCallback(async (
@@ -305,6 +311,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
       // Refresh entries after deletion
       await refreshEntries();
 
+      // Refresh lockbox to update storage usage
+      await refreshLockbox();
+
       return true;
     } catch (err) {
       // Check if it's a conflict error
@@ -320,7 +329,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setLoading(false);
     }
-  }, [client, checkSessionTimeout, updateActivity, refreshEntries]);
+  }, [client, checkSessionTimeout, updateActivity, refreshEntries, refreshLockbox]);
 
   // ============================================================================
   // BATCHED OPERATIONS
@@ -487,6 +496,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
         // Refresh entries from blockchain
         await refreshEntries();
 
+        // Refresh lockbox to update storage usage
+        await refreshLockbox();
+
         return true;
       } else {
         // Partial failure - keep only failed changes for retry
@@ -515,6 +527,9 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
         // Partial success - refresh to show successful changes
         await refreshEntries();
 
+        // Refresh lockbox to update storage usage
+        await refreshLockbox();
+
         setError(
           `Sync partially completed: ${successCount} operations succeeded, ${failCount} failed. ` +
           `Failed operations have been retained and will be retried on next sync.`
@@ -528,7 +543,7 @@ export function PasswordProvider({ children }: PasswordProviderProps) {
     } finally {
       setSyncing(false);
     }
-  }, [client, pendingChangesManager, checkSessionTimeout, updateActivity, refreshEntries, notifyPendingChanges]);
+  }, [client, pendingChangesManager, checkSessionTimeout, updateActivity, refreshEntries, refreshLockbox, notifyPendingChanges]);
 
   /**
    * Discard all pending changes and revert to blockchain state
