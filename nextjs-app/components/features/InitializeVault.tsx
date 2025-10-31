@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useLockbox } from '../../contexts';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
@@ -16,10 +16,19 @@ export function InitializeVault() {
   const router = useRouter();
   const toast = useToast();
   const { client, loading: authLoading, error: authError, initializeSession } = useAuth();
-  const { error: lockboxError, refreshLockbox } = useLockbox();
+  const { masterLockbox, error: lockboxError, refreshLockbox } = useLockbox();
 
   const error = authError || lockboxError;
   const loading = authLoading;
+
+  // Auto-redirect if vault already exists
+  useEffect(() => {
+    if (masterLockbox && !loading) {
+      console.log('[InitializeVault] Vault already exists, redirecting to dashboard...');
+      toast.showInfo('Your vault already exists! Redirecting to dashboard...');
+      router.push('/');
+    }
+  }, [masterLockbox, loading, router, toast]);
 
   return (
     <div className="initialize-vault">
@@ -117,7 +126,10 @@ export function InitializeVault() {
 
                         // Handle specific errors
                         if (err.message?.includes('already initialized') ||
-                            err.message?.includes('already been processed')) {
+                            err.message?.includes('already been processed') ||
+                            err.message?.includes('Unexpected error') ||
+                            err.toString().includes('WalletSendTransactionError')) {
+                          // Account likely already exists
                           toast.showInfo('Your password vault already exists! Redirecting...');
                           // Refresh lockbox state before redirecting
                           await refreshLockbox();
