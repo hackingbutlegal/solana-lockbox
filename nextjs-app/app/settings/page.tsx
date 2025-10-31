@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { AccountOverview } from '../../components/features/AccountOverview';
 import { SubscriptionBillingPanel } from '../../components/features/SubscriptionBillingPanel';
 import { SecuritySettingsPanel } from '../../components/features/SecuritySettingsPanel';
@@ -30,12 +31,20 @@ type SettingsTab = 'account' | 'storage' | 'import-export' | 'preferences' | 'da
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { connected } = useWallet();
 
   // Import/Export functionality
   const { entries, createEntry } = usePassword();
 
   // Get tab from URL query params, default to 'account'
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
+
+  // Redirect to home if wallet disconnects
+  useEffect(() => {
+    if (!connected) {
+      router.push('/');
+    }
+  }, [connected, router]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as SettingsTab;
