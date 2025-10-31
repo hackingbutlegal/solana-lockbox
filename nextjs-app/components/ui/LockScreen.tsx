@@ -58,6 +58,7 @@ export function LockScreen() {
       <div className="lock-content">
         <div className="lock-icon">🔒</div>
         <h1>Vault Locked</h1>
+        <p>Your vault is locked for security.<br/>Please unlock to continue.</p>
 
         {error && (
           <div className="error-message">

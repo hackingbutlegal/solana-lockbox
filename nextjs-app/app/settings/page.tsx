@@ -8,6 +8,7 @@ import { SecuritySettingsPanel } from '../../components/features/SecuritySetting
 import { PreferencesPanel } from '../../components/features/PreferencesPanel';
 import { ImportExportPanel } from '../../components/features/ImportExportPanel';
 import { DangerZonePanel } from '../../components/features/DangerZonePanel';
+import { LoadingState } from '../../components/ui/LoadingState';
 import { usePassword } from '../../contexts';
 import { PasswordEntry } from '../../sdk/src/types-v2';
 
@@ -350,11 +351,9 @@ export default function SettingsPage() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#f8f9fa',
+        background: 'linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%)',
       }}>
-        <div style={{ color: '#2c3e50', fontSize: '1.25rem' }}>
-          Loading Settings...
-        </div>
+        <LoadingState variant="pulse" size="lg" />
       </div>
     }>
       <SettingsContent />
