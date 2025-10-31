@@ -1099,13 +1099,6 @@ export function PasswordManager() {
             </button>
             <button
               className="tool-btn"
-              onClick={() => setShowTOTPModal(true)}
-              disabled={entries.filter(e => e.type === PasswordEntryType.Login && (e as any).totpSecret).length === 0}
-            >
-              🔐 2FA Codes ({entries.filter(e => e.type === PasswordEntryType.Login && (e as any).totpSecret).length})
-            </button>
-            <button
-              className="tool-btn"
               onClick={() => setShowRotationModal(true)}
             >
               🔄 Password Rotation

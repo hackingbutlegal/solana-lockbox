@@ -165,15 +165,15 @@ export function FavoritesSidebar({
       <style jsx>{`
         .favorites-toggle {
           position: fixed;
-          left: 0;
+          right: 0;
           top: 50%;
           transform: translateY(-50%);
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           border: none;
-          border-radius: 0 8px 8px 0;
+          border-radius: 8px 0 0 8px;
           padding: 12px 8px;
           cursor: pointer;
-          box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+          box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
           z-index: 998;
           display: flex;
           flex-direction: column;
@@ -183,12 +183,12 @@ export function FavoritesSidebar({
         }
 
         .favorites-toggle:hover {
-          padding-left: 12px;
-          box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+          padding-right: 12px;
+          box-shadow: -2px 0 12px rgba(0, 0, 0, 0.3);
         }
 
         .favorites-toggle.open {
-          left: 320px;
+          right: 320px;
         }
 
         .toggle-icon {
@@ -209,20 +209,20 @@ export function FavoritesSidebar({
 
         .favorites-sidebar {
           position: fixed;
-          left: -320px;
+          right: -320px;
           top: 0;
           bottom: 0;
           width: 320px;
           background: white;
-          box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+          box-shadow: -2px 0 12px rgba(0, 0, 0, 0.1);
           z-index: 999;
           display: flex;
           flex-direction: column;
-          transition: left 0.3s ease;
+          transition: right 0.3s ease;
         }
 
         .favorites-sidebar.open {
-          left: 0;
+          right: 0;
         }
 
         .sidebar-header {
@@ -468,12 +468,12 @@ export function FavoritesSidebar({
         @media (max-width: 768px) {
           .favorites-sidebar {
             width: 280px;
-            left: -280px;
+            right: -280px;
             max-width: 85vw;
           }
 
           .favorites-toggle.open {
-            left: 280px;
+            right: 280px;
           }
 
           .sidebar-header {
@@ -492,12 +492,12 @@ export function FavoritesSidebar({
         @media (max-width: 480px) {
           .favorites-sidebar {
             width: 260px;
-            left: -260px;
+            right: -260px;
             max-width: 80vw;
           }
 
           .favorites-toggle.open {
-            left: 260px;
+            right: 260px;
           }
 
           .sidebar-search {
