@@ -57,6 +57,8 @@ export function SubscriptionBillingPanel() {
       return;
     }
 
+    let expandSucceeded = false;
+
     try {
       setUpgrading(true);
 
@@ -64,16 +66,44 @@ export function SubscriptionBillingPanel() {
       const signatures = await client.expandStorageToCapacity(targetBytes);
 
       console.log(`✅ Storage expanded successfully! ${signatures.length} transaction(s) completed.`);
-      alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
+      expandSucceeded = true;
 
-      // Refresh the lockbox data to show new capacity
-      await refreshLockbox();
+      alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
 
     } catch (error) {
       console.error('Failed to expand storage:', error);
-      alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      throw error;
+
+      // Even if expansion threw an error, check if it actually succeeded on-chain
+      // The wallet might throw errors even when the transaction succeeds
+      console.log('Checking if storage was actually expanded despite error...');
+
+      try {
+        const updatedMaster = await client.getMasterLockbox();
+        const newCapacity = Number(updatedMaster.totalCapacity);
+
+        if (newCapacity >= targetBytes) {
+          console.log(`✅ Storage expansion succeeded on-chain! New capacity: ${newCapacity} bytes`);
+          expandSucceeded = true;
+          alert(`Storage expanded successfully to ${newCapacity} bytes!\n\nNote: Wallet reported an error but the transaction succeeded on the blockchain.`);
+        } else {
+          alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw error;
+        }
+      } catch (checkError) {
+        console.error('Failed to verify storage expansion:', checkError);
+        alert(`Failed to expand storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw error;
+      }
     } finally {
+      // Always refresh lockbox data if expansion might have succeeded
+      if (expandSucceeded) {
+        try {
+          await refreshLockbox();
+          console.log('Lockbox data refreshed successfully');
+        } catch (refreshError) {
+          console.error('Failed to refresh lockbox data:', refreshError);
+        }
+      }
       setUpgrading(false);
     }
   };
