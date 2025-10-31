@@ -34,7 +34,7 @@ export function StorageUsageBar({ used, total, tier, onUpgrade }: StorageUsageBa
   };
 
   const tierInfo = TIER_INFO[tier];
-  const canUpgrade = tier < SubscriptionTier.Pro;
+  const canExpand = tier < SubscriptionTier.Pro; // Can expand storage up to Pro tier limits
 
   return (
     <div className="storage-usage-container">
@@ -74,9 +74,9 @@ export function StorageUsageBar({ used, total, tier, onUpgrade }: StorageUsageBa
           </span>
         </div>
 
-        {(isNearLimit || isAtLimit) && canUpgrade && (
+        {(isNearLimit || isAtLimit) && canExpand && onUpgrade && (
           <button className="btn-upgrade-storage" onClick={onUpgrade}>
-            Upgrade for More Storage
+            Expand Storage
           </button>
         )}
       </div>
@@ -85,8 +85,8 @@ export function StorageUsageBar({ used, total, tier, onUpgrade }: StorageUsageBa
         <div className="warning-message">
           <strong>⚠️ Storage limit reached!</strong>
           <p>
-            {canUpgrade
-              ? 'Upgrade your subscription to add more passwords.'
+            {canExpand
+              ? 'Expand your storage to add more passwords (one-time payment).'
               : 'Consider deleting unused passwords to free up space.'}
           </p>
         </div>

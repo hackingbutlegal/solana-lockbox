@@ -16,7 +16,8 @@ import { SettingsModal } from '../modals/SettingsModal';
 import { PasswordRotationModal } from '../modals/PasswordRotationModal';
 import { ActivityLogModal } from '../modals/ActivityLogModal';
 import { PasswordPolicyModal } from '../modals/PasswordPolicyModal';
-import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
+// Subscription removed - using one-time storage expansion instead
+// import { SubscriptionUpgradeModal } from '../modals/SubscriptionUpgradeModal';
 import { OrphanedChunkRecovery } from '../ui/OrphanedChunkRecovery';
 import { useToast } from '../ui/Toast';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -103,7 +104,8 @@ export function PasswordManager() {
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showActivityLogModal, setShowActivityLogModal] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  // Subscription removed - using one-time storage expansion instead
+  // const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [showFavoritesSidebar, setShowFavoritesSidebar] = useState(false);
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
@@ -359,18 +361,19 @@ export function PasswordManager() {
   };
 
   // Handle subscription upgrade
-  const handleUpgradeSubscription = async (newTier: number) => {
-    try {
-      await upgradeSubscription(newTier);
-      const tierName = TIER_INFO[newTier as keyof typeof TIER_INFO]?.name || 'Unknown';
-      toast.showSuccess(`Successfully upgraded to ${tierName} tier!`);
-      setShowUpgradeModal(false);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to upgrade subscription';
-      console.error('Upgrade failed:', err);
-      toast.showError(`Upgrade failed: ${errorMsg}`);
-    }
-  };
+  // Subscription removed - using one-time storage expansion instead
+  // const handleUpgradeSubscription = async (newTier: number) => {
+  //   try {
+  //     await upgradeSubscription(newTier);
+  //     const tierName = TIER_INFO[newTier as keyof typeof TIER_INFO]?.name || 'Unknown';
+  //     toast.showSuccess(`Successfully upgraded to ${tierName} tier!`);
+  //     setShowUpgradeModal(false);
+  //   } catch (err) {
+  //     const errorMsg = err instanceof Error ? err.message : 'Failed to upgrade subscription';
+  //     console.error('Upgrade failed:', err);
+  //     toast.showError(`Upgrade failed: ${errorMsg}`);
+  //   }
+  // };
 
   // Batch operation handlers - REMOVED: Batch mode feature from UI
   // Keeping handlers defined to prevent runtime errors
@@ -1960,15 +1963,15 @@ export function PasswordManager() {
         }}
       />
 
-      {/* Subscription Upgrade Modal */}
-      {masterLockbox && (
+      {/* Subscription Upgrade Modal - REMOVED: Using one-time storage expansion */}
+      {/* {masterLockbox && (
         <SubscriptionUpgradeModal
           isOpen={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
           currentTier={masterLockbox.subscriptionTier}
           onUpgrade={handleUpgradeSubscription}
         />
-      )}
+      )} */}
 
       {/* Batch Progress Modal - REMOVED: Feature deemed functionally useless */}
       {/* <BatchProgressModal

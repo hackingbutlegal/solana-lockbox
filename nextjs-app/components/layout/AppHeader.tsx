@@ -43,7 +43,7 @@ export function AppHeader() {
   };
 
   const handleStorageClick = () => {
-    router.push('/settings?tab=subscription');
+    router.push('/settings?tab=storage');
   };
 
   const handleNavigateDashboard = () => {
@@ -71,7 +71,7 @@ export function AppHeader() {
           <div
             className="storage-indicator"
             onClick={handleStorageClick}
-            title="Click to upgrade storage"
+            title="Click to expand storage"
           >
             <div className="storage-label">Storage</div>
             <div className="storage-bar-container">
