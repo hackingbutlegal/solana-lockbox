@@ -51,23 +51,23 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How much does it cost to use?",
-    answer: "One-time storage rent: ~0.01-0.03 SOL per storage chunk (recoverable when account closed). Initial account creation: ~0.009 SOL. Transaction fees: ~0.00001 SOL per operation. There are NO monthly subscriptions - you pay once for storage space. Currently on Devnet (free test network with test SOL)."
+    answer: "Storage rent: ~0.071 SOL for 10KB initial chunk (recoverable when account closed). Transaction fees: ~0.00001 SOL per operation. You can expand storage as needed. There are NO monthly subscriptions - you pay once for storage space. Currently on Devnet (free test network with test SOL)."
   },
   {
-    question: "What's the maximum data size?",
-    answer: "You can store up to 1 KiB (1024 bytes) of data per transaction. This is perfect for passwords, private keys, 2FA backup codes, notes, or small sensitive text."
+    question: "What's the maximum storage capacity?",
+    answer: "Your vault starts with 10KB (enough for ~50 passwords). You can expand up to 1MB total (100 chunks × 10KB each), which holds approximately 250+ password entries. Each password entry is encrypted separately and can be managed independently."
   },
   {
     question: "Is my data visible on the blockchain?",
     answer: "Yes, the encrypted data is publicly visible on Solana's blockchain - but it's completely encrypted. Without your wallet, the data appears as random bytes. No one can decrypt it except you."
   },
   {
-    question: "Why does decrypted data auto-hide?",
-    answer: "For security! After you decrypt and view data, it automatically hides after 30 seconds and is cleared from memory. This prevents shoulder surfing and accidental exposure if you leave your screen unlocked."
+    question: "How does clipboard security work?",
+    answer: "For security, when you copy a password to your clipboard, it's automatically cleared after 30 seconds. This prevents accidental exposure if you forget to clear it manually. A notification confirms when the clipboard has been auto-cleared."
   },
   {
     question: "What happens when I refresh the page?",
-    answer: "All decrypted data is immediately cleared from memory. You'll need to reconnect your wallet and click 'Decrypt & View' again to see your data. This ensures nothing sensitive persists."
+    answer: "Your session keys are cleared from memory. You'll need to sign a new message with your wallet to restore your session and access your encrypted passwords. This security measure ensures encryption keys never persist after you close or refresh the app."
   },
   {
     question: "Can I use this on mobile?",
@@ -75,7 +75,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "What's the session timeout?",
-    answer: "Your session automatically expires after 15 minutes of inactivity. This protects you if you forget to disconnect your wallet. You'll need to reconnect to continue."
+    answer: "Your session automatically expires after 5 minutes of inactivity OR 15 minutes absolute (whichever comes first). This protects you if you forget to disconnect your wallet. You'll need to sign a new message with your wallet to continue."
   },
   {
     question: "Is this ready for mainnet?",
@@ -142,11 +142,11 @@ const faqData: FAQItem[] = [
   },
   {
     question: "What can I store in Lockbox?",
-    answer: "Lockbox is perfect for: passwords, private keys, seed phrases, 2FA backup codes, API keys, sensitive notes, recovery codes, or any small text that needs encryption. Each storage can hold up to 1024 bytes."
+    answer: "Lockbox is designed for password management and storing sensitive credentials: website passwords, usernames, API keys, 2FA backup codes, secure notes, credit card numbers, crypto wallet passphrases, and any sensitive text. You can organize entries with categories, tags, and favorites."
   },
   {
-    question: "Can I delete or update stored data?",
-    answer: "Yes! When you store new data, it overwrites your previous data in the same lockbox. Each wallet has one lockbox that gets updated with each new storage transaction. Your transaction history remains visible on the blockchain."
+    question: "Can I delete or update stored passwords?",
+    answer: "Yes! You have full control over your password entries. You can create, read, update, and delete individual passwords at any time. Changes are stored on-chain and your vault maintains a complete history. You can also batch delete multiple entries at once."
   },
   {
     question: "Why use blockchain instead of cloud storage?",
@@ -194,17 +194,7 @@ export function FAQ() {
       </div>
 
       <div className="faq-footer">
-        <p>Still have questions?</p>
-        <p className="faq-contact">
-          Check out the{' '}
-          <a
-            href="https://github.com/hackingbutlegal/lockbox"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub repository
-          </a>
-        </p>
+        <p>Still have questions? Connect your wallet and try it out on Devnet!</p>
       </div>
     </div>
   );
