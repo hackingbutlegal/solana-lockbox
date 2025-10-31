@@ -515,21 +515,19 @@ Researchers can verify the implementation:
   - Search by title (client-side, via hash matching)
 
 - ✅ **Security Features**
-  - **Password Health Analysis**: Identifies weak, reused, old passwords
-  - **Breach Detection**: Integration with Have I Been Pwned API
-  - **Password Generator**: Configurable length, character sets, strength
-  - **Strength Meter**: zxcvbn-based scoring (0-4 scale)
-  - **Weak Password Warnings**: Non-blocking advice
-  - **Reuse Detection**: Flags duplicate passwords across entries
-  - **Expiry Tracking**: Reminds you to rotate old passwords
+  - **Password Health Analysis**: Identifies weak passwords with visual indicators
+  - **Password Generator**: Cryptographically secure with configurable options (length, character sets, passphrases)
+  - **Strength Meter**: Real-time password strength assessment
+  - **Quick Copy**: One-click password/username copy with activity logging
+  - **Pre-fill Workflow**: Generate → Copy → Create entry in one flow
+  - **Weak Password Warnings**: Visual health scores and recommendations
 
 - ✅ **Mobile & PWA Support**
-  - **Progressive Web App**: Install to home screen
+  - **Progressive Web App**: Install to home screen, works offline
+  - **Service Worker**: Automatic caching, offline support, network-first for RPC
   - **Mobile Wallet Adapter**: Native Android wallet integration
-  - **Solana Seeker**: Optimized for Seed Vault security
-  - **Offline Mode**: View passwords without internet
-  - **Touch-Optimized**: 48dp touch targets, responsive design
-  - **Service Worker**: Fast loading, offline caching
+  - **Touch-Optimized**: Responsive design for all screen sizes
+  - **App Manifest**: Standalone mode, custom theme, shortcuts
 
 - ✅ **Import/Export**
   - **CSV Export**: Compatible with Excel, Google Sheets (with security warning)
@@ -547,12 +545,13 @@ Researchers can verify the implementation:
 
 ### Advanced Features
 
-- ✅ **Backup Codes**: 8 single-use recovery codes
-- ✅ **Session Management**: Auto-lock after inactivity
-- ✅ **Activity Logging**: Track all account actions
-- ✅ **TOTP 2FA Support**: Generate 2FA codes for entries
-- ✅ **Clipboard Auto-Clear**: Security timeout for copied passwords
-- ✅ **QR Code Generation**: For sharing WiFi, crypto addresses
+- ✅ **Recovery Backup Codes**: Two-factor recovery with 8 single-use codes
+- ✅ **Activity Logging**: Track all account actions with timestamps
+- ✅ **Virtual Scrolling**: High-performance rendering for large vaults (500+ entries)
+- ✅ **Advanced Search & Filtering**: Multi-select filters by type, category, favorites, archived
+- ✅ **User Preferences**: Persistent view mode, theme (light/dark/system), display options
+- ✅ **TOTP 2FA Support**: Generate time-based 2FA codes for password entries
+- ✅ **QR Code Generation**: For sharing WiFi credentials, crypto addresses
 
 ---
 

@@ -158,10 +158,10 @@ export function SettingsModal({
                 <h3>About Solana Lockbox</h3>
                 <div className="about-section">
                   <div className="about-item">
-                    <strong>Version:</strong> v2.2.1
+                    <strong>Version:</strong> v2.3.2
                   </div>
                   <div className="about-item">
-                    <strong>Build Date:</strong> October 15, 2025
+                    <strong>Build Date:</strong> October 30, 2025
                   </div>
                   <div className="about-item">
                     <strong>Network:</strong> Solana Devnet
@@ -181,12 +181,14 @@ export function SettingsModal({
                     <strong>Key Features:</strong>
                   </p>
                   <ul>
-                    <li>End-to-end encryption</li>
-                    <li>Blockchain-based storage</li>
-                    <li>Multi-device sync</li>
+                    <li>Client-side encryption (XChaCha20-Poly1305)</li>
+                    <li>Blockchain-based storage on Solana</li>
+                    <li>Multi-device sync via wallet</li>
                     <li>Password health monitoring</li>
-                    <li>Batch operations support</li>
-                    <li>Import from popular password managers</li>
+                    <li>Cryptographic password generator</li>
+                    <li>Import/Export (LastPass, 1Password, Bitwarden)</li>
+                    <li>Progressive Web App (offline support)</li>
+                    <li>Recovery backup codes (two-factor)</li>
                   </ul>
                 </div>
 
