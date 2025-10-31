@@ -724,32 +724,62 @@ export class LockboxV2Client {
       console.log(`[initializeStorageChunk] Signing and sending transaction for chunk ${chunkIndex}...`);
 
       let signature: string;
-      if (this.wallet.sendTransaction) {
-        signature = await this.wallet.sendTransaction(transaction, this.connection, {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 3,
-        });
-      } else {
-        const signed = await this.wallet.signTransaction(transaction);
-        signature = await this.connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 3,
-        });
+      let sendError: any = null;
+
+      try {
+        if (this.wallet.sendTransaction) {
+          signature = await this.wallet.sendTransaction(transaction, this.connection, {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+            maxRetries: 3,
+          });
+        } else {
+          const signed = await this.wallet.signTransaction(transaction);
+          signature = await this.connection.sendRawTransaction(signed.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+            maxRetries: 3,
+          });
+        }
+
+        console.log(`[initializeStorageChunk] Transaction sent:`, signature);
+
+        await this.connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        }, 'confirmed');
+
+        console.log(`[initializeStorageChunk] Chunk ${chunkIndex} created successfully`);
+
+        return signature;
+      } catch (error: any) {
+        console.warn(`[initializeStorageChunk] Error during send/confirm:`, error?.message || error);
+        sendError = error;
+
+        // Transaction may have succeeded despite wallet error
+        // Check if chunk was actually created on-chain
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s for RPC to update
+
+        try {
+          const chunkAccount = await this.connection.getAccountInfo(storageChunk);
+          if (chunkAccount && chunkAccount.owner.equals(PROGRAM_ID)) {
+            console.log(`[initializeStorageChunk] Transaction succeeded on-chain despite wallet error!`);
+            // Chunk was created successfully - find the transaction signature
+            const signatures = await this.connection.getSignaturesForAddress(storageChunk, { limit: 5 });
+            if (signatures.length > 0) {
+              console.log(`[initializeStorageChunk] Found transaction signature: ${signatures[0].signature}`);
+              return signatures[0].signature;
+            }
+            return 'success-no-signature-found';
+          }
+        } catch (checkError) {
+          console.warn(`[initializeStorageChunk] Error checking chunk existence:`, checkError);
+        }
+
+        // Chunk wasn't created - this is a real error
+        throw sendError;
       }
-
-      console.log(`[initializeStorageChunk] Transaction sent:`, signature);
-
-      await this.connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight,
-      }, 'confirmed');
-
-      console.log(`[initializeStorageChunk] Chunk ${chunkIndex} created successfully`);
-
-      return signature;
     } catch (error: any) {
       // Check if error is "account already in use" - this can happen with RPC data lag
       const errorMsg = error?.message || String(error);
