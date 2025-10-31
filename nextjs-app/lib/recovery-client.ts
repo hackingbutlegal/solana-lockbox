@@ -98,56 +98,93 @@ export class RecoveryClient {
     // Deserialize master lockbox data (Borsh format)
     const data = accountInfo.data;
 
-    // Check if buffer has minimum required size
-    const minSize = 8 + 32 + 1 + 8 + 4; // discriminator + owner + tier + expiry + chunks_len
-    if (data.length < minSize) {
-      throw new Error('Invalid master lockbox data: buffer too small');
-    }
-
     try {
-      // Skip discriminator (8 bytes)
-      let offset = 8;
+      // Skip discriminator (8 bytes) and start from offset 0 in sliced data
+      const slicedData = data.slice(8);
+      let offset = 0;
 
       // Read owner (32 bytes)
-      const owner = new PublicKey(data.slice(offset, offset + 32));
+      const owner = new PublicKey(slicedData.slice(offset, offset + 32));
       offset += 32;
 
-      // Read subscription tier (1 byte)
-      const subscriptionTier = data[offset];
-      offset += 1;
-
-      // Read subscription expiry (8 bytes, i64)
-      const subscriptionExpiry = Number(data.readBigInt64LE(offset));
+      // Read total_entries (u64, 8 bytes)
+      const totalEntries = Number(slicedData.readBigUInt64LE(offset));
       offset += 8;
 
-      // Read storage_chunks length (4 bytes, u32)
-      const storageChunksLength = data.readUInt32LE(offset);
-      offset += 4;
+      // Read storage_chunks_count (u16, 2 bytes)
+      const storageChunksCount = slicedData.readUInt16LE(offset);
+      offset += 2;
 
-      // Read storage chunks
+      // Read subscription_tier (u8, 1 byte)
+      const subscriptionTier = slicedData.readUInt8(offset);
+      offset += 1;
+
+      // Read last_accessed (i64, 8 bytes)
+      const lastAccessed = Number(slicedData.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read subscription_expires (i64, 8 bytes)
+      const subscriptionExpiry = Number(slicedData.readBigInt64LE(offset));
+      offset += 8;
+
+      // Read total_capacity (u64, 8 bytes)
+      const totalCapacity = Number(slicedData.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read storage_used (u64, 8 bytes)
+      const storageUsed = Number(slicedData.readBigUInt64LE(offset));
+      offset += 8;
+
+      // Read storage_chunks vec (4-byte length + items)
+      const storageChunksLen = slicedData.readUInt32LE(offset);
+      offset += 4;
       const storageChunks = [];
-      for (let i = 0; i < storageChunksLength; i++) {
-        const chunkIndex = data.readUInt16LE(offset);
-        offset += 2;
-        const chunkAddress = new PublicKey(data.slice(offset, offset + 32));
+
+      // Read each StorageChunkInfo
+      for (let i = 0; i < storageChunksLen; i++) {
+        // chunk_address (32 bytes)
+        const chunkAddress = new PublicKey(slicedData.slice(offset, offset + 32));
         offset += 32;
+
+        // chunk_index (u16, 2 bytes)
+        const chunkIndex = slicedData.readUInt16LE(offset);
+        offset += 2;
+
+        // max_capacity (u32, 4 bytes)
+        offset += 4; // Skip
+
+        // size_used (u32, 4 bytes)
+        offset += 4; // Skip
+
+        // data_type (u8, 1 byte)
+        offset += 1; // Skip
+
+        // created_at (i64, 8 bytes)
+        offset += 8; // Skip
+
+        // last_modified (i64, 8 bytes)
+        offset += 8; // Skip
+
         storageChunks.push({ chunkIndex, chunkAddress });
       }
 
-      // Read next entry id (8 bytes, u64)
-      const nextEntryId = Number(data.readBigUInt64LE(offset));
+      // Read encrypted_index vec (4-byte length + data)
+      const encryptedIndexLen = slicedData.readUInt32LE(offset);
+      offset += 4;
+      offset += encryptedIndexLen; // Skip encrypted index data
+
+      // Read next_entry_id (u64, 8 bytes)
+      const nextEntryId = Number(slicedData.readBigUInt64LE(offset));
       offset += 8;
 
-      // Read total entries (8 bytes, u64)
-      const totalEntries = Number(data.readBigUInt64LE(offset));
+      // Read categories_count (u32, 4 bytes)
+      offset += 4; // Skip
+
+      // Read created_at (i64, 8 bytes)
+      const createdAt = Number(slicedData.readBigInt64LE(offset));
       offset += 8;
 
-      // Read created_at (8 bytes, i64)
-      const createdAt = Number(data.readBigInt64LE(offset));
-      offset += 8;
-
-      // Read last_accessed (8 bytes, i64)
-      const lastAccessed = Number(data.readBigInt64LE(offset));
+      // Skip bump (u8, 1 byte) - don't need to read it
 
       return {
         owner,
