@@ -32,8 +32,9 @@ export function AppHeader() {
   // Only show navigation and storage when wallet is connected AND vault is initialized
   const isVaultInitialized = !!publicKey && !!masterLockbox;
 
-  // Hide navigation on /initialize page when vault is not initialized
+  // Hide navigation and storage on /initialize page to prevent navigation during vault creation
   const shouldShowNavigation = isVaultInitialized && pathname !== '/initialize';
+  const shouldShowStorage = isVaultInitialized && pathname !== '/initialize';
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -75,8 +76,8 @@ export function AppHeader() {
           </div>
         </div>
 
-        {/* Storage Usage Indicator - Only show when vault initialized */}
-        {isVaultInitialized && (
+        {/* Storage Usage Indicator - Only show when vault initialized and not on /initialize page */}
+        {shouldShowStorage && (
           <div
             className="storage-indicator"
             onClick={handleStorageClick}
