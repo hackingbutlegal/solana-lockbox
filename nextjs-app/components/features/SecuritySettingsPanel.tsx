@@ -110,48 +110,12 @@ export function SecuritySettingsPanel() {
         )}
       </div>
 
+      {/* Security Settings - Coming Soon
       <h3>Security Settings</h3>
-      <div className="settings-section">
-        <div className="setting-item">
-          <label>
-            <input type="checkbox" defaultChecked />
-            <span>Require master password confirmation for sensitive operations</span>
-          </label>
-        </div>
-        <div className="setting-item">
-          <label>
-            <input type="checkbox" defaultChecked />
-            <span>Auto-lock after inactivity</span>
-          </label>
-          <div className="setting-detail">
-            <label>
-              Timeout (minutes):
-              <input type="number" defaultValue="15" min="1" max="120" />
-            </label>
-          </div>
-        </div>
-        <div className="setting-item">
-          <label>
-            <input type="checkbox" defaultChecked />
-            <span>Enable clipboard auto-clear (30 seconds)</span>
-          </label>
-        </div>
-        <div className="setting-item">
-          <label>
-            <input type="checkbox" defaultChecked />
-            <span>Show password strength warnings</span>
-          </label>
-        </div>
-        <div className="setting-item">
-          <label>
-            <input type="checkbox" defaultChecked />
-            <span>Warn when reusing passwords</span>
-          </label>
-        </div>
-      </div>
       <p className="settings-note">
-        Note: These settings are stored locally and will not sync across devices.
+        Advanced security settings (auto-lock, clipboard auto-clear, password policies) are planned for a future release.
       </p>
+      */}
 
       <BackupCodesModal
         isOpen={showBackupCodesModal}

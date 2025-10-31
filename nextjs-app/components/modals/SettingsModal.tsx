@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { PasswordEntry } from '../../sdk/src/types-v2';
 import { ImportExportPanel } from '../features/ImportExportPanel';
+import { PreferencesPanel } from '../features/PreferencesPanel';
 import { BackupCodesModal } from './BackupCodesModal';
 import { getBackupCodesStats, hasBackupCodes } from '../../lib/backup-codes-manager';
 
@@ -137,88 +138,18 @@ export function SettingsModal({
                   </div>
                 </div>
 
+                {/* Security Settings - Coming Soon
                 <h3>Security Settings</h3>
-                <div className="settings-section">
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Require master password confirmation for sensitive operations</span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Auto-lock after inactivity</span>
-                    </label>
-                    <div className="setting-detail">
-                      <label>
-                        Timeout (minutes):
-                        <input type="number" defaultValue="15" min="1" max="120" />
-                      </label>
-                    </div>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Enable clipboard auto-clear (30 seconds)</span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Show password strength warnings</span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Warn when reusing passwords</span>
-                    </label>
-                  </div>
-                </div>
                 <p className="settings-note">
-                  Note: These settings are stored locally and will not sync across devices.
+                  Advanced security settings (auto-lock, clipboard auto-clear, password policies) are planned for a future release.
                 </p>
+                */}
               </div>
             )}
 
             {activeTab === 'preferences' && (
               <div className="tab-panel">
-                <h3>Display Preferences</h3>
-                <div className="settings-section">
-                  <div className="setting-item">
-                    <label>
-                      Default view mode:
-                      <select defaultValue="list">
-                        <option value="list">List</option>
-                        <option value="grid">Grid</option>
-                        <option value="virtual">Virtual (for large vaults)</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      Theme:
-                      <select defaultValue="system">
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                        <option value="system">System</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Show entry previews in list view</span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <label>
-                      <input type="checkbox" defaultChecked />
-                      <span>Compact mode (higher density)</span>
-                    </label>
-                  </div>
-                </div>
+                <PreferencesPanel />
               </div>
             )}
 

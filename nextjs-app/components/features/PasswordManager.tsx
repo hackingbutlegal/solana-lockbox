@@ -1529,9 +1529,6 @@ export function PasswordManager() {
                   case 'health':
                     setShowHealthModal(true);
                     break;
-                  case 'import':
-                    toast.showInfo('Import feature coming soon!');
-                    break;
                 }
               }}
             />
