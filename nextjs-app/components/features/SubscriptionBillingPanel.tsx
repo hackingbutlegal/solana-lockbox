@@ -18,9 +18,10 @@ import { StorageSliderModal } from '../modals/StorageSliderModal';
 
 export function SubscriptionBillingPanel() {
   const { connected } = useWallet();
-  const authContext = useAuth();
-  const client = authContext?.client;
-  const { refreshLockbox } = useLockbox();
+  const auth = useAuth();
+  const lockbox = useLockbox();
+  const subscription = useSubscription();
+
   const {
     currentTier,
     storageUsed,
@@ -31,18 +32,10 @@ export function SubscriptionBillingPanel() {
     tierName,
     upgradeSubscription,
     loading
-  } = useSubscription();
+  } = subscription;
 
   const [upgrading, setUpgrading] = useState(false);
   const [showSliderModal, setShowSliderModal] = useState(false);
-
-  // Debug logging
-  console.log('[SubscriptionBillingPanel] Render:', {
-    connected,
-    hasAuthContext: !!authContext,
-    hasClient: !!client,
-    clientType: client?.constructor?.name
-  });
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -60,88 +53,38 @@ export function SubscriptionBillingPanel() {
   };
 
   const handleStorageExpansion = async (targetBytes: number) => {
-    console.log('[handleStorageExpansion] Starting expansion:', {
-      targetBytes,
-      connected,
-      hasClient: !!client,
-      clientType: client?.constructor?.name
-    });
-
-    // Verify wallet is connected before proceeding
-    if (!connected || !client) {
-      const errorMsg = !connected
-        ? 'Please connect your wallet first to expand storage.'
-        : 'Client not initialized. Please refresh the page and try again.';
-      alert(errorMsg);
-      console.error('[handleStorageExpansion] Validation failed:', { connected, hasClient: !!client });
+    if (!connected || !auth.client) {
+      alert('Please connect your wallet first.');
       return;
     }
-
-    let expandSucceeded = false;
 
     try {
       setUpgrading(true);
 
-      // Use the smart expansion method that handles chunks automatically
-      const signatures = await client.expandStorageToCapacity(targetBytes);
+      await auth.client.expandStorageToCapacity(targetBytes);
 
-      console.log(`✅ Storage expanded successfully! ${signatures.length} transaction(s) completed.`);
-      expandSucceeded = true;
+      // Always refresh regardless of errors
+      await lockbox.refreshLockbox();
 
-      alert(`Storage expanded to ${targetBytes} bytes!\n\nCompleted ${signatures.length} blockchain transaction(s).`);
-
-    } catch (error) {
-      console.error('[handleStorageExpansion] Failed to expand storage:', error);
-
-      // Even if expansion threw an error, check if it actually succeeded on-chain
-      // The wallet might throw errors even when the transaction succeeds
-      console.log('[handleStorageExpansion] Checking if storage was actually expanded despite error...');
-
+      alert(`Storage expanded to ${targetBytes} bytes!`);
+    } catch (error: any) {
+      // Check if it actually worked despite error
       try {
-        if (!client) {
-          throw new Error('Client is not available for verification');
-        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await lockbox.refreshLockbox();
 
-        // Wait a moment for RPC to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const master = await auth.client.getMasterLockbox();
+        const newCapacity = Number(master.totalCapacity);
 
-        const updatedMaster = await client.getMasterLockbox();
-        const newCapacity = Number(updatedMaster.totalCapacity);
-        const currentCapacity = Number(storageLimit);
-
-        console.log('[handleStorageExpansion] Capacity check:', {
-          currentCapacity,
-          newCapacity,
-          targetBytes,
-          wasExpanded: newCapacity > currentCapacity
-        });
-
-        if (newCapacity >= targetBytes || newCapacity > currentCapacity) {
-          console.log(`[handleStorageExpansion] ✅ Storage expansion succeeded on-chain! New capacity: ${newCapacity} bytes`);
-          expandSucceeded = true;
-          alert(`Storage expanded successfully to ${newCapacity} bytes!\n\nNote: Wallet reported an error but the transaction succeeded on the blockchain.`);
+        if (newCapacity >= targetBytes) {
+          alert(`Storage expanded successfully to ${newCapacity} bytes!`);
         } else {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.error('[handleStorageExpansion] Transaction actually failed:', errorMsg);
-          alert(`Failed to expand storage: ${errorMsg}\n\nThe transaction did not succeed on the blockchain. Please check your wallet balance and try again.`);
-          throw error;
+          alert(`Expansion failed: ${error.message || 'Unknown error'}`);
         }
-      } catch (checkError) {
-        console.error('[handleStorageExpansion] Failed to verify storage expansion:', checkError);
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        alert(`Failed to expand storage: ${errorMsg}\n\nCould not verify if the transaction succeeded. Please refresh the page to see your current storage capacity.`);
-        throw error;
+      } catch {
+        alert(`Error: ${error.message || 'Unknown error'}. Please refresh to see current storage.`);
       }
     } finally {
-      // Always refresh lockbox data if expansion might have succeeded
-      if (expandSucceeded) {
-        try {
-          await refreshLockbox();
-          console.log('Lockbox data refreshed successfully');
-        } catch (refreshError) {
-          console.error('Failed to refresh lockbox data:', refreshError);
-        }
-      }
       setUpgrading(false);
     }
   };
