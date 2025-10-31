@@ -104,6 +104,7 @@ export function PasswordManager() {
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showActivityLogModal, setShowActivityLogModal] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [showFAQModal, setShowFAQModal] = useState(false);
   // Subscription removed - using one-time storage expansion instead
   // const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [entryModalMode, setEntryModalMode] = useState<'create' | 'edit' | 'view'>('create');
@@ -771,7 +772,7 @@ export function PasswordManager() {
                 Pre-production software on Devnet. Do not use for sensitive data. Security audit pending.
               </div>
             </div>
-            <p className="tagline">The world&apos;s first blockchain-powered password manager</p>
+            <p className="tagline">Open-source password manager on Solana</p>
             <div className="features-grid">
               <div className="feature-item">
                 <span className="feature-icon">🔒</span>
@@ -1418,6 +1419,12 @@ export function PasswordManager() {
             >
               ⚙️ Settings
             </button>
+            <button
+              className="tool-btn"
+              onClick={() => setShowFAQModal(true)}
+            >
+              ❓ Help & FAQ
+            </button>
           </div>
 
           <div className="sidebar-section">
@@ -1920,6 +1927,21 @@ export function PasswordManager() {
         entry={shareEntry}
         walletAddress={publicKey?.toBase58() || ''}
       />
+
+      {/* FAQ Modal */}
+      {showFAQModal && (
+        <div className="modal-overlay" onClick={() => setShowFAQModal(false)}>
+          <div className="modal-content faq-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Help & FAQ</h2>
+              <button className="close-btn" onClick={() => setShowFAQModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <FAQ />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Generator Modal (Standalone) */}
       <PasswordGeneratorModal
@@ -2865,6 +2887,53 @@ export function PasswordManager() {
           .btn-explorer {
             width: 100%;
           }
+        }
+
+        /* FAQ Modal */
+        .faq-modal {
+          max-width: 900px;
+        }
+
+        .faq-modal .modal-header {
+          padding: 1.5rem 2rem;
+          border-bottom: 1px solid #e1e8ed;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .faq-modal .modal-header h2 {
+          margin: 0;
+          font-size: 1.75rem;
+          color: white;
+          font-weight: 700;
+        }
+
+        .faq-modal .close-btn {
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          font-size: 2rem;
+          color: white;
+          cursor: pointer;
+          padding: 0;
+          width: 2.5rem;
+          height: 2.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          transition: all 0.2s;
+        }
+
+        .faq-modal .close-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+
+        .faq-modal .modal-body {
+          padding: 0;
+          max-height: calc(90vh - 100px);
+          overflow-y: auto;
         }
       `}</style>
 

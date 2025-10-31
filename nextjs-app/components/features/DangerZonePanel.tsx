@@ -152,8 +152,7 @@ export function DangerZonePanel() {
             proceeding.
           </p>
           <p>
-            <strong>✅ Benefit:</strong> You will reclaim all rent paid for storage (~$10-1,000
-            depending on storage used).
+            <strong>✅ Benefit:</strong> You will reclaim all rent paid for storage.
           </p>
         </div>
         <button className="btn-action btn-danger" onClick={handleCloseAccount} disabled={!client}>
