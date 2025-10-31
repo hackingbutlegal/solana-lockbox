@@ -180,6 +180,30 @@ Solana Lockbox is evolving from a proof-of-concept 1KB encrypted storage solutio
 **Status**: 🏗️ **IN DEVELOPMENT** (60% Complete)
 **Started**: October 17, 2025
 
+### Public Goods Impact: Solving Web3's Achilles Heel
+
+**The Problem:** "Not your keys, not your coins" also means "Lose your keys, lose everything."
+- 20% of Bitcoin ($140B+) is permanently lost due to forgotten keys (Chainalysis, 2024)
+- No customer service to call, no "forgot password" button
+- This single UX problem prevents mainstream adoption
+
+**Solana Lockbox Social Recovery: The First Trustless Solution**
+
+Unlike centralized recovery (trust a company) or custodial solutions (trust an exchange), our **Shamir Secret Sharing** implementation enables:
+- ✅ **M-of-N Guardian Recovery:** Choose 5 guardians, any 3 can help recover
+- ✅ **Zero-Knowledge:** Guardians never see your passwords (information-theoretic security)
+- ✅ **Time-Lock Protection:** 7-day delay prevents instant takeovers
+- ✅ **On-Chain Audit Trail:** Immutable recovery history
+- ✅ **Challenge-Response Proof:** Cryptographically verify reconstruction without exposing shares
+
+**This is a PUBLIC GOOD because:**
+1. **Reusable Pattern:** Any Solana wallet can implement this for seed phrase recovery
+2. **Educational Resource:** Complete Shamir Secret Sharing implementation (37 tests, GF(2^8) arithmetic)
+3. **Ecosystem Standard:** Potential SLP (Solana Lockbox Protocol) for recovery mechanisms
+4. **Mainstream Enabler:** Solves the #1 barrier to Web3 adoption (fear of permanent loss)
+
+**Imagine if every Solana wallet had guardian recovery built-in.** Users could finally feel safe knowing their $100k+ in crypto isn't one device loss away from permanent loss.
+
 ### Social Recovery via Threshold Cryptography ✅ CORE COMPLETE
 
 #### Shamir Secret Sharing Implementation ✅ COMPLETE
