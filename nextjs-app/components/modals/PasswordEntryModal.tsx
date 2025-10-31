@@ -148,14 +148,15 @@ export function PasswordEntryModal({
         // Silent fail - don't show errors for draft restoration
       }
 
+      // Initialize form - use entry for pre-filling if provided (e.g., generated password)
       setFormData({
-        title: '',
-        username: '',
-        password: '',
-        url: '',
-        notes: '',
-        type: PasswordEntryType.Login,
-        category: 0,
+        title: entry?.title || '',
+        username: entry?.username || '',
+        password: entry?.password || '',
+        url: entry?.url || '',
+        notes: entry?.notes || '',
+        type: entry?.type || PasswordEntryType.Login,
+        category: entry?.category || 0,
         email: '',
         phone: '',
         totpSecret: '',

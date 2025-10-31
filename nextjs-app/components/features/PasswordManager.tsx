@@ -109,6 +109,8 @@ export function PasswordManager() {
   const [currentView, setCurrentView] = useState<'list' | 'dashboard'>('list');
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareEntry, setShareEntry] = useState<PasswordEntry | undefined>(undefined);
+  const [showPasswordGeneratorModal, setShowPasswordGeneratorModal] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState<string>('');
   // const [isBatchMode, setIsBatchMode] = useState(false); // Batch mode toggle - REMOVED: Feature deemed functionally useless
 
   // PasswordContext automatically triggers refreshEntries when masterLockbox loads
@@ -305,6 +307,54 @@ export function PasswordManager() {
     } catch (err) {
       console.error('Failed to delete entry:', err);
       toast.showError('Failed to delete password entry');
+    }
+  };
+
+  // Handle copy password to clipboard
+  const handleCopyPassword = async (entry: PasswordEntry) => {
+    try {
+      if ('password' in entry && entry.password) {
+        await navigator.clipboard.writeText(entry.password);
+        toast.showSuccess('Password copied to clipboard');
+
+        // Log activity
+        logActivity(
+          ActivityType.ACCESS,
+          `Copied password for: ${entry.title}`,
+          {
+            entryId: entry.id,
+            entryTitle: entry.title,
+            action: 'copy_password',
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to copy password:', err);
+      toast.showError('Failed to copy password');
+    }
+  };
+
+  // Handle copy username to clipboard
+  const handleCopyUsername = async (entry: PasswordEntry) => {
+    try {
+      if ('username' in entry && entry.username) {
+        await navigator.clipboard.writeText(entry.username);
+        toast.showSuccess('Username copied to clipboard');
+
+        // Log activity
+        logActivity(
+          ActivityType.ACCESS,
+          `Copied username for: ${entry.title}`,
+          {
+            entryId: entry.id,
+            entryTitle: entry.title,
+            action: 'copy_username',
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to copy username:', err);
+      toast.showError('Failed to copy username');
     }
   };
 
@@ -1474,7 +1524,7 @@ export function PasswordManager() {
                     setTimeout(() => setShowCreateModal(true), 0);
                     break;
                   case 'generate':
-                    toast.showInfo('Password generator coming soon!');
+                    setShowPasswordGeneratorModal(true);
                     break;
                   case 'health':
                     setShowHealthModal(true);
@@ -1638,6 +1688,8 @@ export function PasswordManager() {
               selectedEntryIds={selectedEntryIds}
               height="calc(100vh - 400px)"
               className="virtualized-list"
+              onCopyPassword={handleCopyPassword}
+              onCopyUsername={handleCopyUsername}
             />
           ) : (
             <div className={`entry-${viewMode}`}>
@@ -1727,9 +1779,13 @@ export function PasswordManager() {
       {showCreateModal && entryModalMode === 'create' && (
         <PasswordEntryModal
           isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => {
+            setShowCreateModal(false);
+            setSelectedEntry(null); // Clear any pre-filled data
+          }}
           onSave={handleCreateEntry}
           mode="create"
+          entry={selectedEntry} // Pass entry for pre-filling (e.g., generated password)
         />
       )}
 
@@ -1863,6 +1919,48 @@ export function PasswordManager() {
         }}
         entry={shareEntry}
         walletAddress={publicKey?.toBase58() || ''}
+      />
+
+      {/* Password Generator Modal (Standalone) */}
+      <PasswordGeneratorModal
+        isOpen={showPasswordGeneratorModal}
+        onClose={() => setShowPasswordGeneratorModal(false)}
+        onSelect={(password) => {
+          setGeneratedPassword(password);
+          setShowPasswordGeneratorModal(false);
+
+          // Copy to clipboard
+          navigator.clipboard.writeText(password)
+            .then(() => {
+              toast.showSuccess('Password copied to clipboard!');
+
+              // Ask if user wants to create an entry with this password
+              setTimeout(() => {
+                const createEntry = window.confirm(
+                  'Would you like to create a password entry with this generated password?'
+                );
+                if (createEntry) {
+                  // Pre-fill the password field by setting it before opening modal
+                  setSelectedEntry({
+                    title: '',
+                    username: '',
+                    password: password,
+                    url: '',
+                    notes: '',
+                    type: PasswordEntryType.Login,
+                    category: 0,
+                    favorite: false,
+                    tags: [],
+                  } as PasswordEntry);
+                  setEntryModalMode('create');
+                  setShowCreateModal(true);
+                }
+              }, 300);
+            })
+            .catch(() => {
+              toast.showError('Failed to copy to clipboard');
+            });
+        }}
       />
 
       {/* Subscription Upgrade Modal */}

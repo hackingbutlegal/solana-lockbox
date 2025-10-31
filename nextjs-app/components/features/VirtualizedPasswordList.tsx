@@ -35,6 +35,8 @@ export interface VirtualizedPasswordListProps {
   width?: string;
   className?: string;
   overscanCount?: number; // Number of items to render outside viewport
+  onCopyPassword?: (entry: PasswordEntry) => void;
+  onCopyUsername?: (entry: PasswordEntry) => void;
 }
 
 interface RowProps {
@@ -43,11 +45,14 @@ interface RowProps {
   data: {
     entries: PasswordEntry[];
     onEntryClick: (entry: PasswordEntry) => void;
+    onCopyPassword?: (entry: PasswordEntry) => void;
+    onCopyUsername?: (entry: PasswordEntry) => void;
   };
 }
 
 const PasswordRow: React.FC<RowProps> = ({ index, style, data }) => {
   const entry = data.entries[index];
+  const [justCopied, setJustCopied] = React.useState<'password' | 'username' | null>(null);
 
   const getEntryTypeLabel = (type: PasswordEntryType): string => {
     switch (type) {
@@ -60,6 +65,13 @@ const PasswordRow: React.FC<RowProps> = ({ index, style, data }) => {
       case PasswordEntryType.CryptoWallet: return 'Wallet';
       default: return 'Unknown';
     }
+  };
+
+  const handleCopy = (type: 'password' | 'username', e: React.MouseEvent, callback?: (entry: PasswordEntry) => void) => {
+    e.stopPropagation();
+    callback?.(entry);
+    setJustCopied(type);
+    setTimeout(() => setJustCopied(null), 2000);
   };
 
   const formatDate = (date?: Date): string => {
@@ -98,9 +110,34 @@ const PasswordRow: React.FC<RowProps> = ({ index, style, data }) => {
               <span className="favorite-star" title="Favorite">★</span>
             )}
           </div>
-          <div className="row-badges">
-            <span className="type-badge">{getEntryTypeLabel(entry.type)}</span>
-            {entry.archived && <span className="archived-badge">Archived</span>}
+          <div className="row-actions">
+            {/* Quick Copy Actions */}
+            {entry.type === PasswordEntryType.Login && (
+              <div className="copy-buttons">
+                {data.onCopyPassword && (
+                  <button
+                    className="copy-btn"
+                    onClick={(e) => handleCopy('password', e, data.onCopyPassword)}
+                    title="Copy password"
+                  >
+                    {justCopied === 'password' ? '✓' : '🔒'}
+                  </button>
+                )}
+                {data.onCopyUsername && 'username' in entry && entry.username && (
+                  <button
+                    className="copy-btn"
+                    onClick={(e) => handleCopy('username', e, data.onCopyUsername)}
+                    title="Copy username"
+                  >
+                    {justCopied === 'username' ? '✓' : '👤'}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="row-badges">
+              <span className="type-badge">{getEntryTypeLabel(entry.type)}</span>
+              {entry.archived && <span className="archived-badge">Archived</span>}
+            </div>
           </div>
         </div>
 
@@ -189,6 +226,43 @@ const PasswordRow: React.FC<RowProps> = ({ index, style, data }) => {
           color: #f59e0b;
           font-size: 14px;
           flex-shrink: 0;
+        }
+
+        .row-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        .copy-buttons {
+          display: flex;
+          gap: 6px;
+        }
+
+        .copy-btn {
+          width: 28px;
+          height: 28px;
+          border: none;
+          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+          border-radius: 6px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .copy-btn:hover {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          transform: scale(1.1);
+          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .copy-btn:active {
+          transform: scale(0.95);
         }
 
         .row-badges {
@@ -292,12 +366,16 @@ export function VirtualizedPasswordList({
   width = '100%',
   className = '',
   overscanCount = 5,
+  onCopyPassword,
+  onCopyUsername,
 }: VirtualizedPasswordListProps) {
   const listRef = useRef<any>(null);
 
   const itemData = {
     entries,
     onEntryClick,
+    onCopyPassword,
+    onCopyUsername,
   };
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
