@@ -295,9 +295,9 @@ Upgrade to 2.2.0 or later. Re-export CSVs to include protection.
 
 ## Links
 
-- [GitHub Repository](https://github.com/your-org/solana-lockbox)
+- [GitHub Repository](https://github.com/hackingbutlegal/solana-lockbox)
 - [Documentation](./README.md)
-- [Issue Tracker](https://github.com/your-org/solana-lockbox/issues)
+- [Issue Tracker](https://github.com/hackingbutlegal/solana-lockbox/issues)
 - [Roadmap](./docs/ROADMAP.md)
 
 ---

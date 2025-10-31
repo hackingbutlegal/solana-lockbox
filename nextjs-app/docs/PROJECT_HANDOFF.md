@@ -23,7 +23,7 @@ Solana Lockbox is a decentralized password manager built on Solana blockchain wi
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/solana-lockbox.git
+git clone https://github.com/hackingbutlegal/solana-lockbox.git
 cd solana-lockbox/nextjs-app
 npm install
 
@@ -441,16 +441,17 @@ See [docs/DEPLOYMENT.md](./DEPLOYMENT.md) for detailed guide (TODO: create this 
 - Search existing GitHub issues
 
 **Bug Reports**:
-- GitHub Issues: https://github.com/your-org/solana-lockbox/issues
+- GitHub Issues: https://github.com/hackingbutlegal/solana-lockbox/issues
 - Include: Browser, OS, steps to reproduce, console errors
 
 **Feature Requests**:
-- GitHub Discussions: https://github.com/your-org/solana-lockbox/discussions
+- GitHub Discussions: https://github.com/hackingbutlegal/solana-lockbox/discussions
 
 ### Contact
 
-- **Technical Lead**: [Name] - [email]
-- **Product Manager**: [Name] - [email]
+- **Technical Lead**: Jackie - jackie@web3stud.io
+- **Product Manager**: Jason - jason@web3stud.io
+- **Development Team**: @hackingbutlegal, @echohtp
 - **Previous Developer**: Claude Code AI Assistant
 
 ## Final Notes

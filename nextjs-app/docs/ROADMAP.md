@@ -371,7 +371,7 @@ await wallet.signAndSendTransaction(tx); // One tx for all changes
 
 ### Submit Feature Requests
 
-Visit [GitHub Discussions](https://github.com/your-org/solana-lockbox/discussions) to:
+Visit [GitHub Discussions](https://github.com/hackingbutlegal/solana-lockbox/discussions) to:
 - Submit new feature requests
 - Vote on existing requests
 - Discuss implementation details
@@ -428,7 +428,7 @@ Migration guide will be provided before release.
 Interested in contributing? Check:
 - [DEVELOPMENT.md](./DEVELOPMENT.md) - Development guide
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [GitHub Issues](https://github.com/your-org/solana-lockbox/issues) - Open issues
+- [GitHub Issues](https://github.com/hackingbutlegal/solana-lockbox/issues) - Open issues
 
 ---
 
@@ -454,10 +454,10 @@ We follow [SemVer](https://semver.org/):
 
 Your feedback shapes our roadmap!
 
-- **Email**: feedback@lockbox.com
-- **GitHub**: [Discussions](https://github.com/your-org/solana-lockbox/discussions)
-- **Discord**: [Join our community](https://discord.gg/lockbox)
-- **Twitter**: [@SolanaLockbox](https://twitter.com/solanalockbox)
+- **Email**: feedback@web3stud.io
+- **GitHub**: [Discussions](https://github.com/hackingbutlegal/solana-lockbox/discussions)
+- **Discord**: Coming soon
+- **Twitter**: Coming soon
 
 ---
 

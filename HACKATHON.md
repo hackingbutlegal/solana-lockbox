@@ -591,8 +591,8 @@ We offer:
 - [MOBILE_PWA_GUIDE.md](docs/MOBILE_PWA_GUIDE.md) - Mobile deployment guide
 
 ### Social
-- **Twitter**: @SolanaLockbox (Coming soon)
-- **Discord**: (Coming soon)
+- **Twitter**: Coming soon
+- **Discord**: Coming soon
 
 ---
 

@@ -306,7 +306,7 @@ Expanded from 100 to 300+ common passwords with lazy loading support.
 
 ### How to Report
 
-1. **Check existing issues**: Search [GitHub Issues](https://github.com/your-org/solana-lockbox/issues)
+1. **Check existing issues**: Search [GitHub Issues](https://github.com/hackingbutlegal/solana-lockbox/issues)
 2. **Create new issue** with:
    - Clear title
    - Steps to reproduce
@@ -384,5 +384,5 @@ Check `window.__lockboxDecryptionErrors` for details.
 
 ---
 
-**Last Updated**: 2025-10-15  
-**Report Issues**: https://github.com/your-org/solana-lockbox/issues
+**Last Updated**: 2025-10-15
+**Report Issues**: https://github.com/hackingbutlegal/solana-lockbox/issues

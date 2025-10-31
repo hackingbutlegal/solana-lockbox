@@ -87,7 +87,7 @@ Rust >= 1.75.x (if modifying program)
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/solana-lockbox.git
+git clone https://github.com/hackingbutlegal/solana-lockbox.git
 cd solana-lockbox/nextjs-app
 
 # Install dependencies
@@ -653,9 +653,9 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 ## Support
 
-- **GitHub Issues**: https://github.com/your-org/solana-lockbox/issues
-- **Discord**: [Your Discord link]
-- **Email**: support@lockbox.com
+- **GitHub Issues**: https://github.com/hackingbutlegal/solana-lockbox/issues
+- **Discord**: Coming soon
+- **Email**: feedback@web3stud.io
 
 ## License
 

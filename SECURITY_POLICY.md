@@ -59,7 +59,7 @@ What could an attacker do with this vulnerability?
 **Suggested Fix**:
 [Your recommendations]
 
-**Reporter Contact**: your-email@example.com
+**Reporter Contact**: security@web3stud.io
 ```
 
 ---

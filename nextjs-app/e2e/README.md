@@ -697,7 +697,7 @@ test('my test', async ({ authenticatedPage }) => {
 - [Playwright Documentation](https://playwright.dev/docs/intro)
 - [Playwright Best Practices](https://playwright.dev/docs/best-practices)
 - [Solana Devnet Faucet](https://faucet.solana.com/)
-- [Project GitHub](https://github.com/your-org/solana-lockbox)
+- [Project GitHub](https://github.com/hackingbutlegal/solana-lockbox)
 
 ## Contributing
 
