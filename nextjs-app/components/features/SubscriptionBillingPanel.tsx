@@ -53,7 +53,10 @@ export function SubscriptionBillingPanel() {
   };
 
   const handleStorageExpansion = async (targetBytes: number) => {
-    if (!connected || !auth.client) {
+    // Get the client from auth context
+    const clientInstance = auth?.client;
+
+    if (!connected || !clientInstance) {
       alert('Please connect your wallet first.');
       return;
     }
@@ -61,7 +64,7 @@ export function SubscriptionBillingPanel() {
     try {
       setUpgrading(true);
 
-      await auth.client.expandStorageToCapacity(targetBytes);
+      await clientInstance.expandStorageToCapacity(targetBytes);
 
       // Always refresh regardless of errors
       await lockbox.refreshLockbox();
@@ -73,7 +76,7 @@ export function SubscriptionBillingPanel() {
         await new Promise(resolve => setTimeout(resolve, 2000));
         await lockbox.refreshLockbox();
 
-        const master = await auth.client.getMasterLockbox();
+        const master = await clientInstance.getMasterLockbox();
         const newCapacity = Number(master.totalCapacity);
 
         if (newCapacity >= targetBytes) {
