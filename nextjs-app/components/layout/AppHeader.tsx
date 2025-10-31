@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useSubscription, useLockbox } from '../../contexts';
@@ -19,6 +19,7 @@ import { SubscriptionTier } from '../../sdk/src/types-v2';
 
 export function AppHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const { publicKey } = useWallet();
   const { masterLockbox } = useLockbox();
   const {
@@ -30,6 +31,9 @@ export function AppHeader() {
 
   // Only show navigation and storage when wallet is connected AND vault is initialized
   const isVaultInitialized = !!publicKey && !!masterLockbox;
+
+  // Hide navigation on /initialize page when vault is not initialized
+  const shouldShowNavigation = isVaultInitialized && pathname !== '/initialize';
 
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)}MB`;
@@ -94,8 +98,8 @@ export function AppHeader() {
           </div>
         )}
 
-        {/* Navigation - Only show when vault initialized */}
-        {isVaultInitialized && (
+        {/* Navigation - Only show when vault initialized and not on /initialize page */}
+        {shouldShowNavigation && (
           <nav className="header-nav">
             <button onClick={handleNavigateDashboard} className="nav-link">
               Dashboard
