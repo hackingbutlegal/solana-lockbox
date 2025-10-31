@@ -81,7 +81,7 @@ export function PasswordManager() {
   // Batch operations state - REMOVED: Feature deemed functionally useless
   // Keeping state defined to prevent runtime errors, but UI components removed
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<number>>(new Set());
-  // const [isVirtualizedView, setIsVirtualizedView] = useState(false);
+  const [isVirtualizedView, setIsVirtualizedView] = useState(false);
 
   // Batch progress modal state - REMOVED: Feature deemed functionally useless
   // const [showBatchProgress, setShowBatchProgress] = useState(false);
