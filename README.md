@@ -335,34 +335,7 @@ const result = {
 | **Forward Secrecy** | Independent per entry | Compromise one ≠ compromise others |
 | **Domain Separation** | HKDF info string | Session keys isolated from search keys |
 
-#### 3. Secondary Encryption: AES-GCM (Recovery & Sharing)
-
-**Note**: Social recovery and password sharing features use **AES-GCM** (WebCrypto API) instead of XChaCha20-Poly1305:
-
-```typescript
-// Used in: lib/recovery-client-v2.ts and lib/password-sharing.ts
-const encryptedData = await crypto.subtle.encrypt(
-  {
-    name: 'AES-GCM',
-    iv: nonce // 12 bytes (96-bit)
-  },
-  key, // 256-bit AES key
-  plaintext
-);
-```
-
-**Why two algorithms?**
-- **Main storage (XChaCha20-Poly1305)**: TweetNaCl provides consistent cross-platform implementation
-- **Recovery/Sharing (AES-GCM)**: WebCrypto API provides native browser performance
-- **Both are secure**: NIST/industry-standard AEAD ciphers with 256-bit keys
-
-**Specifications:**
-- **Algorithm**: AES-256-GCM
-- **Key Size**: 256 bits
-- **IV Size**: 96 bits (12 bytes) - standard for GCM
-- **Tag Size**: 128 bits (16 bytes) - authentication tag
-
-#### 4. On-Chain Storage Format
+#### 3. On-Chain Storage Format
 
 ```rust
 // What actually gets stored on Solana
@@ -424,7 +397,7 @@ Data: [0xf3, 0x9a, 0x7c, 0xe2, 0x45, 0x8f, 0x1b, ...] ← Gibberish
 
 **Security Guarantee:** Even Solana validators cannot decrypt your passwords.
 
-#### 5. Decryption (Retrieval)
+#### 4. Decryption (Retrieval)
 
 ```typescript
 // Decrypt passwords when user needs them
@@ -582,11 +555,10 @@ Researchers can verify the implementation:
 | **Cross-Device** | ✅ Yes (blockchain) | ⚠️ Limited (account sync) |
 | **Encryption** | XChaCha20-Poly1305 | OS keychain (varies) |
 | **Password Health** | ✅ Yes | ⚠️ Basic |
-| **Breach Detection** | ✅ Yes | ⚠️ Chrome only |
 | **Categories/Tags** | ✅ Yes | ❌ No |
 | **Multiple Entry Types** | ✅ Yes | ❌ Passwords only |
 | **Import/Export** | ✅ Full portability | ⚠️ Limited |
-| **Mobile Support** | ✅ PWA + Seeker | Browser-dependent |
+| **Mobile Support** | ✅ PWA | Browser-dependent |
 | **Vendor Control** | None | Browser vendor |
 
 ### vs. Other Crypto Password Managers
@@ -760,10 +732,10 @@ await lockbox.deletePassword(chunkIndex, entryId);
 - ✅ Search and organization
 
 **Known Limitations:**
-- ⚠️ **Devnet only**: Not yet on mainnet (intentional)
-- ⚠️ **No social recovery**: Lose wallet = lose passwords (roadmap item)
-- ⚠️ **No browser extension**: Web-only for now (roadmap item)
+- ⚠️ **Devnet only**: Not yet on mainnet (intentional - requires security audit first)
+- ⚠️ **No browser extension**: Web-only for now (roadmap item for Q2 2026)
 - ⚠️ **Single wallet**: No multi-wallet shared vaults yet (roadmap item)
+- ⚠️ **Wallet dependency**: Losing wallet private key = losing password access (standard for blockchain apps)
 
 **Hackathon Readiness:**
 - ✅ Fully functional demo
@@ -808,14 +780,12 @@ await lockbox.deletePassword(chunkIndex, entryId);
 **2.2 Mobile Apps**
 - Submit PWA to Solana dApp Store (Android)
 - iOS app (if possible with wallet integration)
-- Biometric unlock
 - **Why:** Native feel, better performance, app store distribution
 
-**2.3 Social Recovery (Guardians)**
-- Nominate 3-5 trusted guardians
-- Shamir Secret Sharing for backup
-- Recover vault access if wallet lost
-- **Why:** Major user concern—"What if I lose my wallet?"
+**2.3 Advanced Security Features**
+- Planned: Social recovery with trusted guardians (Shamir Secret Sharing)
+- Planned: Emergency access with time-locked sharing
+- **Why:** Reduce risk of permanent data loss from wallet loss
 
 ### Phase 3: Ecosystem Integration (Q3 2026)
 
@@ -844,13 +814,7 @@ await lockbox.deletePassword(chunkIndex, entryId);
 - Audit logs (who accessed what, when)
 - **Why:** Enterprise and family use cases
 
-**4.2 Emergency Access**
-- Time-locked password sharing
-- Designated beneficiary
-- Automated inheritance
-- **Why:** Estate planning, emergency situations
-
-**4.3 Cross-Chain Support**
+**4.2 Cross-Chain Support**
 - Ethereum bridge (store passwords on Ethereum)
 - Polygon, Arbitrum, Optimism
 - Unified identity across chains
