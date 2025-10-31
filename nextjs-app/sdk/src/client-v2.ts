@@ -340,6 +340,7 @@ const INSTRUCTION_DISCRIMINATORS = {
   downgradeSubscription: Buffer.from([0x39, 0x12, 0x7b, 0x76, 0xcb, 0x07, 0xc1, 0x25]),
   closeStorageChunk: Buffer.from([0x79, 0xb6, 0xfd, 0x51, 0x67, 0xd2, 0x2e, 0xe9]),
   expandChunk: Buffer.from([0xa1, 0x4e, 0xa3, 0xae, 0x28, 0x5d, 0xe8, 0xf1]),
+  forceCloseOrphanedChunk: Buffer.from([0xc5, 0x70, 0x4f, 0xae, 0x0f, 0xf1, 0x23, 0x60]),
 };
 
 /**
@@ -553,19 +554,47 @@ export class LockboxV2Client {
       }
 
       if (orphanedChunks.length > 0) {
-        console.error('[initializeMasterLockbox] ORPHANED CHUNKS DETECTED');
-        console.error('  Orphaned chunk indices:', orphanedChunks);
-        console.error('  These chunks exist from a previous failed transaction');
-        console.error('  Total rent locked:', orphanedChunks.length * 0.00878352, 'SOL');
+        console.warn('[initializeMasterLockbox] ORPHANED CHUNKS DETECTED - attempting automatic cleanup');
+        console.warn('  Orphaned chunk indices:', orphanedChunks);
+        console.warn('  Total rent to reclaim:', orphanedChunks.length * 0.00878352, 'SOL');
 
-        throw new Error(
-          `Cannot initialize: ${orphanedChunks.length} orphaned storage chunk(s) detected (indices: ${orphanedChunks.join(', ')}). ` +
-          `These chunks exist from previous failed transactions and are locking approximately ${(orphanedChunks.length * 0.00878352).toFixed(4)} SOL. ` +
-          `To recover, you have two options:\n` +
-          `1. Use a different wallet address (recommended)\n` +
-          `2. Wait for a program upgrade that includes recovery functionality\n\n` +
-          `This prevention check protects you from creating more orphaned accounts.`
-        );
+        // Check if MasterLockbox exists
+        const [masterLockbox] = this.getMasterLockboxAddress();
+        const masterAccount = await this.connection.getAccountInfo(masterLockbox);
+
+        if (masterAccount) {
+          // MasterLockbox exists - we can use force_close_orphaned_chunk
+          console.log('[initializeMasterLockbox] MasterLockbox exists - cleaning up orphaned chunks...');
+
+          for (const chunkIndex of orphanedChunks) {
+            try {
+              console.log(`[initializeMasterLockbox] Closing orphaned chunk ${chunkIndex}...`);
+              await this.forceCloseOrphanedChunk(chunkIndex);
+              console.log(`[initializeMasterLockbox] ✓ Chunk ${chunkIndex} closed and rent reclaimed`);
+            } catch (error) {
+              console.error(`[initializeMasterLockbox] Failed to close chunk ${chunkIndex}:`, error);
+              throw new Error(
+                `Failed to clean up orphaned chunk ${chunkIndex}. ` +
+                `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
+                `Please try again or use a different wallet address.`
+              );
+            }
+          }
+
+          console.log('[initializeMasterLockbox] ✓ All orphaned chunks cleaned up successfully');
+
+          // After cleaning up chunks, the MasterLockbox already exists, so we can't initialize
+          throw new Error(
+            `Your vault already exists. The orphaned chunks have been cleaned up and rent reclaimed. ` +
+            `Please refresh the page to access your existing vault.`
+          );
+        } else {
+          // MasterLockbox doesn't exist - orphaned chunks from deleted vault
+          // Strategy: Initialize MasterLockbox first, then clean up chunks
+          console.log('[initializeMasterLockbox] MasterLockbox does not exist - will initialize it first to enable cleanup');
+          console.log('[initializeMasterLockbox] Proceeding with initialization...');
+          // Continue with normal initialization flow - chunks will be cleaned up after initialization
+        }
       }
 
       console.log('[initializeMasterLockbox] ✓ No orphaned chunks detected');
@@ -625,6 +654,26 @@ export class LockboxV2Client {
       }
 
       console.log('✅ Master lockbox initialized successfully!');
+
+      // CLEANUP STEP: If we had orphaned chunks detected earlier, clean them up now
+      if (orphanedChunks.length > 0) {
+        console.log('[initializeMasterLockbox] Cleaning up orphaned chunks after initialization...');
+
+        for (const chunkIndex of orphanedChunks) {
+          try {
+            console.log(`[initializeMasterLockbox] Closing orphaned chunk ${chunkIndex}...`);
+            await this.forceCloseOrphanedChunk(chunkIndex);
+            console.log(`[initializeMasterLockbox] ✓ Chunk ${chunkIndex} closed and ${(0.00878352).toFixed(5)} SOL reclaimed`);
+          } catch (error) {
+            console.warn(`[initializeMasterLockbox] Warning: Could not close orphaned chunk ${chunkIndex}:`, error);
+            // Don't throw - initialization succeeded, cleanup is best-effort
+          }
+        }
+
+        if (orphanedChunks.length > 0) {
+          console.log(`[initializeMasterLockbox] ✓ Cleaned up ${orphanedChunks.length} orphaned chunk(s), reclaimed ~${(orphanedChunks.length * 0.00878352).toFixed(4)} SOL`);
+        }
+      }
 
       return signature;
     } finally {
@@ -2312,6 +2361,73 @@ export class LockboxV2Client {
     }, 'confirmed');
 
     console.log(`[closeStorageChunk] ✓ Chunk ${chunkIndex} closed successfully`);
+
+    return signature;
+  }
+
+  /**
+   * Force close an orphaned storage chunk
+   *
+   * This is used to clean up storage chunks that exist on-chain but are not
+   * properly registered in the master lockbox (e.g., from failed transactions).
+   *
+   * @param chunkIndex Index of the orphaned chunk to close
+   * @returns Transaction signature
+   */
+  async forceCloseOrphanedChunk(chunkIndex: number): Promise<string> {
+    const [masterLockbox] = this.getMasterLockboxAddress();
+    const [storageChunk] = this.getStorageChunkAddress(chunkIndex);
+
+    console.log(`[forceCloseOrphanedChunk] Force closing orphaned chunk ${chunkIndex} at ${storageChunk.toBase58()}`);
+
+    // Build instruction data: discriminator + chunk_index (u16)
+    const argsBuffer = Buffer.alloc(2);
+    argsBuffer.writeUInt16LE(chunkIndex, 0);
+
+    const instructionData = Buffer.concat([
+      INSTRUCTION_DISCRIMINATORS.forceCloseOrphanedChunk,
+      argsBuffer,
+    ]);
+
+    const instruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: storageChunk, isSigner: false, isWritable: true },
+        { pubkey: masterLockbox, isSigner: false, isWritable: false },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = this.wallet.publicKey;
+
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+
+    let signature: string;
+    if (this.wallet.sendTransaction) {
+      signature = await this.wallet.sendTransaction(transaction, this.connection, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    } else {
+      const signed = await this.wallet.signTransaction(transaction);
+      signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+    }
+
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, 'confirmed');
+
+    console.log(`[forceCloseOrphanedChunk] ✓ Orphaned chunk ${chunkIndex} closed successfully`);
 
     return signature;
   }

@@ -200,7 +200,7 @@ export function DangerZonePanel() {
 
       <style jsx>{`
         .danger-zone-panel {
-          max-width: 800px;
+          width: 100%;
         }
 
         .panel-header {
